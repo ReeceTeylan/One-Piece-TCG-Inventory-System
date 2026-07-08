@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 // Optional override if images must be loaded from an explicit absolute host in production.
 // Leave empty (default) to load images SAME-ORIGIN so the dev proxy handles them and no
 // cross-origin (CORP/CORS) blocking can occur.
-const ASSET_BASE = (import.meta.env.VITE_ASSET_URL ?? '').replace(/\/$/, '');
+const ASSET_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
 
 // Backend origin(s) we want to collapse to same-origin in dev so the Vite proxy serves the
 // file and the browser never makes a cross-origin request (avoids ERR_BLOCKED_BY_RESPONSE
