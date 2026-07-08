@@ -13,7 +13,6 @@ const ASSET_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '')
 // .NotSameOrigin from Helmet's Cross-Origin-Resource-Policy).
 const API_ORIGIN_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i;
 
-// Normalize whatever the backend returns into a browser-loadable, same-origin URL.
 export function resolveImageUrl(raw?: string | null): string | undefined {
   if (!raw) return undefined;
   let url = raw.trim();
@@ -22,18 +21,16 @@ export function resolveImageUrl(raw?: string | null): string | undefined {
   // Leave blob:/data: previews untouched.
   if (/^(blob:|data:)/i.test(url)) return url;
 
-  // If an explicit asset host is configured, use the URL as-is (absolute) or prefix it.
+  // 1. ALWAYS strip localhost first, no matter what!
+  url = url.replace(API_ORIGIN_RE, '');
+
+  // 2. Attach the live Render server link
   if (ASSET_BASE) {
     if (/^https?:\/\//i.test(url)) return url;
     return `${ASSET_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
   }
 
-  // No asset host configured -> force SAME-ORIGIN.
-  // Strip a localhost/127.0.0.1[:port] backend origin so "http://localhost:4000/uploads/x.webp"
-  // becomes "/uploads/x.webp" and is served through the Vite dev proxy (same origin as the app).
-  url = url.replace(API_ORIGIN_RE, '');
-
-  // Guarantee a single leading slash for root-relative paths.
+  // 3. Fallback (Guarantee a single leading slash)
   return url.startsWith('/') ? url : `/${url}`;
 }
 
