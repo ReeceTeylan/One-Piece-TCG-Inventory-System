@@ -13,14 +13,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const config = app.get(ConfigService);
 
-  app.use(helmet());
+  app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
   app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: config.get('corsOrigin') || '*',
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    credentials: true,
-  });
+  origin: config.get('corsOrigin') || '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  credentials: true,
+});
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
