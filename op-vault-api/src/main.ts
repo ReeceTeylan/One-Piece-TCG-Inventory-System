@@ -16,7 +16,11 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: config.get('corsOrigin'), credentials: true });
+  app.enableCors({
+    origin: config.get('corsOrigin') || '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
