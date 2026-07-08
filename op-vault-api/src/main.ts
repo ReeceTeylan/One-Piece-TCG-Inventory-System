@@ -32,8 +32,8 @@ async function bootstrap() {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
 
-  const port = config.get<number>('port') || 4000;
-  await app.listen(port);
+  const port = config.get<number>('port');
+  await app.listen(port ?? 3000);
   Logger.log(`OP-Vault API running on http://localhost:${port}/api  ·  docs: /api/docs`, 'Bootstrap');
 }
 bootstrap();

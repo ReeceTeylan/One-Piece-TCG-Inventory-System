@@ -16,71 +16,15 @@ datasource db {
 }
 
 // ---------------------- ENUMS ----------------------
-enum Role {
-  OWNER
-  STAFF
-}
-
-enum ItemType {
-  RAW
-  SLAB
-}
-
-enum StockStatus {
-  AVAILABLE
-  LOW
-  OUT
-  SOLD
-}
-
-enum SaleStatus {
-  PAID
-  PARTIAL
-  UNPAID
-  CANCELLED
-  REFUNDED
-}
-
-enum ShipStatus {
-  TO_PACK
-  READY
-  SHIPPED
-  DELIVERED
-  CANCELLED
-}
-
-enum Courier {
-  LBC
-  JNT
-  LALAMOVE
-  MEETUP
-  OTHER
-}
-
-enum InvAction {
-  CREATE
-  RESTOCK
-  SALE
-  CANCEL_SALE
-  ADJUST
-  PRICE_CHANGE
-}
-
-enum NotifType {
-  LOW_STOCK
-  OUT_OF_STOCK
-  SALE
-  SHIPMENT
-  SYSTEM
-}
-
-enum PaymentMethod {
-  CASH
-  GCASH
-  MARIBANK
-  MAYA
-  OTHER
-}
+enum Role         { OWNER STAFF }
+enum ItemType     { RAW SLAB }
+enum StockStatus  { AVAILABLE LOW OUT SOLD }
+enum SaleStatus   { PAID PARTIAL UNPAID CANCELLED REFUNDED }
+enum ShipStatus   { TO_PACK READY SHIPPED DELIVERED CANCELLED }
+enum Courier      { LBC JNT LALAMOVE MEETUP OTHER }
+enum InvAction    { CREATE RESTOCK SALE CANCEL_SALE ADJUST PRICE_CHANGE }
+enum NotifType    { LOW_STOCK OUT_OF_STOCK SALE SHIPMENT SYSTEM }
+enum PaymentMethod{ CASH GCASH BANK_TRANSFER MAYA OTHER }
 
 // ---------------------- USERS ----------------------
 model User {

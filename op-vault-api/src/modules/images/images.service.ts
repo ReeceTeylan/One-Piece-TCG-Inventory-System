@@ -24,12 +24,14 @@ export class ImagesService {
 
     const id = randomUUID();
     // 1:1 compressed main image + square thumbnail (webp for size).
+    // Preserve the card's real aspect ratio (e.g. 5:7) instead of square-cropping it.
+    // 'inside' bounds the image within 1000x1400 without cropping or enlarging.
     const main = await sharp(file.buffer)
       .resize(1000, 1400, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer();
     const thumb = await sharp(file.buffer)
-      .resize(300, 420, { fit: 'inside', withoutEnlargement: true })
+      .resize(300, 300, { fit: 'cover', position: 'attention' })
       .webp({ quality: 75 })
       .toBuffer();
 
