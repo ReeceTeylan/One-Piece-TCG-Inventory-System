@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 7%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 7%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 7%;
+    --primary: 217 33% 17%;          /* dark slate — restrained accent */
+    --primary-foreground: 0 0% 100%;
+    --sidebar: 217 33% 17%;
+    --sidebar-foreground: 214 20% 78%;
+    --border: 0 0% 90%;
+    --input: 0 0% 83%;
+    --ring: 217 20% 40%;
+    --success: 142 71% 37%;
+    --warning: 32 95% 44%;
+    --destructive: 0 72% 51%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 240 6% 6%;
+    --foreground: 0 0% 95%;
+    --card: 240 5% 9%;
+    --card-foreground: 0 0% 95%;
+    --muted: 240 4% 12%;
+    --muted-foreground: 240 5% 60%;
+    --accent: 240 4% 14%;
+    --accent-foreground: 0 0% 95%;
+    --primary: 0 0% 95%;
+    --primary-foreground: 240 6% 10%;
+    --sidebar: 240 6% 4%;
+    --sidebar-foreground: 240 5% 70%;
+    --border: 240 4% 16%;
+    --input: 240 4% 22%;
+    --ring: 240 5% 45%;
+    --success: 142 71% 45%;
+    --warning: 32 95% 50%;
+    --destructive: 0 72% 55%;
+  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-feature-settings: 'tnum'; }
+}
+.tnum { font-variant-numeric: tabular-nums; }
