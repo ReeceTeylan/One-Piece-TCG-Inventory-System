@@ -15,13 +15,13 @@ export function SortableCard({ card, config, selected, inSet, aspect, onRemove, 
     <div ref={setNodeRef} style={style} className="group relative">
       {/* click the card body to (de)select for grouping */}
       <button type="button" onClick={() => onToggleSelect(card.key)} className="block w-full text-left" aria-pressed={selected} aria-label={selected ? 'Deselect card' : 'Select card'}>
-        <FbCardTile card={card} config={config} aspect={aspect} />
+        <FbCardTile card={card} config={config} aspect={aspect} inSet={inSet} />
       </button>
 
       {/* selection ring / set indicator */}
       {(selected || inSet) && (
         <div className={cn('pointer-events-none absolute inset-0 rounded-[inherit] ring-2 ring-offset-0',
-          selected ? 'ring-primary' : 'ring-amber-400/70')} style={{ borderRadius: config.borderRadius }} />
+          selected ? 'ring-primary' : 'ring-white/85')} style={{ borderRadius: config.borderRadius }} />
       )}
       {selected && (
         <div className="pointer-events-none absolute left-1 top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground">

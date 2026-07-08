@@ -2,8 +2,12 @@ import { peso } from '@/lib/utils';
 import { resolveImageUrl } from '@/components/common/CardImage';
 import type { FbCard, OverlayConfig } from './types';
 
-// A single 5:7 card tile with an overlay. `scale` lets the export clone render larger.
-export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7' }: { card: FbCard; config: OverlayConfig; scale?: number; aspect?: string }) {
+// A single card tile with an overlay. `scale` lets an export clone render larger.
+// `inSet` cards drop their individual price/qty (the set banner carries the price),
+// but their note still shows when notes are enabled.
+export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = false }: {
+  card: FbCard; config: OverlayConfig; scale?: number; aspect?: string; inSet?: boolean;
+}) {
   const dark = config.theme === 'dark';
   const gradient = dark
     ? `linear-gradient(to top, rgba(0,0,0,${config.opacity}) 0%, rgba(0,0,0,${config.opacity * 0.6}) 40%, rgba(0,0,0,0) 100%)`
@@ -15,14 +19,23 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7' }: { card
   const subColor = dark ? 'rgba(255,255,255,.82)' : 'rgba(17,17,17,.72)';
   const fs = config.fontSize * scale;
 
+  // In-set cards hide their own price & quantity (the spanning set banner shows the price).
+  const showPrice = config.showPrice && !inSet;
+  const showQty = config.showQuantity && !inSet;
+  const showNote = config.showNotes && !!card.note;
+  const hasSecondary = showQty || config.showCardNumber || showNote;
+
   const info = (
     <>
-      {config.showPrice && <div style={{ fontSize: fs * 1.15, fontWeight: 800, color: textColor, lineHeight: 1.1 }}>{peso(card.price)}</div>}
-      <div style={{ display: 'flex', gap: fs * 0.5, flexWrap: 'wrap', marginTop: fs * 0.15 }}>
-        {config.showQuantity && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>Qty {card.quantity}</span>}
-        {config.showCardNumber && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>{card.cardNumber}</span>}
-        {card.grade && <span style={{ fontSize: fs * 0.72, fontWeight: 700, color: subColor }}>{card.grade}</span>}
-      </div>
+      {showPrice && <div style={{ fontSize: fs * 1.15, fontWeight: 800, color: textColor, lineHeight: 1.1 }}>{peso(card.price)}</div>}
+      {(showQty || config.showCardNumber || showNote) && (
+        <div style={{ display: 'flex', gap: fs * 0.5, flexWrap: 'wrap', marginTop: fs * 0.15 }}>
+          {showQty && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>Qty {card.quantity}</span>}
+          {config.showCardNumber && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>{card.cardNumber}</span>}
+          {card.grade && <span style={{ fontSize: fs * 0.72, fontWeight: 700, color: subColor }}>{card.grade}</span>}
+          {showNote && <span style={{ fontSize: fs * 0.72, fontWeight: 700, color: subColor }}>{card.note}</span>}
+        </div>
+      )}
     </>
   );
 
@@ -55,9 +68,8 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7' }: { card
       )}
 
       {config.textPosition === 'pill' ? (
-        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center"
-          style={{ paddingBottom: fs * 0.55, gap: fs * 0.28 }}>
-          {config.showPrice && (
+        <div className="absolute inset-x-0 bottom-0 flex flex-col items-center" style={{ paddingBottom: fs * 0.55, gap: fs * 0.28 }}>
+          {showPrice && (
             <div style={{
               background: `rgba(255,255,255,${0.55 + config.opacity * 0.4})`,
               color: '#0b0b0d', fontWeight: 800, fontSize: fs * 1.1, lineHeight: 1,
@@ -67,38 +79,41 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7' }: { card
               {peso(card.price)}
             </div>
           )}
-          {(config.showQuantity || config.showCardNumber || card.note) && (
+          {hasSecondary && (
             <div style={{
               background: `rgba(255,255,255,${0.4 + config.opacity * 0.4})`,
               color: '#111', fontWeight: 700, fontSize: fs * 0.66, lineHeight: 1,
               borderRadius: 999, padding: `${fs * 0.16}px ${fs * 0.6}px`,
               display: 'flex', gap: fs * 0.4, alignItems: 'center',
             }}>
-              {config.showQuantity && <span>Qty {card.quantity}</span>}
+              {showQty && <span>Qty {card.quantity}</span>}
               {config.showCardNumber && <span>{card.cardNumber}</span>}
-              {card.note && <span>{card.note}</span>}
+              {showNote && <span>{card.note}</span>}
             </div>
           )}
         </div>
       ) : config.textPosition === 'top' ? (
-        <div className="absolute inset-x-0 top-0" style={{ padding: fs * 0.7, background: topGradient }}>{info}</div>
+        hasSecondary || showPrice ? <div className="absolute inset-x-0 top-0" style={{ padding: fs * 0.7, background: topGradient }}>{info}</div> : null
       ) : config.textPosition === 'bottom-split' ? (
         <>
-          {config.showPrice && (
+          {showPrice && (
             <div className="absolute" style={{ bottom: fs * 0.6, right: fs * 0.6, padding: `${fs * 0.25}px ${fs * 0.5}px`, borderRadius: 6 * scale,
               background: dark ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.7)', fontSize: fs * 1.05, fontWeight: 800, color: textColor }}>
               {peso(card.price)}
             </div>
           )}
-          <div className="absolute inset-x-0 bottom-0" style={{ padding: fs * 0.7, background: gradient }}>
-            <div style={{ display: 'flex', gap: fs * 0.5 }}>
-              {config.showQuantity && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>Qty {card.quantity}</span>}
-              {config.showCardNumber && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>{card.cardNumber}</span>}
+          {(showQty || config.showCardNumber || showNote) && (
+            <div className="absolute inset-x-0 bottom-0" style={{ padding: fs * 0.7, background: gradient }}>
+              <div style={{ display: 'flex', gap: fs * 0.5, flexWrap: 'wrap' }}>
+                {showQty && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>Qty {card.quantity}</span>}
+                {config.showCardNumber && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>{card.cardNumber}</span>}
+                {showNote && <span style={{ fontSize: fs * 0.72, fontWeight: 700, color: subColor }}>{card.note}</span>}
+              </div>
             </div>
-          </div>
+          )}
         </>
       ) : (
-        <div className="absolute inset-x-0 bottom-0" style={{ padding: fs * 0.7, background: gradient }}>{info}</div>
+        (hasSecondary || showPrice) ? <div className="absolute inset-x-0 bottom-0" style={{ padding: fs * 0.7, background: gradient }}>{info}</div> : null
       )}
     </div>
   );

@@ -9,6 +9,7 @@ export interface OverlayConfig {
   showQuantity: boolean;
   showCardNumber: boolean;
   showLogo: boolean;
+  showNotes: boolean;
   theme: OverlayTheme;
   opacity: number;      // 0..1
   fontSize: number;     // px at base scale
@@ -35,6 +36,7 @@ export interface FbSet {
   id: string;
   price: number;
   label?: string;      // optional custom label; falls back to formatted price
+  quantity: number;    // number of identical grouped sets (e.g. 3x the same set)
   memberKeys: string[];
 }
 
@@ -43,6 +45,7 @@ export const DEFAULT_CONFIG: OverlayConfig = {
   showQuantity: true,
   showCardNumber: false,
   showLogo: true,
+  showNotes: true,
   theme: 'dark',
   opacity: 0.55,
   fontSize: 15,
@@ -80,13 +83,13 @@ export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB'): Fb
     const c = item as RawCard;
     return {
       key: `raw-${c.id}`, id: c.id, itemType, name: c.name, cardNumber: c.cardNumber,
-      price: Number(c.postedPrice), quantity: c.quantity, imageUrl: c.images?.[0]?.url, badge: 'none',
+      price: Number(c.postedPrice), quantity: c.quantity, imageUrl: c.images?.[0]?.url, note: c.notes ?? undefined, badge: 'none',
     };
   }
   const s = item as SlabCard;
   return {
     key: `slab-${s.id}`, id: s.id, itemType, name: s.name, cardNumber: s.slabNumber,
     price: Number(s.sellPrice), quantity: 1, imageUrl: s.images?.[0]?.url,
-    grade: `${s.gradingCompany} ${Number(s.grade)}`, badge: 'none',
+    grade: `${s.gradingCompany} ${Number(s.grade)}`, note: s.notes ?? undefined, badge: 'none',
   };
 }

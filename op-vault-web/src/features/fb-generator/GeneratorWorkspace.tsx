@@ -29,13 +29,14 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
   const [resolution, setResolution] = useState<number>(RESOLUTIONS[1].width);
   const [setPrice, setSetPrice] = useState('');
   const [setLabel, setSetLabel] = useState('');
+  const [setQty, setSetQty] = useState('1');
   const [exporting, setExporting] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
   const setConfig = (patch: Partial<OverlayConfig>) => setConfigState((c) => ({ ...c, ...patch }));
   const selectedKeys = useMemo(() => new Set(cards.map((c) => c.key)), [cards]);
   const setMemberKeys = useMemo(() => new Set(sets.flatMap((s) => s.memberKeys)), [sets]);
-  const rows = Math.max(1, Math.ceil(cards.length / cols));
+  const rows = maxRows; // always lay out on the full page grid so cells keep their aspect (no stretch)
   const banners = useMemo(() => computeSetBanners(cards, sets, cols), [cards, sets, cols]);
 
   const addCard = useCallback((card: FbCard) => {
@@ -67,13 +68,14 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
     if (selected.size < 2) { toast.error('Select at least 2 items to group'); return; }
     const memberKeys = [...selected];
     setCards((prev) => groupContiguous(prev, selected));
-    setSets((prev) => [...prev, { id: newId(), price: Number(setPrice) || 0, label: setLabel.trim() || undefined, memberKeys }]);
-    setSelected(new Set()); setSetPrice(''); setSetLabel('');
+    setSets((prev) => [...prev, { id: newId(), price: Number(setPrice) || 0, label: setLabel.trim() || undefined, quantity: Math.max(1, Number(setQty) || 1), memberKeys }]);
+    setSelected(new Set()); setSetPrice(''); setSetLabel(''); setSetQty('1');
     toast.success('Grouped as a set');
   };
   const ungroup = (id: string) => setSets((prev) => prev.filter((s) => s.id !== id));
   const updateSetPrice = (id: string, price: number) => setSets((prev) => prev.map((s) => (s.id === id ? { ...s, price } : s)));
   const updateSetLabel = (id: string, label: string) => setSets((prev) => prev.map((s) => (s.id === id ? { ...s, label: label || undefined } : s)));
+  const updateSetQty = (id: string, quantity: number) => setSets((prev) => prev.map((s) => (s.id === id ? { ...s, quantity: Math.max(1, quantity) } : s)));
 
   const clearAll = () => { setCards([]); setSets([]); setSelected(new Set()); };
 
@@ -139,6 +141,7 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
               <span className="text-[13px] font-semibold">{selected.size} selected</span>
               <Input value={setLabel} onChange={(e) => setSetLabel(e.target.value)} placeholder="Set label (optional)" className="h-8 w-44" />
               <Input value={setPrice} onChange={(e) => setSetPrice(e.target.value)} type="number" placeholder="Set price ₱" className="h-8 w-28" />
+              <Input value={setQty} onChange={(e) => setSetQty(e.target.value)} type="number" placeholder="Qty" className="h-8 w-20" title="How many of this set" />
               <Button size="sm" onClick={groupSelected} disabled={selected.size < 2}>Group as set</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Cancel</Button>
             </div>
@@ -166,12 +169,13 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
                   <div className="pointer-events-none absolute inset-0"
                     style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0,1fr))`, gap: 6 }}>
                     {banners.map((b) => (
-                      <div key={b.key} style={{ gridColumn: `${b.colStart + 1} / ${b.colEnd + 2}`, gridRow: `${b.row + 1}`, alignSelf: 'start', display: 'flex', justifyContent: 'center' }}>
+                      <div key={b.key} style={{ gridColumn: `${b.colStart + 1} / ${b.colEnd + 2}`, gridRow: `${b.row + 1}`, alignSelf: 'end', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: `0 3% ${Math.max(12, config.fontSize * 1.7)}px 3%` }}>
                         <div style={{
-                          marginTop: 8, background: 'rgba(255,255,255,.92)', color: '#0b0b0d', fontWeight: 800,
-                          borderRadius: 999, padding: `${Math.max(4, config.fontSize * 0.3)}px ${config.fontSize * 0.9}px`,
-                          fontSize: Math.max(13, config.fontSize * 0.95), boxShadow: '0 2px 6px rgba(0,0,0,.3)',
-                          whiteSpace: 'nowrap', maxWidth: '96%', overflow: 'hidden', textOverflow: 'ellipsis',
+                          width: '94%', textAlign: 'center',
+                          background: `rgba(255,255,255,${0.6 + config.opacity * 0.35})`, color: '#0b0b0d', fontWeight: 800,
+                          borderRadius: 999, padding: `${Math.max(5, config.fontSize * 0.34)}px ${config.fontSize * 0.7}px`,
+                          fontSize: Math.max(13, config.fontSize), boxShadow: '0 2px 6px rgba(0,0,0,.3)',
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                         }}>{b.label}</div>
                       </div>
                     ))}
@@ -196,13 +200,13 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
                 {sets.map((s, i) => (
                   <div key={s.id} className="rounded-lg border p-2">
                     <div className="mb-1.5 flex items-center justify-between">
-                      <span className="text-[12px] font-semibold">Set {i + 1} · {s.memberKeys.length} items</span>
+                      <span className="text-[12px] font-semibold">Set {i + 1} · {s.memberKeys.length} cards{s.quantity > 1 ? ` · ×${s.quantity}` : ''}</span>
                       <button onClick={() => ungroup(s.id)} className="text-muted-foreground hover:text-destructive" aria-label="Ungroup"><X className="size-3.5" /></button>
                     </div>
                     <Input value={s.label ?? ''} onChange={(e) => updateSetLabel(s.id, e.target.value)} placeholder="Label (optional)" className="mb-1.5 h-8" />
                     <div className="flex items-center gap-2">
-                      <Input value={s.price} onChange={(e) => updateSetPrice(s.id, Number(e.target.value))} type="number" className="h-8" />
-                      <span className="text-[11px] text-muted-foreground whitespace-nowrap">{s.label ? '' : peso(s.price)}</span>
+                      <Input value={s.price} onChange={(e) => updateSetPrice(s.id, Number(e.target.value))} type="number" className="h-8" title="Set price" />
+                      <div className="flex items-center gap-1 whitespace-nowrap text-[11px] text-muted-foreground">×<Input value={s.quantity} onChange={(e) => updateSetQty(s.id, Number(e.target.value))} type="number" className="h-8 w-14" title="Quantity of this set" /></div>
                     </div>
                   </div>
                 ))}

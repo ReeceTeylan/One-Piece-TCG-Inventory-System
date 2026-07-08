@@ -7,6 +7,7 @@ export interface BannerSegment {
   colStart: number;  // 0-based inclusive
   colEnd: number;    // 0-based inclusive
   label: string;
+  qty: number;
 }
 
 // Split each set's members into contiguous same-row runs so a banner can span them.
@@ -23,7 +24,12 @@ export function computeSetBanners(cards: FbCard[], sets: FbSet[], cols = 5): Ban
       .sort((a, b) => a - b);
     if (!idxs.length) continue;
 
-    const label = set.label?.trim() ? set.label : peso(set.price);
+    const qty = set.quantity ?? 1;
+    const parts: string[] = [];
+    if (set.price > 0) parts.push(peso(set.price));
+    if (set.label?.trim()) parts.push(set.label.trim());
+    if (qty > 1) parts.push(`×${qty}`);
+    const label = parts.length ? parts.join('  ·  ') : peso(set.price);
     let runStart = idxs[0];
     let prev = idxs[0];
 
@@ -34,6 +40,7 @@ export function computeSetBanners(cards: FbCard[], sets: FbSet[], cols = 5): Ban
         colStart: start % cols,
         colEnd: end % cols,
         label,
+        qty,
       });
     };
 
