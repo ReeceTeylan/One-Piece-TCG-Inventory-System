@@ -1,7 +1,7 @@
 {
   "name": "op-vault-api",
   "version": "1.0.0",
-  "description": "OP-Vault \u2014 One Piece TCG inventory & sales backend",
+  "description": "OP-Vault — One Piece TCG inventory & sales backend",
   "author": "OP-Vault",
   "private": true,
   "scripts": {
@@ -34,6 +34,7 @@
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/throttler": "^5.1.1",
     "@prisma/client": "^5.8.0",
+    "@supabase/supabase-js": "^2.110.1",
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",

@@ -3,6 +3,12 @@ export default () => ({
   corsOrigin: process.env.CORS_ORIGIN ?? 'http://localhost:5173',
   publicUrl: process.env.PUBLIC_URL ?? 'http://localhost:4000',
   uploadDir: process.env.UPLOAD_DIR ?? './uploads',
+  storageDriver: process.env.STORAGE_DRIVER ?? 'local', // 'local' | 'supabase'
+  supabase: {
+    url: process.env.SUPABASE_URL ?? '',
+    serviceKey: process.env.SUPABASE_SERVICE_KEY ?? '',
+    bucket: process.env.SUPABASE_BUCKET ?? 'card-images',
+},
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET ?? 'dev-access',
     accessTtl: process.env.JWT_ACCESS_TTL ?? '900s',
