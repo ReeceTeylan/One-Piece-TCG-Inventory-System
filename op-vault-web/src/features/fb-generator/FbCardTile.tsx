@@ -54,22 +54,6 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
         </div>
       )}
 
-      {config.showLogo && (
-        <div className="absolute" style={{ 
-          top: 8 * scale, 
-          left: 8 * scale, 
-          borderRadius: 8 * scale, 
-          overflow: 'hidden', 
-          boxShadow: '0 2px 6px rgba(0,0,0,0.4)' 
-        }}>
-          <img 
-            src={storeLogo} 
-            alt="RB's TCG Logo" 
-            style={{ width: fs * 2.8, height: 'auto', display: 'block' }} 
-          />
-        </div>
-      )}
-
       {card.badge !== 'none' && (
         <div className="absolute" style={{ top: 8 * scale, right: 8 * scale, padding: `${3 * scale}px ${8 * scale}px`, borderRadius: 6 * scale,
           fontSize: fs * 0.7, fontWeight: 800, color: '#fff', background: card.badge === 'sold' ? '#DC2626' : '#D97706' }}>

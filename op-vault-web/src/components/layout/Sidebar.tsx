@@ -2,9 +2,11 @@ import { NavLink } from 'react-router-dom';
 import { visibleNav } from './nav-config';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
+import storeLogo from '@/assets/logo.png';
 
 export function Sidebar({ collapsed, mobileOpen, onNavigate }: { collapsed: boolean; mobileOpen: boolean; onNavigate: () => void }) {
   const { user } = useAuth();
+  
   return (
     <aside className={cn(
       'flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200',
@@ -12,10 +14,22 @@ export function Sidebar({ collapsed, mobileOpen, onNavigate }: { collapsed: bool
       'fixed inset-y-0 left-0 z-40 md:static md:translate-x-0',
       mobileOpen ? 'translate-x-0' : '-translate-x-full',
     )}>
+      {/* Brand Header */}
       <div className="flex h-[57px] items-center gap-2.5 border-b border-white/10 px-4">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-gradient-to-br from-slate-500 to-slate-900 text-sm font-extrabold text-white">OP</div>
-        {!collapsed && <div className="leading-tight"><div className="text-sm font-bold text-white">OP-Vault</div><div className="text-[11px] text-slate-400">TCG Control</div></div>}
+        <img 
+          src={storeLogo} 
+          alt="RB's TCG Logo" 
+          className="h-9 w-9 shrink-0 object-contain drop-shadow-md" 
+        />
+        {!collapsed && (
+          <div className="leading-tight">
+            <div className="text-sm font-bold text-white">RB's TCG</div>
+            <div className="text-[11px] text-slate-400">Inventory System</div>
+          </div>
+        )}
       </div>
+
+      {/* Navigation Links */}
       <nav className="flex-1 overflow-y-auto p-2">
         {visibleNav(user?.role).map((group) => (
           <div key={group.title}>
