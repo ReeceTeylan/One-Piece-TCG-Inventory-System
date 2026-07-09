@@ -15,13 +15,13 @@ export function PagedWorkspace({ mode }: { mode: GenMode }) {
     setCurrent, autoFill, addPage, removePage, setCardsFor, setSetsFor
   } = usePagedGenerator(mode.perPage);
 
-  const { fill, isPending } = useBatchFill(mode.perPage);
-  const [isExporting, setIsExporting] = useState(false);
+    const { fetchAllRawSortedByValue, loading } = useBatchFill();
+    const [isExporting, setIsExporting] = useState(false);
 
-  const handleAutoFill = async () => {
-    const allCards = await fill();
-    if (allCards) autoFill(allCards);
-  };
+    const handleAutoFill = async () => {
+        const allCards = await fetchAllRawSortedByValue();
+        if (allCards) autoFill(allCards);
+    };
 
   const exportAll = async () => {
     setIsExporting(true);
@@ -77,8 +77,8 @@ export function PagedWorkspace({ mode }: { mode: GenMode }) {
 
         <div className="flex items-center gap-2">
           <span className="mr-2 text-xs text-muted-foreground">{totalCards} total items</span>
-          <Button variant="secondary" size="sm" onClick={handleAutoFill} disabled={isPending || isExporting}>
-            <Zap className="mr-1 size-4" /> {isPending ? 'Fetching...' : 'Auto-fill'}
+          <Button variant="outline" size="sm" onClick={handleAutoFill} disabled={loading || isExporting}>
+            <Zap className="mr-1 size-4" /> {loading ? 'Fetching...' : 'Auto-fill'}
           </Button>
           <Button size="sm" onClick={exportAll} disabled={isExporting || totalCards === 0}>
             <Download className="mr-1 size-4" /> {isExporting ? 'Exporting Batch...' : 'Export All (ZIP)'}
