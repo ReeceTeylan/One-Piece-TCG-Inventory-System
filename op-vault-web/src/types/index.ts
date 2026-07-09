@@ -50,7 +50,7 @@ export interface DashboardData {
   cardsSold: Record<'today' | 'week' | 'month' | 'year', number>;
   orders: Record<'today' | 'week' | 'month' | 'year', number>;
   growth: { revenueWeek: number; revenueMonth: number; profitMonth: number };
-  inventory: { inventoryValue: number; averageBuyingCost: number; averageSellingPrice: number; profitMargin: number; lowStockCount: number; deadStockCount: number };
+  inventory: { inventoryValue: number; averageBuyingCost: number; averageSellingPrice: number; profitMargin: number; totalPostedPrice: number; totalSpent: number; };
   counts: { totalRawCards: number; totalSlabs: number; waitingToShip: number };
   generatedAt: string;
 }

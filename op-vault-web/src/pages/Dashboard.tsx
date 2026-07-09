@@ -52,8 +52,8 @@ export function DashboardPage() {
             <Stat label="Profit month" value={peso(d.profit.month)} delta={d.growth.profitMonth} />
             <Stat label="Profit margin" value={`${d.inventory.profitMargin}%`} />
             <Stat label="Waiting to ship" value={String(d.counts.waitingToShip)} />
-            <Stat label="Low stock" value={String(d.inventory.lowStockCount)} />
-            <Stat label="Dead stock" value={String(d.inventory.deadStockCount)} />
+            <Stat label="Total posted price" value={peso(d.inventory.totalPostedPrice)} />
+            <Stat label="Total spent" value={peso(d.inventory.totalSpent)} />
           </>
         )}
       </div>

@@ -95,36 +95,45 @@ export class AnalyticsService {
   }
 
   /** Inventory value & averages & stock health. */
+  /** Inventory value & averages & stock health. */
   async inventory() {
-    const [rawValue] = await this.prisma.$queryRaw<{ value: any; avgcost: any; avgprice: any }[]>(
+    const [rawValue] = await this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any; avgcost: any; avgprice: any }[]>(
       Prisma.sql`SELECT
-        COALESCE(SUM(quantity * "buyCost"),0)      AS value,
+        COALESCE(SUM(quantity * "buyCost"),0)      AS "totalSpent",
+        COALESCE(SUM(quantity * "postedPrice"),0)  AS "totalPosted",
         COALESCE(AVG("buyCost"),0)                 AS avgcost,
         COALESCE(AVG("postedPrice"),0)             AS avgprice
-        FROM raw_cards`,
+      FROM raw_cards`,
     );
-    const [slabValue] = await this.prisma.$queryRaw<{ value: any }[]>(
-      Prisma.sql`SELECT COALESCE(SUM("buyCost"),0) AS value FROM slab_cards WHERE status <> 'SOLD'`,
+
+    const [slabValue] = await this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any }[]>(
+      Prisma.sql`SELECT 
+        COALESCE(SUM("buyCost"),0) AS "totalSpent",
+        COALESCE(SUM("sellPrice"),0) AS "totalPosted"
+      FROM slab_cards WHERE status <> 'SOLD'`,
     );
+
     const margin = await this.prisma.sale.aggregate({
-      where: { status: ACTIVE }, _sum: { grandTotal: true, totalProfit: true },
+      where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } }, 
+      _sum: { grandTotal: true, totalProfit: true },
     });
+
     const rev = num(margin._sum.grandTotal);
     const prof = num(margin._sum.totalProfit);
-    const threshold = await this.settings.get<number>('lowStockThreshold');
 
-    const [lowStock, deadStock] = await Promise.all([
-      this.prisma.rawCard.count({ where: { quantity: { gt: 0, lte: threshold } } }),
-      this.deadStockCount(),
-    ]);
+    const totalSpent = num(rawValue.totalSpent) + num(slabValue.totalSpent);
+    const totalPosted = num(rawValue.totalPosted) + num(slabValue.totalPosted);
+    
+    // Inventory value is now 80% of the total posted price
+    const inventoryValue = totalPosted * 0.8;
 
     return {
-      inventoryValue: num(rawValue.value) + num(slabValue.value),
+      inventoryValue: inventoryValue,
       averageBuyingCost: Number(num(rawValue.avgcost).toFixed(2)),
       averageSellingPrice: Number(num(rawValue.avgprice).toFixed(2)),
       profitMargin: rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,
-      lowStockCount: lowStock,
-      deadStockCount: deadStock,
+      totalPostedPrice: totalPosted,
+      totalSpent: totalSpent,
     };
   }
 
