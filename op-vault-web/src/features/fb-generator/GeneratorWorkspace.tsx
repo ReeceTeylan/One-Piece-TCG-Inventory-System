@@ -18,12 +18,29 @@ import { DEFAULT_CONFIG, RESOLUTIONS } from './types';
 import type { FbCard, FbSet, GenMode, OverlayConfig, BadgeState } from './types';
 import { computeSetBanners, groupContiguous, newId } from './set-utils';
 
-export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
+export function GeneratorWorkspace({
+  mode,
+  cards: cardsProp,
+  onCardsChange,
+  sets: setsProp,
+  onSetsChange,
+}: {
+  mode: GenMode;
+  cards?: FbCard[];
+  onCardsChange?: React.Dispatch<React.SetStateAction<FbCard[]>>;
+  sets?: FbSet[];
+  onSetsChange?: React.Dispatch<React.SetStateAction<FbSet[]>>;
+}) {
   const { cols, rows: maxRows, perPage, aspectW, aspectH } = mode;
   const aspect = `${aspectW} / ${aspectH}`;
 
-  const [cards, setCards] = useState<FbCard[]>([]);
-  const [sets, setSets] = useState<FbSet[]>([]);
+  // Controlled (multi-page) when the parent passes cards/sets; otherwise internal state (single-page tabs).
+  const [cardsInternal, setCardsInternal] = useState<FbCard[]>([]);
+  const [setsInternal, setSetsInternal] = useState<FbSet[]>([]);
+  const cards = cardsProp ?? cardsInternal;
+  const setCards = onCardsChange ?? setCardsInternal;
+  const sets = setsProp ?? setsInternal;
+  const setSets = onSetsChange ?? setSetsInternal;
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [config, setConfigState] = useState<OverlayConfig>(DEFAULT_CONFIG);
   const [resolution, setResolution] = useState<number>(RESOLUTIONS[1].width);
@@ -151,7 +168,7 @@ export function GeneratorWorkspace({ mode }: { mode: GenMode }) {
             <EmptyState message={mode.type === 'SEALED' ? 'Add sealed products from the left to build your post.' : 'Add items from the inventory panel to build your post.'} />
           ) : (
             <div className="w-full">
-              <div ref={exportRef} className={config.theme === 'dark' ? 'mx-auto bg-[#0b0b0d]' : 'mx-auto bg-white'}
+              <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'mx-auto bg-[#0b0b0d]' : 'mx-auto bg-white'}
                 style={{ width: '100%', maxWidth: 900, aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2.2%' }}>
                 <div className="relative" style={{ height: '100%', maxWidth: '100%', aspectRatio: `${cols * aspectW} / ${rows * aspectH}` }}>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

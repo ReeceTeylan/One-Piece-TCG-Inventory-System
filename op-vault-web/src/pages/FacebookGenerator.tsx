@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { cn } from '@/lib/utils';
 import { GeneratorWorkspace } from '@/features/fb-generator/GeneratorWorkspace';
+import { PagedWorkspace } from '@/features/fb-generator/PagedWorkspace';
 import { MODES, type GenType } from '@/features/fb-generator/types';
 
 const TABS: GenType[] = ['RAW', 'SLAB', 'SEALED'];
@@ -25,7 +26,11 @@ export function FacebookGeneratorPage() {
       {/* Keep every workspace mounted so each tab preserves its own layout & settings. */}
       {TABS.map((t) => (
         <div key={t} className={active === t ? '' : 'hidden'}>
-          <GeneratorWorkspace mode={MODES[t]} />
+          {t === 'RAW' ? (
+            <PagedWorkspace mode={MODES[t]} />
+          ) : (
+            <GeneratorWorkspace mode={MODES[t]} />
+          )}
         </div>
       ))}
     </>
