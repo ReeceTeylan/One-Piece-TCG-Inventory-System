@@ -37,7 +37,6 @@ export function ControlsPanel({ config, setConfig }: { config: OverlayConfig; se
         <Toggle label="Price" checked={config.showPrice} onChange={(v) => setConfig({ showPrice: v })} />
         <Toggle label="Quantity" checked={config.showQuantity} onChange={(v) => setConfig({ showQuantity: v })} />
         <Toggle label="Card number" checked={config.showCardNumber} onChange={(v) => setConfig({ showCardNumber: v })} />
-        <Toggle label="Store logo" checked={config.showLogo} onChange={(v) => setConfig({ showLogo: v })} />
         <Toggle label="Notes" checked={config.showNotes} onChange={(v) => setConfig({ showNotes: v })} />
       </div>
 
