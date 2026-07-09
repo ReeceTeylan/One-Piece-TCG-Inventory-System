@@ -1,5 +1,6 @@
 import { peso } from '@/lib/utils';
 import { resolveImageUrl } from '@/components/common/CardImage';
+import storeLogo from '@/assets/LOGO.png';
 import type { FbCard, OverlayConfig } from './types';
 
 // A single card tile with an overlay. `scale` lets an export clone render larger.
@@ -21,7 +22,7 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
 
   // In-set cards hide their own price & quantity (the spanning set banner shows the price).
   const showPrice = config.showPrice && !inSet;
-  const showQty = config.showQuantity && !inSet;
+  const showQty = config.showQuantity && !inSet && card.quantity > 1;
   const showNote = config.showNotes && !!card.note;
   const hasSecondary = showQty || config.showCardNumber || showNote;
 
@@ -54,9 +55,18 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
       )}
 
       {config.showLogo && (
-        <div className="absolute" style={{ top: 8 * scale, left: 8 * scale, display: 'flex', alignItems: 'center', gap: 5 * scale,
-          padding: `${3 * scale}px ${6 * scale}px`, borderRadius: 6 * scale, background: dark ? 'rgba(0,0,0,.5)' : 'rgba(255,255,255,.6)' }}>
-          <span style={{ width: fs, height: fs, borderRadius: 4 * scale, background: 'linear-gradient(135deg,#475569,#0f172a)', display: 'grid', placeItems: 'center', fontSize: fs * 0.6, fontWeight: 800, color: '#fff' }}>OP</span>
+        <div className="absolute" style={{ 
+          top: 8 * scale, 
+          left: 8 * scale, 
+          borderRadius: 8 * scale, 
+          overflow: 'hidden', 
+          boxShadow: '0 2px 6px rgba(0,0,0,0.4)' 
+        }}>
+          <img 
+            src={storeLogo} 
+            alt="RB's TCG Logo" 
+            style={{ width: fs * 2.8, height: 'auto', display: 'block' }} 
+          />
         </div>
       )}
 
