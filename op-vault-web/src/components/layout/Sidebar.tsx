@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { visibleNav } from './nav-config';
 import { useAuth } from '@/contexts/auth-context';
 import { cn } from '@/lib/utils';
-import storeLogo from '@/assets/logo.png';
+import storeLogo from '@/assets/LOGO.png';
 
 export function Sidebar({ collapsed, mobileOpen, onNavigate }: { collapsed: boolean; mobileOpen: boolean; onNavigate: () => void }) {
   const { user } = useAuth();
