@@ -18,6 +18,13 @@
     "strictBindCallApply": false,
     "forceConsistentCasingInFileNames": false,
     "noFallthroughCasesInSwitch": false,
-    "rootDir": "./src"
-  }
+    "strictPropertyInitialization": false,
+    "rootDir": "./src",
+    "ignoreDeprecations": "6.0"
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "prisma"
+  ]
 }
