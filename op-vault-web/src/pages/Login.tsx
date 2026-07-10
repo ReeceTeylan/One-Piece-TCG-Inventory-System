@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,14 @@ export function LoginPage() {
   const { login, user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [slow, setSlow] = useState(false);
+
+  // After ~4s of waiting, assume the free-tier server may be waking from sleep.
+  useEffect(() => {
+    if (!loading) { setSlow(false); return; }
+    const t = setTimeout(() => setSlow(true), 4000);
+    return () => clearTimeout(t);
+  }, [loading]);
   const { register, handleSubmit, formState: { errors } } = useForm<Form>({
     resolver: zodResolver(schema), defaultValues: { email: 'owner@opvault.ph', password: '' },
   });
@@ -25,7 +33,13 @@ export function LoginPage() {
   const onSubmit = async (data: Form) => {
     setLoading(true);
     try { await login(data.email, data.password); navigate('/', { replace: true }); }
-    catch (e) { toast.error(apiError(e).message); }
+    catch (e) {
+      const msg = apiError(e).message;
+      const looksNetwork = /network|timeout|failed to fetch/i.test(msg);
+      toast.error(looksNetwork
+        ? 'Couldn’t reach the server. It may be waking up after inactivity — please try again in a moment.'
+        : msg);
+    }
     finally { setLoading(false); }
   };
 
@@ -39,7 +53,14 @@ export function LoginPage() {
           <div><Label htmlFor="email">Email</Label><Input id="email" autoComplete="username" {...register('email')} className="mt-1.5" />{errors.email && <p className="mt-1 text-xs text-destructive">{errors.email.message}</p>}</div>
           <div><Label htmlFor="password">Password</Label><Input id="password" type="password" autoComplete="current-password" {...register('password')} className="mt-1.5" />{errors.password && <p className="mt-1 text-xs text-destructive">{errors.password.message}</p>}</div>
         </div>
-        <Button type="submit" className="mt-5 h-10 w-full" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</Button>
+        <Button type="submit" className="mt-5 h-10 w-full" disabled={loading}>
+          {loading ? (slow ? 'Waking the server…' : 'Signing in…') : 'Sign in'}
+        </Button>
+        {slow && (
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            The server may be waking up after inactivity. This can take up to a minute on the first try.
+          </p>
+        )}
       </form>
     </div>
   );
