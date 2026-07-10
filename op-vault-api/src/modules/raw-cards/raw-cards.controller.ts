@@ -9,6 +9,7 @@ import { UpdateRawCardDto } from './dto/update-raw-card.dto';
 import { QueryRawCardDto } from './dto/query-raw-card.dto';
 import { RestockDto } from './dto/restock.dto';
 import { AddQuantityDto } from './dto/add-quantity.dto';
+import { ImportRawCardsDto } from './dto/import-raw-cards.dto';
 
 @ApiTags('raw-cards')
 @ApiBearerAuth()
@@ -29,6 +30,11 @@ export class RawCardsController {
   @Post()
   create(@Body() dto: CreateRawCardDto, @CurrentUser('id') userId: string) {
     return this.service.create(dto, userId);
+  }
+  
+  @Post('import')
+  importCards(@Body() dto: ImportRawCardsDto, @CurrentUser('id') userId: string) {
+    return this.service.importCards(dto.rows, userId);
   }
 
   // When the UI's duplicate dialog is confirmed, it calls this instead of create.

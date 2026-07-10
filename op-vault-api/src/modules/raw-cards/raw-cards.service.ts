@@ -41,6 +41,32 @@ export class RawCardsService {
     });
     return card;
   }
+  
+  // Bulk restock/import. Matches existing cards on the DB identity
+  // (cardNumber + setName + rarity); adds quantity to matches, creates the rest.
+  async importCards(rows: CreateRawCardDto[], userId: string) {
+    let created = 0;
+    let restocked = 0;
+    const errors: { row: number; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const existing = await this.repo.findByIdentity(row.cardNumber, row.setName, row.rarity);
+        if (existing) {
+          await this.addQuantity(existing.id, row.quantity, Number(row.buyCost) || 0, userId);
+          restocked++;
+        } else {
+          await this.create(row, userId);
+          created++;
+        }
+      } catch (e: any) {
+        errors.push({ row: i + 1, reason: e?.message ?? 'Unknown error' });
+      }
+    }
+
+    return { total: rows.length, created, restocked, errors };
+  }
 
   async findAll(query: QueryRawCardDto) {
     const where: Prisma.RawCardWhereInput = {};
