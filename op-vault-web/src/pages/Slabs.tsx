@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Upload, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Upload, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -40,6 +40,23 @@ export function SlabsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SlabCard | null>(null);
   const [toDelete, setToDelete] = useState<SlabCard | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const rows = data?.data ?? [];
+  const allSelected = rows.length > 0 && rows.every((s) => selected.has(s.id));
+  const someSelected = rows.some((s) => selected.has(s.id));
+  const toggleOne = (id: string) => setSelected((prev) => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const toggleAll = () => setSelected((prev) => {
+    const n = new Set(prev);
+    if (allSelected) rows.forEach((s) => n.delete(s.id));
+    else rows.forEach((s) => n.add(s.id));
+    return n;
+  });
+  const clearSelection = () => setSelected(new Set());
 
   const openImage = (id: string) => {
     const input = document.createElement('input');
@@ -82,16 +99,34 @@ export function SlabsPage() {
         </Select>
       </div>
 
+      {selected.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+          <span className="text-[13px] font-semibold">{selected.size} selected</span>
+          <Button size="sm" variant="ghost" onClick={clearSelection}>Clear selection</Button>
+          <span className="text-xs text-muted-foreground">Bulk actions coming next…</span>
+        </div>
+      )}
+
       <Card>
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : (
           <Table>
             <THead><TR>
+              <TH className="w-8">
+                <input type="checkbox" aria-label="Select all on page"
+                  checked={allSelected} ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
+                  onChange={toggleAll} className="size-4 cursor-pointer align-middle" />
+              </TH>
               <TH>Slab</TH><TH>Company</TH><TH>Cert #</TH><TH className="text-right">Grade</TH>
               <TH className="text-right">Cost</TH><TH className="text-right">Price</TH><TH>Status</TH><TH></TH>
             </TR></THead>
             <TBody>
               {data.data.map((s) => (
-                <TR key={s.id}>
+                <TR key={s.id} data-selected={selected.has(s.id) || undefined}>
+                  <TD className="w-8">
+                    <input type="checkbox" aria-label={`Select ${s.name}`}
+                      checked={selected.has(s.id)} onChange={() => toggleOne(s.id)}
+                      className="size-4 cursor-pointer align-middle" />
+                  </TD>
                   <TD>
                     <div className="flex items-center gap-3">
                       <CardThumb url={s.images?.[0]?.url} alt={s.name} className="h-[52px] w-[38px]" />
