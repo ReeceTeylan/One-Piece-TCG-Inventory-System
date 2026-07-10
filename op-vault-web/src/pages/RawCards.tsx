@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import { Pagination } from '@/components/common/Pagination';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
+import { ImportCsvDialog } from '@/features/raw-cards/ImportCsvDialog';
 import { RestockDialog } from '@/features/raw-cards/RestockDialog';
 import { useRawCards, useRawCardMutations, RARITIES } from '@/features/raw-cards/use-raw-cards';
 import { useImageDrop } from '@/features/raw-cards/use-image-drop';
@@ -38,6 +39,7 @@ export function RawCardsPage() {
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editCard, setEditCard] = useState<RawCard | null>(null);
   const [restockCard, setRestockCard] = useState<RawCard | null>(null);
   const [deleteCard, setDeleteCard] = useState<RawCard | null>(null);
@@ -122,7 +124,12 @@ export function RawCardsPage() {
   return (
     <div>
       <PageHeader title="Raw Cards" subtitle={query.data ? `${query.data.meta.total} titles` : undefined}
-        actions={<Button onClick={() => setShowAdd(true)}><Plus className="size-4" /> Add raw card</Button>} />
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowImport(true)}><Upload className="size-4" /> Import CSV</Button>
+            <Button onClick={() => setShowAdd(true)}><Plus className="size-4" /> Add raw card</Button>
+          </div>
+        } />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <form onSubmit={onSearch} className="relative w-full max-w-xs">
@@ -228,6 +235,7 @@ export function RawCardsPage() {
       </Card>
 
       <RawCardForm open={showAdd} onOpenChange={setShowAdd} />
+      <ImportCsvDialog open={showImport} onOpenChange={setShowImport} />
       <RawCardForm open={!!editCard} onOpenChange={(o) => !o && setEditCard(null)} editing={editCard} />
       <RestockDialog card={restockCard} onClose={() => setRestockCard(null)} />
       <ConfirmDialog open={!!deleteCard} onOpenChange={(o) => !o && setDeleteCard(null)}

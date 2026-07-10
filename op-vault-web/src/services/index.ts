@@ -12,6 +12,7 @@ export const rawCardsService = {
   list: (p?: Record<string, any>) => list<RawCard>('/raw-cards', p),
   get: (id: string) => one<RawCard>(`/raw-cards/${id}`),
   create: (dto: any) => api.post('/raw-cards', dto).then(unwrap<RawCard>),
+  import: (rows: any[]) => api.post('/raw-cards/import', { rows }).then(unwrap<{ total: number; created: number; restocked: number; errors: { row: number; reason: string }[] }>),
   addQuantity: (id: string, quantity: number) => api.post(`/raw-cards/${id}/add-quantity`, { quantity }).then(unwrap<RawCard>),
   restock: (id: string, dto: any) => api.post(`/raw-cards/${id}/restock`, dto).then(unwrap<RawCard>),
   update: (id: string, dto: any) => api.patch(`/raw-cards/${id}`, dto).then(unwrap<RawCard>),
