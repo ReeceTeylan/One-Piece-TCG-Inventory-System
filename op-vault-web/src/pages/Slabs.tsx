@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Upload, Pencil, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
@@ -17,6 +18,8 @@ import { stockVariant, stockLabel } from '@/lib/status';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/contexts/auth-context';
 import { apiError } from '@/lib/api';
+import { slabsService } from '@/services';
+import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
 import type { SlabCard } from '@/types';
 import { useSlabs, useSlabMutations, GRADES } from '@/features/slabs/use-slabs';
 import { SlabForm } from '@/features/slabs/SlabForm';
@@ -57,6 +60,47 @@ export function SlabsPage() {
     return n;
   });
   const clearSelection = () => setSelected(new Set());
+
+  // --- Bulk actions (price + delete; slab DTO has no status field) ---
+  const { run: bulkRun, progress: bulkProgress } = useBulkRun(['slabs']);
+  const [bulkOp, setBulkOp] = useState('inc_pct');
+  const [bulkVal, setBulkVal] = useState('');
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+
+  const selectedRows = useMemo(() => rows.filter((s) => selected.has(s.id)), [rows, selected]);
+
+  const nextPrice = (current: number, op: string, v: number): number => {
+    let p = current;
+    if (op === 'inc_pct') p = current * (1 + v / 100);
+    else if (op === 'dec_pct') p = current * (1 - v / 100);
+    else if (op === 'inc_amt') p = current + v;
+    else if (op === 'dec_amt') p = current - v;
+    else if (op === 'set') p = v;
+    return Math.max(0, Math.round(p));
+  };
+
+  const applyBulkPrice = async () => {
+    const v = Number(bulkVal);
+    if (!Number.isFinite(v)) { toast.error('Enter a number'); return; }
+    if (!selectedRows.length) return;
+    await bulkRun(
+      selectedRows,
+      (s) => slabsService.update(s.id, { sellPrice: nextPrice(Number(s.sellPrice), bulkOp, v) }),
+      { label: 'slabs' },
+    );
+    setBulkVal('');
+  };
+
+  const applyBulkDelete = async () => {
+    setBulkDeleteOpen(false);
+    const ids = [...selected];
+    await bulkRun(
+      rows.filter((s) => selected.has(s.id)),
+      (s) => slabsService.remove(s.id),
+      { label: 'slabs' },
+    );
+    setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
+  };
 
   const openImage = (id: string) => {
     const input = document.createElement('input');
@@ -102,8 +146,27 @@ export function SlabsPage() {
       {selected.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
           <span className="text-[13px] font-semibold">{selected.size} selected</span>
-          <Button size="sm" variant="ghost" onClick={clearSelection}>Clear selection</Button>
-          <span className="text-xs text-muted-foreground">Bulk actions coming next…</span>
+          <div className="mx-1 h-5 w-px bg-border" />
+
+          <Select value={bulkOp} onChange={(e) => setBulkOp(e.target.value)} className="h-8" aria-label="Bulk price operation">
+            <option value="inc_pct">Increase %</option>
+            <option value="dec_pct">Decrease %</option>
+            <option value="inc_amt">Increase ₱</option>
+            <option value="dec_amt">Decrease ₱</option>
+            <option value="set">Set price ₱</option>
+          </Select>
+          <Input value={bulkVal} onChange={(e) => setBulkVal(e.target.value)} type="number" placeholder="Value" className="h-8 w-24" />
+          <Button size="sm" onClick={applyBulkPrice} disabled={bulkProgress.running || !bulkVal}>
+            {bulkProgress.running ? <><Loader2 className="size-4 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : 'Apply price'}
+          </Button>
+
+          <div className="mx-1 h-5 w-px bg-border" />
+          {isOwner && (
+            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setBulkDeleteOpen(true)} disabled={bulkProgress.running}>
+              <Trash2 className="size-4" /> Delete selected
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={clearSelection} disabled={bulkProgress.running}>Clear</Button>
         </div>
       )}
 
@@ -158,6 +221,9 @@ export function SlabsPage() {
       <ConfirmDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)} destructive
         title="Delete slab" description={`Delete "${toDelete?.name}" (cert ${toDelete?.slabNumber})? This cannot be undone.`}
         confirmLabel="Delete" loading={remove.isPending} onConfirm={confirmDelete} />
+      <ConfirmDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} destructive
+        title={`Delete ${selected.size} slabs?`} description="The selected slabs on this page will be permanently removed. This cannot be undone."
+        confirmLabel="Delete all" loading={bulkProgress.running} onConfirm={applyBulkDelete} />
     </>
   );
 }
