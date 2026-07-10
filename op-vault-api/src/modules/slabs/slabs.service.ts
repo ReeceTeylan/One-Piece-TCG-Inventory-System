@@ -30,9 +30,10 @@ export class SlabsService {
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
-        { slabNumber: { contains: query.search, mode: 'insensitive' } },
+        { cardNumber: { contains: query.search, mode: 'insensitive' } },
         { setName: { contains: query.search, mode: 'insensitive' } },
         { character: { contains: query.search, mode: 'insensitive' } },
+        { notes: { contains: query.search, mode: 'insensitive' } },
       ];
     }
     const sortable = ['name', 'sellPrice', 'grade', 'createdAt'];

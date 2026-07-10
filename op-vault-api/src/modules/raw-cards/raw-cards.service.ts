@@ -78,6 +78,7 @@ export class RawCardsService {
         { cardNumber: { contains: query.search, mode: 'insensitive' } },
         { setName: { contains: query.search, mode: 'insensitive' } },
         { character: { contains: query.search, mode: 'insensitive' } },
+        { notes: { contains: query.search, mode: 'insensitive' } },
       ];
     }
     const sortable = ['name', 'postedPrice', 'quantity', 'createdAt', 'buyCost'];
