@@ -16,6 +16,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
 import { RestockDialog } from '@/features/raw-cards/RestockDialog';
 import { useRawCards, useRawCardMutations, RARITIES } from '@/features/raw-cards/use-raw-cards';
+import { useImageDrop } from '@/features/raw-cards/use-image-drop';
 import { useAuth } from '@/contexts/auth-context';
 import { peso } from '@/lib/utils';
 import { apiError } from '@/lib/api';
@@ -47,7 +48,11 @@ export function RawCardsPage() {
     search: search || undefined, status: status || undefined, rarity: rarity || undefined,
     sortBy, sortOrder, page, limit: 15,
   });
-  const { remove } = useRawCardMutations();
+  const { remove, upload } = useRawCardMutations();
+  const { dragId, busyId, onDragOver, onDragLeave, onDrop } = useImageDrop({
+    onUpload: (file, id) => upload.mutateAsync({ file, id }),
+    hasImage: (id) => !!rows.find((c) => c.id === id)?.images?.[0],
+  });
 
   const rows = query.data?.data ?? [];
   const allSelected = rows.length > 0 && rows.every((c) => selected.has(c.id));
@@ -179,7 +184,9 @@ export function RawCardsPage() {
               </TR></THead>
               <TBody>
                 {query.data.data.map((c) => (
-                  <TR key={c.id} data-selected={selected.has(c.id) || undefined}>
+                  <TR key={c.id} data-selected={selected.has(c.id) || undefined}
+                    onDragOver={onDragOver(c.id)} onDragLeave={onDragLeave(c.id)} onDrop={onDrop(c.id)}
+                    className={dragId === c.id ? 'outline outline-2 -outline-offset-2 outline-primary' : undefined}>
                     <TD className="w-8">
                       <input type="checkbox" aria-label={`Select ${c.name}`}
                         checked={selected.has(c.id)} onChange={() => toggleOne(c.id)}
@@ -187,7 +194,14 @@ export function RawCardsPage() {
                     </TD>
                     <TD>
                       <div className="flex items-center gap-2.5">
-                        <CardThumb url={c.images?.[0]?.url} alt={c.name} className="h-[46px] w-[34px]" />
+                        <div className="relative">
+                          <CardThumb url={c.images?.[0]?.url} alt={c.name} className="h-[46px] w-[34px]" />
+                          {busyId === c.id && (
+                            <div className="absolute inset-0 grid place-items-center rounded bg-black/50">
+                              <Loader2 className="size-4 animate-spin text-white" />
+                            </div>
+                          )}
+                        </div>
                         <div><div className="font-medium">{c.name}</div><div className="text-xs text-muted-foreground">{c.cardNumber}</div></div>
                       </div>
                     </TD>

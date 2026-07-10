@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { rawCardsService } from '@/services';
+import { rawCardsService, imagesService } from '@/services';
 
 export function useRawCards(params: Record<string, any>) {
   return useQuery({ queryKey: ['raw-cards', params], queryFn: () => rawCardsService.list(params) });
@@ -13,6 +13,7 @@ export function useRawCardMutations() {
     addQuantity: useMutation({ mutationFn: (v: { id: string; quantity: number }) => rawCardsService.addQuantity(v.id, v.quantity), onSuccess: invalidate }),
     restock: useMutation({ mutationFn: (v: { id: string; dto: any }) => rawCardsService.restock(v.id, v.dto), onSuccess: invalidate }),
     remove: useMutation({ mutationFn: rawCardsService.remove, onSuccess: invalidate }),
+    upload: useMutation({ mutationFn: (v: { file: File; id: string }) => imagesService.upload(v.file, 'RAW', v.id), onSuccess: invalidate }),
   };
 }
 
