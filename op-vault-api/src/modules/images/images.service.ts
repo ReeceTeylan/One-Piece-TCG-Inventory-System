@@ -40,6 +40,21 @@ export class ImagesService {
     const saved = await this.storage.save(mainKey, main, 'image/webp');
     await this.storage.save(thumbKey, thumb, 'image/webp');
 
+    // Replace behavior: remove any existing image(s) for this item so a card
+    // has exactly one image and old files don't become orphans.
+    const existing = await this.prisma.cardImage.findMany({
+      where: dto.itemType === 'RAW' ? { rawCardId: dto.itemId } : { slabId: dto.itemId },
+    });
+    for (const old of existing) {
+      await this.storage.delete(old.storageKey);
+      await this.storage.delete(old.storageKey.replace('.webp', '_thumb.webp'));
+    }
+    if (existing.length) {
+      await this.prisma.cardImage.deleteMany({
+        where: { id: { in: existing.map((e) => e.id) } },
+      });
+    }
+
     const image = await this.prisma.cardImage.create({
       data: {
         itemType: dto.itemType,
