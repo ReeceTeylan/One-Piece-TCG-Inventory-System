@@ -169,8 +169,8 @@ export function GeneratorWorkspace({
           ) : (
             <div className="w-full">
               <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'mx-auto bg-[#0b0b0d]' : 'mx-auto bg-white'}
-                style={{ width: '100%', maxWidth: 900, aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2.2%' }}>
-                <div className="relative" style={{ height: '100%', maxWidth: '100%', aspectRatio: `${cols * aspectW} / ${rows * aspectH}` }}>
+                style={{ width: '100%', maxWidth: 900, aspectRatio: `${cols * aspectW} / ${rows * aspectH}`, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.5%' }}>
+                <div className="relative" style={{ width: '100%', height: '100%' }}>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                     <SortableContext items={cards.map((c) => c.key)} strategy={rectSortingStrategy}>
                       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridTemplateRows: `repeat(${rows}, minmax(0,1fr))`, gap: 6, height: '100%' }}>
