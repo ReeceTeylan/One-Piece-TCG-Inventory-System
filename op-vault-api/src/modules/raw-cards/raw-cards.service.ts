@@ -83,7 +83,9 @@ export class RawCardsService {
     }
     const sortable = ['name', 'postedPrice', 'quantity', 'createdAt', 'buyCost'];
     const sortBy = sortable.includes(query.sortBy ?? '') ? query.sortBy! : 'createdAt';
-    const orderBy = { [sortBy]: query.sortOrder };
+    // Secondary sort by id guarantees a STABLE, deterministic order so paginated
+    // results never duplicate/skip rows when the primary field has ties.
+    const orderBy = [{ [sortBy]: query.sortOrder }, { id: 'asc' as const }];
     const { data, total } = await this.repo.findMany(where, orderBy, query.skip, query.limit);
     return paginate(data, total, query);
   }

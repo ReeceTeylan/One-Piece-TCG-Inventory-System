@@ -15,6 +15,7 @@ export function useBatchFill() {
     try {
       const limit = 100;
       const all: FbCard[] = [];
+      const seen = new Set<string>();
 
       // Page 1 tells us how many pages there are.
       const first = await rawCardsService.list({
@@ -24,7 +25,10 @@ export function useBatchFill() {
       const collect = (rows: any[]) => {
         for (const c of rows) {
           if (c.quantity > 0 && c.status !== 'SOLD' && c.status !== 'OUT') {
-            all.push(toFbCard(c, 'RAW'));
+            const card = toFbCard(c, 'RAW');
+            if (seen.has(card.key)) continue; // guard against paginated duplicates
+            seen.add(card.key);
+            all.push(card);
           }
         }
       };
