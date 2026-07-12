@@ -38,6 +38,7 @@ export function RawCardsPage() {
   const [rarity, setRarity] = useState('');
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
+  const [pageInputVal, setPageInputVal] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCard, setEditCard] = useState<RawCard | null>(null);
@@ -229,7 +230,41 @@ export function RawCardsPage() {
                 ))}
               </TBody>
             </Table>
-            <Pagination page={page} totalPages={query.data.meta.totalPages} total={query.data.meta.total} onPage={setPage} />
+            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4">
+  {/* Existing Pagination component */}
+  <Pagination 
+    page={page} 
+    totalPages={query.data.meta.totalPages} 
+    total={query.data.meta.total} 
+    onPage={setPage} 
+  />
+
+  {/* New Jump-to-Page Input */}
+  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <span>Go to page:</span>
+    <Input
+      type="number"
+      min={1}
+      max={query.data.meta.totalPages}
+      value={pageInputVal}
+      onChange={(e) => setPageInputVal(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          const parsed = parseInt(pageInputVal, 10);
+          if (!isNaN(parsed) && parsed >= 1 && parsed <= query.data.meta.totalPages) {
+            setPage(parsed);
+            setPageInputVal('');
+          } else {
+            toast.error(`Enter a page between 1 and ${query.data.meta.totalPages}`);
+          }
+        }
+      }}
+      placeholder={page.toString()}
+      className="w-16 h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+    />
+    <span className="text-xs font-medium">/ {query.data.meta.totalPages}</span>
+  </div>
+</div>
           </>
         )}
       </Card>

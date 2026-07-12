@@ -102,10 +102,10 @@ function ShipmentDetail({ shipment, onOpenChange }: { shipment: Shipment | null;
 
   return (
     <Dialog open={!!shipment} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col">
         <DialogHeader><DialogTitle>{shipment?.sale?.reference} · {shipment?.sale?.customer?.name}</DialogTitle></DialogHeader>
         {shipment && (
-          <>
+          <div className="-mr-2 flex-1 overflow-y-auto pr-2">
             <div className="mb-4 flex items-center gap-3">
               <Badge variant={shipVariant(shipment.status)}>{shipLabel(shipment.status)}</Badge>
               <span className="text-sm text-muted-foreground">Value {peso(shipment.totalValue)} · Fee {peso(shipment.shippingFee)}</span>
@@ -140,7 +140,7 @@ function ShipmentDetail({ shipment, onOpenChange }: { shipment: Shipment | null;
                 </div>
               )) : <p className="text-sm text-muted-foreground">No events yet.</p>}
             </div>
-          </>
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={saveTracking} disabled={update.isPending}>Save tracking</Button>
