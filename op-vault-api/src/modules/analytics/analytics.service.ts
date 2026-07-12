@@ -153,18 +153,37 @@ export class AnalyticsService {
     const rows = await this.prisma.$queryRaw<
       { bucket: Date; revenue: any; profit: any; orders: any; cards: any }[]
     >(Prisma.sql`
-      SELECT date_trunc(${unit}, s."createdAt") AS bucket,
-             COALESCE(SUM(s."grandTotal"),0)     AS revenue,
-             COALESCE(SUM(s."totalProfit"),0)    AS profit,
-             COUNT(DISTINCT s.id)                AS orders,
-             COALESCE(SUM(si.quantity),0)        AS cards
-      FROM sales s
-      LEFT JOIN sale_items si ON si."saleId" = s.id
-      WHERE s.status NOT IN ('CANCELLED','REFUNDED')
-      GROUP BY bucket
-      ORDER BY bucket DESC
+      WITH daily_sales AS (
+        SELECT 
+          date_trunc(${unit}, "createdAt") AS bucket,
+          SUM("grandTotal") AS revenue,
+          SUM("totalProfit") AS profit,
+          COUNT(id) AS orders
+        FROM sales
+        WHERE status NOT IN ('CANCELLED','REFUNDED')
+        GROUP BY 1
+      ),
+      daily_items AS (
+        SELECT 
+          date_trunc(${unit}, s."createdAt") AS bucket,
+          SUM(si.quantity) AS cards
+        FROM sales s
+        LEFT JOIN sale_items si ON si."saleId" = s.id
+        WHERE s.status NOT IN ('CANCELLED','REFUNDED')
+        GROUP BY 1
+      )
+      SELECT 
+        s.bucket,
+        COALESCE(s.revenue, 0) AS revenue,
+        COALESCE(s.profit, 0) AS profit,
+        COALESCE(s.orders, 0) AS orders,
+        COALESCE(i.cards, 0) AS cards
+      FROM daily_sales s
+      LEFT JOIN daily_items i ON s.bucket = i.bucket
+      ORDER BY s.bucket DESC
       LIMIT ${query.points}
     `);
+
     return rows
       .map((r) => ({
         date: r.bucket,
