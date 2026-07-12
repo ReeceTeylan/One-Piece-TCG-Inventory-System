@@ -38,7 +38,7 @@ export function DashboardPage() {
     queryFn: () => analyticsService.trends({ 
       granularity: 'daily', 
       points: 30,
-      targetMonth
+      targetMonth: targetMonth || undefined
     }) 
   });
   const d = dash.data;
