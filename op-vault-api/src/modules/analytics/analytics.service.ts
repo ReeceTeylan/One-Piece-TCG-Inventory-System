@@ -148,8 +148,21 @@ export class AnalyticsService {
   }
 
   /** Time-bucketed trend series for the line charts. */
-  async trends(query: TrendQueryDto) {
+  async trends(query: TrendQueryDto & { targetMonth?: string }) {
     const unit = query.granularity === 'yearly' ? 'year' : query.granularity === 'monthly' ? 'month' : 'day';
+
+    let salesDateFilter = Prisma.empty;
+    let itemsDateFilter = Prisma.empty;
+    
+    if (query.targetMonth) {
+      const [year, month] = query.targetMonth.split('-');
+      const startDate = new Date(Number(year), Number(month) - 1, 1);
+      const endDate = new Date(Number(year), Number(month), 1); 
+
+      salesDateFilter = Prisma.sql`AND "createdAt" >= ${startDate} AND "createdAt" < ${endDate}`;
+      itemsDateFilter = Prisma.sql`AND s."createdAt" >= ${startDate} AND s."createdAt" < ${endDate}`;
+    }
+
     const rows = await this.prisma.$queryRaw<
       { bucket: Date; revenue: any; profit: any; orders: any; cards: any }[]
     >(Prisma.sql`
@@ -160,7 +173,7 @@ export class AnalyticsService {
           SUM("totalProfit") AS profit,
           COUNT(id) AS orders
         FROM sales
-        WHERE status NOT IN ('CANCELLED','REFUNDED')
+        WHERE status NOT IN ('CANCELLED','REFUNDED') ${salesDateFilter}
         GROUP BY 1
       ),
       daily_items AS (
@@ -169,7 +182,7 @@ export class AnalyticsService {
           SUM(si.quantity) AS cards
         FROM sales s
         LEFT JOIN sale_items si ON si."saleId" = s.id
-        WHERE s.status NOT IN ('CANCELLED','REFUNDED')
+        WHERE s.status NOT IN ('CANCELLED','REFUNDED') ${itemsDateFilter}
         GROUP BY 1
       )
       SELECT 
@@ -181,7 +194,7 @@ export class AnalyticsService {
       FROM daily_sales s
       LEFT JOIN daily_items i ON s.bucket = i.bucket
       ORDER BY s.bucket DESC
-      LIMIT ${query.points}
+      LIMIT ${query.targetMonth ? 31 : query.points}
     `);
 
     return rows
