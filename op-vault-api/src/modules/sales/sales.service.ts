@@ -40,99 +40,11 @@ export class SalesService {
         let itemsProfit = 0;
         const saleItemsData: Prisma.SaleItemCreateManySaleInput[] = [];
         const shipmentItemsData: { nameSnapshot: string; quantity: number }[] = [];
-
         // 2. Validate stock/slabs/prices, deduct inventory, snapshot cost & profit
         for (const line of dto.items) {
-          if (line.unitPrice < 0) throw new BadRequestException('Unit price cannot be negative');
-
-          if (line.itemType === 'RAW') {
-            if (!line.rawCardId) throw new BadRequestException('rawCardId required for RAW item');
-            const card = await tx.rawCard.findUnique({ where: { id: line.rawCardId } });
-            if (!card) throw new NotFoundException(`Raw card ${line.rawCardId} not found`);
-            if (card.quantity < line.quantity) {
-              throw new BadRequestException(
-                `Insufficient stock for ${card.name}: ${card.quantity} available, ${line.quantity} requested`,
-              );
-            }
-            const unitCost = Number(card.buyCost);
-            const lineRevenue = line.unitPrice * line.quantity;
-            const lineProfit = (line.unitPrice - unitCost) * line.quantity;
-            subtotal += lineRevenue;
-            itemsProfit += lineProfit;
-
-            const newQty = card.quantity - line.quantity;
-            const newTotalSold = card.totalSold + line.quantity;
-            const prevAvg = Number(card.avgSellPrice ?? 0);
-            const newAvg = (prevAvg * card.totalSold + lineRevenue) / newTotalSold;
-
-            await tx.rawCard.update({
-              where: { id: card.id },
-              data: {
-                quantity: newQty,
-                status: stockStatus(newQty),
-                totalSold: newTotalSold,
-                lastSoldAt: new Date(),
-                avgSellPrice: new Prisma.Decimal(newAvg.toFixed(2)),
-              },
-            });
-            await tx.inventoryLog.create({
-              data: {
-                itemType: 'RAW', rawCardId: card.id, action: 'SALE',
-                quantityDelta: -line.quantity, quantityAfter: newQty, userId,
-              },
-            });
-            if (newQty <= LOW_STOCK) {
-              await tx.notification.create({
-                data: {
-                  type: newQty <= 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK',
-                  title: newQty <= 0 ? `Out of stock: ${card.name}` : `Low stock: ${card.name}`,
-                  body: `${newQty} remaining after sale`,
-                },
-              });
-            }
-            // Update price history if the sold price differs from posted price
-            if (Number(card.postedPrice) !== line.unitPrice) {
-              await tx.priceHistory.create({
-                data: {
-                  itemType: 'RAW', itemId: card.id, field: 'salePrice',
-                  oldValue: card.postedPrice, newValue: new Prisma.Decimal(line.unitPrice),
-                },
-              });
-            }
-            saleItemsData.push({
-              itemType: 'RAW', rawCardId: card.id, nameSnapshot: card.name,
-              quantity: line.quantity, unitPrice: new Prisma.Decimal(line.unitPrice),
-              unitCost: new Prisma.Decimal(unitCost), lineProfit: new Prisma.Decimal(lineProfit),
-            });
-            shipmentItemsData.push({ nameSnapshot: `${card.name} x${line.quantity}`, quantity: line.quantity });
-          } else {
-            // SLAB — always quantity 1, must be AVAILABLE
-            if (!line.slabId) throw new BadRequestException('slabId required for SLAB item');
-            const slab = await tx.slabCard.findUnique({ where: { id: line.slabId } });
-            if (!slab) throw new NotFoundException(`Slab ${line.slabId} not found`);
-            if (slab.status === 'SOLD') throw new BadRequestException(`Slab ${slab.name} is already sold`);
-
-            const unitCost = Number(slab.buyCost);
-            const lineProfit = line.unitPrice - unitCost;
-            subtotal += line.unitPrice;
-            itemsProfit += lineProfit;
-
-            await tx.slabCard.update({
-              where: { id: slab.id }, data: { status: 'SOLD', soldAt: new Date() },
-            });
-            await tx.inventoryLog.create({
-              data: {
-                itemType: 'SLAB', slabId: slab.id, action: 'SALE',
-                quantityDelta: -1, quantityAfter: 0, userId,
-              },
-            });
-            saleItemsData.push({
-              itemType: 'SLAB', slabId: slab.id, nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`,
-              quantity: 1, unitPrice: new Prisma.Decimal(line.unitPrice),
-              unitCost: new Prisma.Decimal(unitCost), lineProfit: new Prisma.Decimal(lineProfit),
-            });
-            shipmentItemsData.push({ nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`, quantity: 1 });
-          }
+          const { lineRevenue, lineProfit } = await this.applySaleLine(tx, line, userId, { saleItemsData, shipmentItemsData });
+          subtotal += lineRevenue;
+          itemsProfit += lineProfit;
         }
 
         // 3. Totals — discount reduces profit; shipping fee is pass-through (not profit)
@@ -202,6 +114,102 @@ export class SalesService {
     );
   }
 
+  // Shared per-line logic: validate + deduct inventory for ONE sale line, and
+  // push the resulting sale-item + shipment-item snapshots. Used by completeSale
+  // and editSaleItems so inventory/profit math lives in exactly one place.
+  private async applySaleLine(
+    tx: Prisma.TransactionClient,
+    line: CreateSaleDto['items'][number],
+    userId: string,
+    acc: {
+      saleItemsData: Prisma.SaleItemCreateManySaleInput[];
+      shipmentItemsData: { nameSnapshot: string; quantity: number }[];
+    },
+  ): Promise<{ lineRevenue: number; lineProfit: number }> {
+    if (line.unitPrice < 0) throw new BadRequestException('Unit price cannot be negative');
+
+    if (line.itemType === 'RAW') {
+      if (!line.rawCardId) throw new BadRequestException('rawCardId required for RAW item');
+      const card = await tx.rawCard.findUnique({ where: { id: line.rawCardId } });
+      if (!card) throw new NotFoundException(`Raw card ${line.rawCardId} not found`);
+      if (card.quantity < line.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for ${card.name}: ${card.quantity} available, ${line.quantity} requested`,
+        );
+      }
+      const unitCost = Number(card.buyCost);
+      const lineRevenue = line.unitPrice * line.quantity;
+      const lineProfit = (line.unitPrice - unitCost) * line.quantity;
+      const newQty = card.quantity - line.quantity;
+      const newTotalSold = card.totalSold + line.quantity;
+      const prevAvg = Number(card.avgSellPrice ?? 0);
+      const newAvg = (prevAvg * card.totalSold + lineRevenue) / newTotalSold;
+      await tx.rawCard.update({
+        where: { id: card.id },
+        data: {
+          quantity: newQty,
+          status: stockStatus(newQty),
+          totalSold: newTotalSold,
+          lastSoldAt: new Date(),
+          avgSellPrice: new Prisma.Decimal(newAvg.toFixed(2)),
+        },
+      });
+      await tx.inventoryLog.create({
+        data: {
+          itemType: 'RAW', rawCardId: card.id, action: 'SALE',
+          quantityDelta: -line.quantity, quantityAfter: newQty, userId,
+        },
+      });
+      if (newQty <= LOW_STOCK) {
+        await tx.notification.create({
+          data: {
+            type: newQty <= 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK',
+            title: newQty <= 0 ? `Out of stock: ${card.name}` : `Low stock: ${card.name}`,
+            body: `${newQty} remaining after sale`,
+          },
+        });
+      }
+      if (Number(card.postedPrice) !== line.unitPrice) {
+        await tx.priceHistory.create({
+          data: {
+            itemType: 'RAW', itemId: card.id, field: 'salePrice',
+            oldValue: card.postedPrice, newValue: new Prisma.Decimal(line.unitPrice),
+          },
+        });
+      }
+      acc.saleItemsData.push({
+        itemType: 'RAW', rawCardId: card.id, nameSnapshot: card.name,
+        quantity: line.quantity, unitPrice: new Prisma.Decimal(line.unitPrice),
+        unitCost: new Prisma.Decimal(unitCost), lineProfit: new Prisma.Decimal(lineProfit),
+      });
+      acc.shipmentItemsData.push({ nameSnapshot: `${card.name} x${line.quantity}`, quantity: line.quantity });
+      return { lineRevenue, lineProfit };
+    }
+
+    // SLAB — always quantity 1, must be AVAILABLE
+    if (!line.slabId) throw new BadRequestException('slabId required for SLAB item');
+    const slab = await tx.slabCard.findUnique({ where: { id: line.slabId } });
+    if (!slab) throw new NotFoundException(`Slab ${line.slabId} not found`);
+    if (slab.status === 'SOLD') throw new BadRequestException(`Slab ${slab.name} is already sold`);
+    const unitCost = Number(slab.buyCost);
+    const lineProfit = line.unitPrice - unitCost;
+    await tx.slabCard.update({
+      where: { id: slab.id }, data: { status: 'SOLD', soldAt: new Date() },
+    });
+    await tx.inventoryLog.create({
+      data: {
+        itemType: 'SLAB', slabId: slab.id, action: 'SALE',
+        quantityDelta: -1, quantityAfter: 0, userId,
+      },
+    });
+    acc.saleItemsData.push({
+      itemType: 'SLAB', slabId: slab.id, nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`,
+      quantity: 1, unitPrice: new Prisma.Decimal(line.unitPrice),
+      unitCost: new Prisma.Decimal(unitCost), lineProfit: new Prisma.Decimal(lineProfit),
+    });
+    acc.shipmentItemsData.push({ nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`, quantity: 1 });
+    return { lineRevenue: line.unitPrice, lineProfit };
+  }
   // ===================================================================
   // Reversal helpers (shared by cancel / refund / undo)
   // ===================================================================
