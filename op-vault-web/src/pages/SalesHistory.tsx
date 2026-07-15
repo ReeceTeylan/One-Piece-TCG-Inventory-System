@@ -105,7 +105,7 @@ export function SalesHistoryPage() {
       <EditOrderDialog 
         sale={editSale} 
         open={!!editSale} 
-        onOpenChange={(open) => !open && setEditSale(null)} 
+        onOpenChange={(open: boolean) => !open && setEditSale(null)} 
         onSuccess={() => setEditSale(null)} 
       />
     </>
