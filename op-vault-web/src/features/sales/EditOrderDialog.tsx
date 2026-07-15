@@ -38,9 +38,11 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
           itemType: item.itemType,
           rawCardId: item.rawCardId,
           slabId: item.slabId,
-          name: isSlab ? item.slab.name : item.rawCard.name,
-          sub: isSlab ? `${item.slab.gradingCompany} ${Number(item.slab.grade)}` : item.rawCard.cardNumber,
-          imageUrl: isSlab ? item.slab.images?.[0]?.url : item.rawCard.images?.[0]?.url,
+          name: isSlab ? (item.slab?.name || 'Deleted Slab') : (item.rawCard?.name || 'Deleted Card'),
+          sub: isSlab 
+            ? `${item.slab?.gradingCompany || 'Unknown'} ${Number(item.slab?.grade || 0)}` 
+            : (item.rawCard?.cardNumber || 'N/A'),
+          imageUrl: isSlab ? item.slab?.images?.[0]?.url : item.rawCard?.images?.[0]?.url,
           unitPrice: Number(item.unitPrice),
           unitCost: Number(item.unitCost || 0),
           quantity: item.quantity,
