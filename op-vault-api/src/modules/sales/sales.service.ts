@@ -441,7 +441,11 @@ export class SalesService {
   async findOne(id: string) {
     const sale = await this.prisma.sale.findUnique({
       where: { id },
-      include: { items: true, payments: true, customer: true, shipment: { include: { items: true, events: true } } },
+      include: {
+        items: { include: { rawCard: { include: { images: true } }, slab: { include: { images: true } } } },
+        payments: true, customer: true,
+        shipment: { include: { items: true, events: true } },
+      },
     });
     if (!sale) throw new NotFoundException('Sale not found');
     return sale;
