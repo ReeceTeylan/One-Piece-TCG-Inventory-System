@@ -12,6 +12,8 @@ import { peso, pesoF } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useProductSearch, useSaleMutations } from '@/features/sales/use-sales';
 import { CartLine, cartSubtotal } from '@/features/sales/cart';
+import { useQuery } from '@tanstack/react-query';
+import { salesService } from '@/services';
 
 interface EditOrderDialogProps {
   sale: any; // The existing sale object containing its current items
@@ -28,10 +30,16 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
   
   const [cart, setCart] = useState<CartLine[]>([]);
 
+  const { data: fullSale, isLoading: saleLoading } = useQuery({
+    queryKey: ['sale-detail', sale?.id],
+    queryFn: () => salesService.get(sale!.id),
+    enabled: !!sale?.id && open,
+  });
+
   // Pre-load existing sale items into the cart state when dialog opens
   useEffect(() => {
-    if (open && sale) {
-      const initialCart: CartLine[] = sale.items.map((item: any) => {
+    if (open && fullSale) {
+      const initialCart: CartLine[] = (fullSale.items ?? []).map((item: any) => {
         const isSlab = item.itemType === 'SLAB';
         return {
           key: isSlab ? `slab-${item.slabId}` : `raw-${item.rawCardId}`,
@@ -55,7 +63,7 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
       setCart([]);
       setProdSearch('');
     }
-  }, [open, sale]);
+  }, [open, fullSale]);
 
   const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
   // Assuming discount and shippingFee are retained from the original order
