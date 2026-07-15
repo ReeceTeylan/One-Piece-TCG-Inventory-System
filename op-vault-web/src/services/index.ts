@@ -38,6 +38,7 @@ export const salesService = {
   list: (p?: Record<string, any>) => list<Sale>('/sales', p),
   get: (id: string) => one<Sale>(`/sales/${id}`),
   complete: (dto: any) => api.post('/sales', dto).then(unwrap<Sale>),
+  editItems: (id: string, dto: any) => api.patch(`/sales/${id}/items`, dto).then(unwrap<Sale>),
   cancel: (id: string, reason?: string) => api.post(`/sales/${id}/cancel`, { reason }).then(unwrap),
   refund: (id: string, reason?: string) => api.post(`/sales/${id}/refund`, { reason }).then(unwrap),
   undo: (id: string) => api.post(`/sales/${id}/undo`).then(unwrap),

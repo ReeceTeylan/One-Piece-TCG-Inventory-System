@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { apiError } from '@/lib/api';
 import type { Sale } from '@/types';
 import { useSales, useSaleMutations } from '@/features/sales/use-sales';
+import { EditOrderDialog } from '@/features/sales/EditOrderDialog';
 
 const RANGES = ['today', 'week', 'month', 'year'] as const;
 
@@ -31,11 +32,14 @@ export function SalesHistoryPage() {
   const { data, isLoading, isError } = useSales({ page, limit: 20, search: debounced || undefined, range: range || undefined, status: status || undefined });
 
   const [action, setAction] = useState<{ type: 'cancel' | 'refund'; sale: Sale } | null>(null);
+  const [editSale, setEditSale] = useState<Sale | null>(null);
+
   const runAction = async () => {
     if (!action) return;
     try {
-      if (action.type === 'cancel') await cancel.mutateAsync({ id: action.sale.id });
-      else await refund.mutateAsync({ id: action.sale.id });
+      // Fixed: Added the required 'reason' property
+      if (action.type === 'cancel') await cancel.mutateAsync({ id: action.sale.id, reason: 'Cancelled by user' });
+      else await refund.mutateAsync({ id: action.sale.id, reason: 'Refunded by user' });
       toast.success(`Sale ${action.type === 'cancel' ? 'cancelled' : 'refunded'}`);
       setAction(null);
     } catch (e) { toast.error(apiError(e).message); }
@@ -75,12 +79,15 @@ export function SalesHistoryPage() {
                   <TD><Badge variant={saleVariant(s.status)}>{s.status}</Badge></TD>
                   <TD className="text-muted-foreground">{s.shipment?.courier ?? '—'}</TD>
                   <TD>
-                    {isOwner && s.status !== 'CANCELLED' && s.status !== 'REFUNDED' && (
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setAction({ type: 'cancel', sale: s })}>Cancel</Button>
-                        <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setAction({ type: 'refund', sale: s })}>Refund</Button>
-                      </div>
-                    )}
+                    <div className="flex justify-end gap-1">
+                      {isOwner && s.status !== 'CANCELLED' && s.status !== 'REFUNDED' && (
+                        <>
+                          <Button variant="outline" size="sm" onClick={() => setEditSale(s)}>Edit</Button>
+                          <Button variant="ghost" size="sm" onClick={() => setAction({ type: 'cancel', sale: s })}>Cancel</Button>
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setAction({ type: 'refund', sale: s })}>Refund</Button>
+                        </>
+                      )}
+                    </div>
                   </TD>
                 </TR>
               ))}
@@ -92,8 +99,15 @@ export function SalesHistoryPage() {
 
       <ConfirmDialog open={!!action} onOpenChange={(o) => !o && setAction(null)} destructive={action?.type === 'refund'}
         title={action?.type === 'cancel' ? 'Cancel sale' : 'Refund sale'}
-        description={`${action?.type === 'cancel' ? 'Cancel' : 'Refund'} ${action?.sale.reference}? Inventory will be restored.`}
+        description={`${action?.type === 'cancel' ? 'Cancel' : 'Refund'} ${action?.sale?.reference}? Inventory will be restored.`}
         confirmLabel={action?.type === 'cancel' ? 'Cancel sale' : 'Refund'} loading={cancel.isPending || refund.isPending} onConfirm={runAction} />
+
+      <EditOrderDialog 
+        sale={editSale} 
+        open={!!editSale} 
+        onOpenChange={(open) => !open && setEditSale(null)} 
+        onSuccess={() => setEditSale(null)} 
+      />
     </>
   );
 }

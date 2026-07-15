@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -7,6 +7,7 @@ import { SalesService } from './sales.service';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { QuerySaleDto } from './dto/query-sale.dto';
 import { CancelSaleDto } from './dto/cancel-sale.dto';
+import { EditSaleItemsDto } from './dto/edit-sale-items.dto';
 
 @ApiTags('sales')
 @ApiBearerAuth()
@@ -20,6 +21,16 @@ export class SalesController {
   @Post()
   complete(@Body() dto: CreateSaleDto, @CurrentUser('id') userId: string) {
     return this.service.completeSale(dto, userId);
+  }
+  
+  @Patch(':id/items')
+  @Roles(Role.OWNER)
+  editItems(@Param('id') id: string, @Body() dto: EditSaleItemsDto, @CurrentUser('id') userId: string) {
+    return this.service.editSaleItems(id, dto.items, userId, {
+      discount: dto.discount,
+      shippingFee: dto.shippingFee,
+      notes: dto.notes,
+    });
   }
 
   @Post(':id/cancel')

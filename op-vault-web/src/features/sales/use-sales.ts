@@ -16,11 +16,12 @@ export function useSaleMutations() {
     qc.invalidateQueries({ queryKey: ['shipments'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
   };
+  
   return {
     complete: useMutation({ mutationFn: salesService.complete, onSuccess: invalidateAll }),
-    cancel: useMutation({ mutationFn: (v: { id: string; reason?: string }) => salesService.cancel(v.id, v.reason), onSuccess: invalidateAll }),
-    refund: useMutation({ mutationFn: (v: { id: string; reason?: string }) => salesService.refund(v.id, v.reason), onSuccess: invalidateAll }),
-    undo: useMutation({ mutationFn: (id: string) => salesService.undo(id), onSuccess: invalidateAll }),
+    cancel: useMutation({ mutationFn: (v: { id: string; reason: string }) => salesService.cancel(v.id, v.reason), onSuccess: invalidateAll }),
+    refund: useMutation({ mutationFn: (v: { id: string; reason: string }) => salesService.refund(v.id, v.reason), onSuccess: invalidateAll }),
+    editItems: useMutation({ mutationFn: (v: { saleId: string; data: any }) => salesService.editItems(v.saleId, v.data), onSuccess: invalidateAll }),
   };
 }
 

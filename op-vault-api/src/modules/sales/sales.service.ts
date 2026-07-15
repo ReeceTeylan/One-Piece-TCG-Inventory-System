@@ -114,6 +114,104 @@ export class SalesService {
     );
   }
 
+  // ===================================================================
+  // EDIT SALE ITEMS — revise a pre-shipment order in place (same record).
+  // Only allowed while the shipment is TO_PACK or READY. Reverses old
+  // inventory, rebuilds items via applySaleLine, recomputes totals/status.
+  // amountPaid is preserved (over/underpayment handled in person).
+  // ===================================================================
+  async editSaleItems(
+    id: string,
+    items: CreateSaleDto['items'],
+    userId: string,
+    opts?: { discount?: number; shippingFee?: number; notes?: string },
+  ) {
+    if (!items?.length) throw new BadRequestException('A sale must have at least one item');
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        // 1. Load + guard
+        const sale = await tx.sale.findUnique({ where: { id }, include: { shipment: true } });
+        if (!sale) throw new NotFoundException('Sale not found');
+        if (sale.status === 'CANCELLED' || sale.status === 'REFUNDED') {
+          throw new BadRequestException('Cancelled or refunded sales cannot be edited');
+        }
+        if (!sale.shipment) throw new BadRequestException('Sale has no shipment to edit');
+        if (sale.shipment.status !== 'TO_PACK' && sale.shipment.status !== 'READY') {
+          throw new BadRequestException('Order can only be edited while it is To Pack or Ready');
+        }
+
+        // 2. Reverse the CURRENT inventory (raw stock, totalSold, slab status, logs)
+        await this.restoreInventory(tx, id, userId);
+
+        // 3. Clear old item snapshots (sale items + shipment items) so we can rebuild
+        await tx.saleItem.deleteMany({ where: { saleId: id } });
+        await tx.shipmentItem.deleteMany({ where: { shipmentId: sale.shipment.id } });
+
+        // 4. Re-apply each new line via the shared helper (deducts stock, builds snapshots)
+        let subtotal = 0;
+        let itemsProfit = 0;
+        const saleItemsData: Prisma.SaleItemCreateManySaleInput[] = [];
+        const shipmentItemsData: { nameSnapshot: string; quantity: number }[] = [];
+        for (const line of items) {
+          const { lineRevenue, lineProfit } = await this.applySaleLine(tx, line, userId, { saleItemsData, shipmentItemsData });
+          subtotal += lineRevenue;
+          itemsProfit += lineProfit;
+        }
+
+        // 5. Recompute totals — keep existing amountPaid; re-derive status
+        const discount = opts?.discount ?? Number(sale.discount);
+        const shippingFee = opts?.shippingFee ?? Number(sale.shippingFee);
+        if (discount > subtotal) throw new BadRequestException('Discount cannot exceed subtotal');
+        const grandTotal = subtotal - discount + shippingFee;
+        const totalProfit = itemsProfit - discount;
+        const amountPaid = Math.min(Number(sale.amountPaid), grandTotal);
+        const status = PaymentsService.deriveStatus(amountPaid, grandTotal);
+
+        // 6. Update the SAME sale record + recreate its items
+        await tx.sale.update({
+          where: { id },
+          data: {
+            subtotal: new Prisma.Decimal(subtotal),
+            discount: new Prisma.Decimal(discount),
+            shippingFee: new Prisma.Decimal(shippingFee),
+            grandTotal: new Prisma.Decimal(grandTotal),
+            amountPaid: new Prisma.Decimal(amountPaid),
+            totalProfit: new Prisma.Decimal(totalProfit),
+            status,
+            notes: opts?.notes ?? sale.notes,
+            items: { createMany: { data: saleItemsData } },
+          },
+        });
+
+        // 7. Rebuild shipment items + refresh its total value
+        await tx.shipment.update({
+          where: { id: sale.shipment.id },
+          data: {
+            totalValue: new Prisma.Decimal(grandTotal),
+            items: { createMany: { data: shipmentItemsData } },
+          },
+        });
+        await tx.shipmentEvent.create({
+          data: { shipmentId: sale.shipment.id, status: sale.shipment.status, note: 'Order edited — items updated' },
+        });
+
+        // 8. Audit
+        await this.audit.log(
+          { userId, action: 'sale.edit', entityType: 'Sale', entityId: id,
+            metadata: { reference: sale.reference, grandTotal, items: saleItemsData.length } },
+          tx,
+        );
+
+        return tx.sale.findUnique({
+          where: { id },
+          include: { items: true, payments: true, shipment: { include: { items: true } }, customer: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 },
+    );
+  }
+  
   // Shared per-line logic: validate + deduct inventory for ONE sale line, and
   // push the resulting sale-item + shipment-item snapshots. Used by completeSale
   // and editSaleItems so inventory/profit math lives in exactly one place.
