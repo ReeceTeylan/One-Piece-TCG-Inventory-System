@@ -21,6 +21,7 @@ import { useImageDrop } from '@/features/raw-cards/use-image-drop';
 import { useAuth } from '@/contexts/auth-context';
 import { peso } from '@/lib/utils';
 import { apiError } from '@/lib/api';
+import { useDebounce } from '@/hooks/use-debounce';
 import type { RawCard, StockStatus } from '@/types';
 import { rawCardsService } from '@/services';
 import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
@@ -36,6 +37,10 @@ export function RawCardsPage() {
   const [search, setSearch] = useState(sp.get('search') ?? '');
   const [status, setStatus] = useState('');
   const [rarity, setRarity] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const minDebounced = useDebounce(minPrice);
+  const maxDebounced = useDebounce(maxPrice);
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
   const [pageInputVal, setPageInputVal] = useState('');
@@ -49,6 +54,8 @@ export function RawCardsPage() {
   const [sortBy, sortOrder] = sort.split(':');
   const query = useRawCards({
     search: search || undefined, status: status || undefined, rarity: rarity || undefined,
+    minPrice: minDebounced !== '' ? Number(minDebounced) : undefined,
+    maxPrice: maxDebounced !== '' ? Number(maxDebounced) : undefined,
     sortBy, sortOrder, page, limit: 15,
   });
   const { remove, upload } = useRawCardMutations();
@@ -145,6 +152,16 @@ export function RawCardsPage() {
           <option value="postedPrice:desc">Price high→low</option><option value="postedPrice:asc">Price low→high</option>
           <option value="quantity:desc">Qty high→low</option><option value="quantity:asc">Qty low→high</option>
         </Select>
+        <div className="flex items-center gap-1.5">
+          <Input type="number" min={0} value={minPrice} onChange={(e) => { setMinPrice(e.target.value); setPage(1); }}
+            placeholder="Min ₱" className="h-9 w-24" aria-label="Minimum price" />
+          <span className="text-muted-foreground">–</span>
+          <Input type="number" min={0} value={maxPrice} onChange={(e) => { setMaxPrice(e.target.value); setPage(1); }}
+            placeholder="Max ₱" className="h-9 w-24" aria-label="Maximum price" />
+          {(minPrice || maxPrice) && (
+            <Button variant="ghost" size="sm" onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1); }}>Clear</Button>
+          )}
+        </div>
       </div>
 
       {selected.size > 0 && (

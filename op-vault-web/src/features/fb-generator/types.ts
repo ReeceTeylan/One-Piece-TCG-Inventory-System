@@ -47,9 +47,9 @@ export const DEFAULT_CONFIG: OverlayConfig = {
   showLogo: true,
   showNotes: true,
   theme: 'dark',
-  opacity: 0.55,
+  opacity: 0.85,
   fontSize: 15,
-  borderRadius: 12,
+  borderRadius: 5,
   shadow: true,
   textPosition: 'pill',
 };

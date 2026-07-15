@@ -72,6 +72,12 @@ export class RawCardsService {
     const where: Prisma.RawCardWhereInput = {};
     if (query.status) where.status = query.status;
     if (query.rarity) where.rarity = query.rarity;
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      where.postedPrice = {
+        ...(query.minPrice !== undefined ? { gte: query.minPrice } : {}),
+        ...(query.maxPrice !== undefined ? { lte: query.maxPrice } : {}),
+      };
+    }
     if (query.search) {
       where.OR = [
         { name: { contains: query.search, mode: 'insensitive' } },
