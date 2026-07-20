@@ -49,6 +49,7 @@ export class AnalyticsService {
   /** Full dashboard payload. */
   async dashboard() {
     const now = new Date();
+    const dayOfMonth = now.getDate(); // days elapsed this month (1-based), PH time via TZ
     const startToday = this.periodStart('today');
     const startWeek = this.periodStart('week');
     const startMonth = this.periodStart('month');
@@ -77,6 +78,7 @@ export class AnalyticsService {
     return {
       revenue: { today: today.revenue, week: week.revenue, month: month.revenue, year: year.revenue },
       profit: { today: today.profit, week: week.profit, month: month.profit, year: year.profit },
+      avgDailyProfit: dayOfMonth > 0 ? Math.round(month.profit / dayOfMonth) : 0,
       cardsSold: { today: today.cardsSold, week: week.cardsSold, month: month.cardsSold, year: year.cardsSold },
       orders: { today: today.orders, week: week.orders, month: month.orders, year: year.orders },
       growth: {

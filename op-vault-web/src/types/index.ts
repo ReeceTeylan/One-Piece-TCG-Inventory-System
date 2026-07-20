@@ -47,6 +47,7 @@ export interface Notification { id: string; type: NotifType; title: string; body
 export interface DashboardData {
   revenue: Record<'today' | 'week' | 'month' | 'year', number>;
   profit: Record<'today' | 'week' | 'month' | 'year', number>;
+  avgDailyProfit: number;
   cardsSold: Record<'today' | 'week' | 'month' | 'year', number>;
   orders: Record<'today' | 'week' | 'month' | 'year', number>;
   growth: { revenueWeek: number; revenueMonth: number; profitMonth: number };

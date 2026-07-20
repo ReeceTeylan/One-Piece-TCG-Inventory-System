@@ -54,7 +54,7 @@ export function DashboardPage() {
             <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} />
             <Stat label="Total raw cards" value={String(d.counts.totalRawCards)} />
             <Stat label="Total slabs" value={String(d.counts.totalSlabs)} />
-            <Stat label="Revenue today" value={peso(d.revenue.today)} />
+            <Stat label="Avg daily profit" value={peso(d.avgDailyProfit)} />
             <Stat label="Revenue month" value={peso(d.revenue.month)} delta={d.growth.revenueMonth} />
             <Stat label="Profit month" value={peso(d.profit.month)} delta={d.growth.profitMonth} />
             <Stat label="Profit margin" value={`${d.inventory.profitMargin}%`} />
