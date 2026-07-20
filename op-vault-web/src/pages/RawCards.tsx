@@ -96,7 +96,9 @@ export function RawCardsPage() {
     else if (op === 'inc_amt') p = current + v;
     else if (op === 'dec_amt') p = current - v;
     else if (op === 'set') p = v;
-    return Math.max(0, Math.round(p)); // whole pesos, never negative
+    // High-value cards round to nearest ₱100; others to nearest ₱10. Never negative.
+    const rounded = p >= 5000 ? Math.round(p / 100) * 100 : Math.round(p / 10) * 10;
+    return Math.max(0, rounded);
   };
 
   const applyBulkPrice = async () => {

@@ -119,9 +119,27 @@ export class RawCardsService {
   async addQuantity(id: string, quantity: number, buyCost: number, userId: string) {
     const card = await this.findOne(id);
     const newQty = card.quantity + quantity;
+
+    // Weighted-average cost: only recompute when a real (>0) new cost is given.
+    // The quick "+Qty" flow passes 0 → keep the existing cost untouched.
+    let newBuyCost = Number(card.buyCost);
+    if (buyCost > 0) {
+      const oldQty = card.quantity;
+      const oldCost = Number(card.buyCost);
+      const totalQty = oldQty + quantity;
+      newBuyCost = totalQty > 0
+        ? (oldQty * oldCost + quantity * buyCost) / totalQty
+        : buyCost;
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const c = await tx.rawCard.update({
-        where: { id }, data: { quantity: newQty, status: this.computeStatus(newQty) },
+        where: { id },
+        data: {
+          quantity: newQty,
+          status: this.computeStatus(newQty),
+          buyCost: new Prisma.Decimal(newBuyCost.toFixed(2)),
+        },
       });
       await tx.restockLog.create({ data: { rawCardId: id, quantityAdded: quantity, buyCost, userId } });
       await tx.inventoryLog.create({
