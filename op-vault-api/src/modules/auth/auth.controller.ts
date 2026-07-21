@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Patch, Post } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
@@ -6,6 +6,7 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -39,4 +40,12 @@ export class AuthController {
   me(@CurrentUser() user: AuthUser) {
     return user;
   }
+
+  @ApiBearerAuth()
+  @Patch('change-password')
+  @HttpCode(200)
+  changePassword(@CurrentUser('id') userId: string, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(userId, dto.currentPassword, dto.newPassword);
+  }
+  
 }
