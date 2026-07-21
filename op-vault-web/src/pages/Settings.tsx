@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { useState } from 'react';
+import { authService } from '@/services';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -53,6 +55,55 @@ export function SettingsPage() {
           </div>
         </form>
       )}
+
+      <ChangePasswordCard />
     </>
+  );
+}
+
+function ChangePasswordCard() {
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async () => {
+    if (next.length < 8) { toast.error('New password must be at least 8 characters'); return; }
+    if (next === current) { toast.error('New password must be different from the current one'); return; }
+    if (next !== confirm) { toast.error('New password and confirmation do not match'); return; }
+    setBusy(true);
+    try {
+      await authService.changePassword({ currentPassword: current, newPassword: next });
+      toast.success('Password changed successfully');
+      setCurrent(''); setNext(''); setConfirm('');
+    } catch (e) {
+      toast.error(apiError(e).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="mt-4 max-w-md p-5">
+      <h3 className="mb-4 text-sm font-bold">Change password</h3>
+      <div className="mb-3">
+        <Label>Current password</Label>
+        <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} className="mt-1" />
+      </div>
+      <div className="mb-3">
+        <Label>New password</Label>
+        <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} className="mt-1" />
+        <p className="mt-1 text-xs text-muted-foreground">At least 8 characters, different from your current password.</p>
+      </div>
+      <div className="mb-4">
+        <Label>Confirm new password</Label>
+        <Input type="password" autoComplete="new-password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className="mt-1" />
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={submit} disabled={busy || !current || !next || !confirm}>
+          {busy ? 'Updating…' : 'Change password'}
+        </Button>
+      </div>
+    </Card>
   );
 }

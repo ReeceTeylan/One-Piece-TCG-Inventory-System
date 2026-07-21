@@ -112,4 +112,8 @@ export function triggerDownload(blob: Blob, filename: string) {
   const a = document.createElement('a');
   a.href = url; a.download = filename; document.body.appendChild(a); a.click();
   a.remove(); URL.revokeObjectURL(url);
+};
+export const authService = {
+  changePassword: (dto: { currentPassword: string; newPassword: string }) =>
+    api.patch('/auth/change-password', dto).then(unwrap<{ message: string }>),
 }
