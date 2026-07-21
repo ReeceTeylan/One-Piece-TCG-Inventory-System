@@ -424,7 +424,10 @@ export class SalesService {
         { customer: { name: { contains: query.search, mode: 'insensitive' } } },
       ];
     }
-    const [data, total] = await this.prisma.$transaction([
+    // Real-sales filter: same filters as the list, but never counts void sales.
+    const realWhere: Prisma.SaleWhereInput = { ...where, status: { notIn: ['CANCELLED', 'REFUNDED'] } };
+
+    const [data, total, agg, cardsAgg] = await this.prisma.$transaction([
       this.prisma.sale.findMany({
         where, orderBy: { createdAt: query.sortOrder }, skip: query.skip, take: query.limit,
         include: {
@@ -434,8 +437,19 @@ export class SalesService {
         },
       }),
       this.prisma.sale.count({ where }),
+      this.prisma.sale.aggregate({ where: realWhere, _sum: { grandTotal: true, totalProfit: true } }),
+      this.prisma.saleItem.aggregate({ where: { sale: realWhere }, _sum: { quantity: true } }),
     ]);
-    return paginate(data, total, query);
+
+    const result = paginate(data, total, query);
+    return {
+      ...result,
+      summary: {
+        totalRevenue: Number(agg._sum.grandTotal ?? 0),
+        totalProfit: Number(agg._sum.totalProfit ?? 0),
+        totalCardsSold: Number(cardsAgg._sum.quantity ?? 0),
+      },
+    };
   }
 
   async findOne(id: string) {

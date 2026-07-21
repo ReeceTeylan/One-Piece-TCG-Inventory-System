@@ -61,6 +61,23 @@ export function SalesHistoryPage() {
         </select>
       </div>
 
+      {data?.summary && (
+        <div className="mb-3.5 grid grid-cols-3 gap-3">
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Total revenue</div>
+            <div className="mt-0.5 text-xl font-bold tabular-nums">{peso(data.summary.totalRevenue)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Total profit</div>
+            <div className="mt-0.5 text-xl font-bold tabular-nums text-success">{peso(data.summary.totalProfit)}</div>
+          </Card>
+          <Card className="p-4">
+            <div className="text-xs text-muted-foreground">Cards sold</div>
+            <div className="mt-0.5 text-xl font-bold tabular-nums">{data.summary.totalCardsSold}</div>
+          </Card>
+        </div>
+      )}
+
       <Card>
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No sales found." /> : (
           <Table>
