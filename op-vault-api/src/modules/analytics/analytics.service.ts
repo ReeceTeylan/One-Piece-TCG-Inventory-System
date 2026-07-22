@@ -170,7 +170,7 @@ export class AnalyticsService {
     >(Prisma.sql`
       WITH daily_sales AS (
         SELECT 
-          date_trunc(${unit}, "createdAt") AS bucket,
+          date_trunc(${unit}, "createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') AS bucket,
           SUM("grandTotal") AS revenue,
           SUM("totalProfit") AS profit,
           COUNT(id) AS orders
@@ -180,7 +180,7 @@ export class AnalyticsService {
       ),
       daily_items AS (
         SELECT 
-          date_trunc(${unit}, s."createdAt") AS bucket,
+          date_trunc(${unit}, s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila') AS bucket,
           SUM(si.quantity) AS cards
         FROM sales s
         LEFT JOIN sale_items si ON si."saleId" = s.id
