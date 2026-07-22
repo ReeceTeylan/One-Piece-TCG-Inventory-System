@@ -30,7 +30,7 @@ function Stat({ label, value, delta }: { label: string; value: string; delta?: n
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const [metric, setMetric] = useState<'revenue' | 'profit' | 'cardsSold'>('revenue');
+  const [metric, setMetric] = useState<'revenue' | 'profit' | 'cardsSold'>('profit');
   const [targetMonth, setTargetMonth] = useState(''); 
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: analyticsService.dashboard });
   const trends = useQuery({ 

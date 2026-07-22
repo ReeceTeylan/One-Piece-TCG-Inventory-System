@@ -5,9 +5,9 @@ import { peso, fmtDate } from '@/lib/utils';
 // Custom tooltip: Revenue, Profit, Cards Sold, Quantity, % growth vs previous point.
 function ChartTooltip({ active, payload }: any) {
   if (!active || !payload?.length) return null;
-  const p = payload[0].payload as TrendPoint & { _prevRevenue?: number };
-  const prev = p._prevRevenue ?? 0;
-  const growth = prev === 0 ? (p.revenue > 0 ? 100 : 0) : ((p.revenue - prev) / prev) * 100;
+  const p = payload[0].payload as TrendPoint & { _prevProfit?: number };
+  const prev = p._prevProfit ?? 0;
+  const growth = prev === 0 ? (p.profit > 0 ? 100 : 0) : ((p.profit - prev) / prev) * 100;
   const Row = ({ label, value, color }: { label: string; value: string; color?: string }) => (
     <div className="flex justify-between gap-6 py-0.5"><span className="text-muted-foreground">{label}</span><span className="font-semibold" style={color ? { color } : undefined}>{value}</span></div>
   );
@@ -18,14 +18,14 @@ function ChartTooltip({ active, payload }: any) {
       <Row label="Profit" value={peso(p.profit)} color="hsl(var(--success))" />
       <Row label="Cards sold" value={String(p.cardsSold)} />
       <Row label="Quantity" value={String(p.cardsSold)} />
-      <Row label="Growth" value={`${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth).toFixed(1)}%`} color={growth >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'} />
+      <Row label="Profit growth" value={`${growth >= 0 ? '▲' : '▼'} ${Math.abs(growth).toFixed(1)}%`} color={growth >= 0 ? 'hsl(var(--success))' : 'hsl(var(--destructive))'} />
     </div>
   );
 }
 
 export function TrendChart({ data, metric = 'revenue' }: { data: TrendPoint[]; metric?: 'revenue' | 'profit' | 'cardsSold' }) {
-  // attach previous-point revenue for growth calc
-  const enriched = data.map((d, i) => ({ ...d, _prevRevenue: i > 0 ? data[i - 1].revenue : 0 }));
+  // attach previous-point profit for growth calc
+  const enriched = data.map((d, i) => ({ ...d, _prevProfit: i > 0 ? data[i - 1].profit : 0 }));
   const color = metric === 'profit' ? 'hsl(var(--success))' : 'hsl(var(--ring))';
   return (
     <ResponsiveContainer width="100%" height={230}>
