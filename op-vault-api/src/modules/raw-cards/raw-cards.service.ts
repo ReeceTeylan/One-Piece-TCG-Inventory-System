@@ -71,6 +71,7 @@ export class RawCardsService {
   async findAll(query: QueryRawCardDto) {
     const where: Prisma.RawCardWhereInput = {};
     if (query.status) where.status = query.status;
+    if (query.inStock) where.quantity = { gt: 0 };
     if (query.rarity) where.rarity = query.rarity;
     if (query.minPrice !== undefined || query.maxPrice !== undefined) {
       where.postedPrice = {

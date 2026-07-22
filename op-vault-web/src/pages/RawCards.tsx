@@ -27,15 +27,14 @@ import { rawCardsService } from '@/services';
 import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
 
 const statusBadge = (s: StockStatus) =>
-  s === 'AVAILABLE' ? <Badge variant="success">Available</Badge>
-  : s === 'LOW' ? <Badge variant="warning">Low</Badge>
-  : s === 'SOLD' ? <Badge>Sold</Badge> : <Badge variant="destructive">Out</Badge>;
+  s === 'OUT' ? <Badge variant="destructive">Sold</Badge>
+  : <Badge variant="success">Available</Badge>;
 
 export function RawCardsPage() {
   const { isOwner } = useAuth();
   const [sp, setSp] = useSearchParams();
   const [search, setSearch] = useState(sp.get('search') ?? '');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('IN_STOCK');
   const [rarity, setRarity] = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -53,7 +52,10 @@ export function RawCardsPage() {
 
   const [sortBy, sortOrder] = sort.split(':');
   const query = useRawCards({
-    search: search || undefined, status: status || undefined, rarity: rarity || undefined,
+    search: search || undefined,
+    status: status === 'IN_STOCK' || status === '' ? undefined : status,
+    inStock: status === 'IN_STOCK' ? true : undefined,
+    rarity: rarity || undefined,
     minPrice: minDebounced !== '' ? Number(minDebounced) : undefined,
     maxPrice: maxDebounced !== '' ? Number(maxDebounced) : undefined,
     sortBy, sortOrder, page, limit: 15,
@@ -146,7 +148,7 @@ export function RawCardsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, set…" className="pl-9" />
         </form>
-        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="">All status</option><option value="AVAILABLE">Available</option><option value="LOW">Low</option><option value="OUT">Out</option></Select>
+        <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="IN_STOCK">Available</option><option value="OUT">Sold</option><option value="">All</option></Select>
         <Select value={rarity} onChange={(e) => { setRarity(e.target.value); setPage(1); }}><option value="">All rarities</option>{RARITIES.map((r) => <option key={r} value={r}>{r}</option>)}</Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="createdAt:desc">Recently added</option>

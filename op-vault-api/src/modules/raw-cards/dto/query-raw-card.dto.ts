@@ -1,10 +1,13 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 import { StockStatus } from '@prisma/client';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class QueryRawCardDto extends PaginationDto {
+  @ApiPropertyOptional({ description: 'Only cards with quantity > 0' })
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean() @IsOptional() inStock?: boolean;
   @ApiPropertyOptional({ enum: StockStatus })
   @IsEnum(StockStatus) @IsOptional() status?: StockStatus;
 
