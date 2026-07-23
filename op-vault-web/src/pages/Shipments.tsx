@@ -25,10 +25,15 @@ import { useShipments, useShipmentMutations, useShipmentTimeline, NEXT_STATUS } 
 const STATUSES = ['TO_PACK', 'READY', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 export function ShipmentsPage() {
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('PENDING');
   const [courier, setCourier] = useState('');
   const [page, setPage] = useState(1);
-  const { data, isLoading, isError } = useShipments({ page, limit: 20, status: status || undefined, courier: courier || undefined });
+  const { data, isLoading, isError } = useShipments({
+    page, limit: 20,
+    status: status === 'PENDING' || status === '' ? undefined : status,
+    pending: status === 'PENDING' ? true : undefined,
+    courier: courier || undefined,
+  });
   const [detail, setDetail] = useState<Shipment | null>(null);
 
   return (
@@ -36,7 +41,9 @@ export function ShipmentsPage() {
       <PageHeader title="Shipments" subtitle="Fulfillment queue & tracking" />
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-          <option value="">All status</option>{STATUSES.map((s) => <option key={s} value={s}>{shipLabel(s as any)}</option>)}
+          <option value="PENDING">To pack &amp; Ready</option>
+          <option value="">All status</option>
+          {STATUSES.map((s) => <option key={s} value={s}>{shipLabel(s as any)}</option>)}
         </Select>
         <Select value={courier} onChange={(e) => { setCourier(e.target.value); setPage(1); }}>
           <option value="">All couriers</option>{COURIERS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -94,6 +101,14 @@ function ShipmentDetail({ shipment, onOpenChange }: { shipment: Shipment | null;
       onOpenChange(false); setTracking(''); setCourier('');
     } catch (e) { toast.error(apiError(e).message); }
   };
+  const markDelivered = async () => {
+    if (!shipment) return;
+    try {
+      await update.mutateAsync({ id: shipment.id, dto: { status: 'DELIVERED', trackingNumber: tracking || shipment.trackingNumber || undefined, courier: courier || undefined } });
+      toast.success('Marked as delivered');
+      onOpenChange(false); setTracking(''); setCourier('');
+    } catch (e) { toast.error(apiError(e).message); }
+  };
   const saveTracking = async () => {
     if (!shipment) return;
     try { await update.mutateAsync({ id: shipment.id, dto: { trackingNumber: tracking, courier: courier || undefined } }); toast.success('Updated'); }
@@ -144,6 +159,9 @@ function ShipmentDetail({ shipment, onOpenChange }: { shipment: Shipment | null;
         )}
         <DialogFooter>
           <Button variant="outline" onClick={saveTracking} disabled={update.isPending}>Save tracking</Button>
+          {shipment && next && next !== 'DELIVERED' && shipment.status !== 'CANCELLED' && (
+            <Button variant="outline" onClick={markDelivered} disabled={update.isPending}>Mark delivered</Button>
+          )}
           {next && <Button onClick={advance} disabled={update.isPending}>Move to {shipLabel(next as any)} <ArrowRight /></Button>}
         </DialogFooter>
       </DialogContent>

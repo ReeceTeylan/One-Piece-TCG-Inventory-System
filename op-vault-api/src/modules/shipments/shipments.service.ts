@@ -9,8 +9,10 @@ import { QueryShipmentDto } from './dto/query-shipment.dto';
 
 // Allowed forward transitions (plus CANCELLED from any non-delivered state).
 const FLOW: Record<ShipStatus, ShipStatus[]> = {
-  TO_PACK: ['READY', 'CANCELLED'],
-  READY: ['SHIPPED', 'CANCELLED'],
+  // DELIVERED is reachable from any active state so meet-ups and hand-offs
+  // can be closed out without stepping through Ready/Shipped.
+  TO_PACK: ['READY', 'DELIVERED', 'CANCELLED'],
+  READY: ['SHIPPED', 'DELIVERED', 'CANCELLED'],
   SHIPPED: ['DELIVERED', 'CANCELLED'],
   DELIVERED: [],
   CANCELLED: [],
@@ -27,6 +29,8 @@ export class ShipmentsService {
   async findAll(query: QueryShipmentDto) {
     const where: Prisma.ShipmentWhereInput = {};
     if (query.status) where.status = query.status;
+    // "Pending" = needs action: still to pack or ready to ship.
+    else if (query.pending) where.status = { in: ['TO_PACK', 'READY'] };
     if (query.courier) where.courier = query.courier;
     if (query.search) {
       where.OR = [
