@@ -11,6 +11,8 @@ import { QuerySaleDto } from './dto/query-sale.dto';
 
 const LOW_STOCK = 3;
 const stockStatus = (q: number): StockStatus => (q <= 0 ? 'OUT' : q <= LOW_STOCK ? 'LOW' : 'AVAILABLE');
+// Sealed products have no LOW tier — the slabs UI filters Available/Sold only.
+const sealedStatus = (q: number): StockStatus => (q <= 0 ? 'SOLD' : 'AVAILABLE');
 
 @Injectable()
 export class SalesService {
@@ -284,29 +286,59 @@ export class SalesService {
       return { lineRevenue, lineProfit };
     }
 
-    // SLAB — always quantity 1, must be AVAILABLE
+    // SLAB row — a graded slab is one physical item; a sealed product stacks.
     if (!line.slabId) throw new BadRequestException('slabId required for SLAB item');
     const slab = await tx.slabCard.findUnique({ where: { id: line.slabId } });
     if (!slab) throw new NotFoundException(`Slab ${line.slabId} not found`);
-    if (slab.status === 'SOLD') throw new BadRequestException(`Slab ${slab.name} is already sold`);
+
+    const isSealed = slab.kind === 'SEALED';
+    const qty = isSealed ? line.quantity : 1;
+    if (isSealed && slab.quantity < qty) {
+      throw new BadRequestException(
+        `Insufficient stock for ${slab.name}: ${slab.quantity} available, ${qty} requested`,
+      );
+    }
+    if (!isSealed && slab.status === 'SOLD') {
+      throw new BadRequestException(`Slab ${slab.name} is already sold`);
+    }
+
     const unitCost = Number(slab.buyCost);
-    const lineProfit = line.unitPrice - unitCost;
+    const lineRevenue = line.unitPrice * qty;
+    const lineProfit = (line.unitPrice - unitCost) * qty;
+    const newSlabQty = Math.max(0, slab.quantity - qty);
+    const newSlabSold = slab.totalSold + qty;
+    const prevSlabAvg = Number(slab.avgSellPrice ?? 0);
+    const newSlabAvg = (prevSlabAvg * slab.totalSold + lineRevenue) / newSlabSold;
+    const label = isSealed ? slab.name : `${slab.name} (${slab.gradingCompany} ${slab.grade})`;
+
     await tx.slabCard.update({
-      where: { id: slab.id }, data: { status: 'SOLD', soldAt: new Date() },
+      where: { id: slab.id },
+      data: {
+        quantity: newSlabQty,
+        status: isSealed ? sealedStatus(newSlabQty) : 'SOLD',
+        totalSold: newSlabSold,
+        avgSellPrice: new Prisma.Decimal(newSlabAvg.toFixed(2)),
+        soldAt: newSlabQty <= 0 ? new Date() : slab.soldAt,
+      },
     });
     await tx.inventoryLog.create({
       data: {
         itemType: 'SLAB', slabId: slab.id, action: 'SALE',
-        quantityDelta: -1, quantityAfter: 0, userId,
+        quantityDelta: -qty, quantityAfter: newSlabQty, userId,
       },
     });
+    if (isSealed && newSlabQty <= 0) {
+      await tx.notification.create({
+        data: { type: 'OUT_OF_STOCK', title: `Out of stock: ${slab.name}`, body: 'No copies remaining after sale' },
+      });
+    }
     acc.saleItemsData.push({
-      itemType: 'SLAB', slabId: slab.id, nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`,
-      quantity: 1, unitPrice: new Prisma.Decimal(line.unitPrice),
+      itemType: 'SLAB', slabId: slab.id, nameSnapshot: label,
+      quantity: qty, unitPrice: new Prisma.Decimal(line.unitPrice),
       unitCost: new Prisma.Decimal(unitCost), lineProfit: new Prisma.Decimal(lineProfit),
     });
-    acc.shipmentItemsData.push({ nameSnapshot: `${slab.name} (${slab.gradingCompany} ${slab.grade})`, quantity: 1 });
-    return { lineRevenue: line.unitPrice, lineProfit };
+    acc.shipmentItemsData.push({ nameSnapshot: qty > 1 ? `${label} x${qty}` : label, quantity: qty });
+    return { lineRevenue, lineProfit };
   }
   // ===================================================================
   // Reversal helpers (shared by cancel / refund / undo)
@@ -334,10 +366,26 @@ export class SalesService {
           });
         }
       } else if (it.itemType === 'SLAB' && it.slabId) {
-        await tx.slabCard.update({ where: { id: it.slabId }, data: { status: 'AVAILABLE', soldAt: null } });
-        await tx.inventoryLog.create({
-          data: { itemType: 'SLAB', slabId: it.slabId, action: 'CANCEL_SALE', quantityDelta: 1, quantityAfter: 1, reference: saleId, userId },
-        });
+        const slab = await tx.slabCard.findUnique({ where: { id: it.slabId } });
+        if (slab) {
+          const isSealed = slab.kind === 'SEALED';
+          const newQty = isSealed ? slab.quantity + it.quantity : 1;
+          await tx.slabCard.update({
+            where: { id: slab.id },
+            data: {
+              quantity: newQty,
+              status: isSealed ? sealedStatus(newQty) : 'AVAILABLE',
+              totalSold: Math.max(0, slab.totalSold - it.quantity),
+              soldAt: null,
+            },
+          });
+          await tx.inventoryLog.create({
+            data: {
+              itemType: 'SLAB', slabId: slab.id, action: 'CANCEL_SALE',
+              quantityDelta: it.quantity, quantityAfter: newQty, reference: saleId, userId,
+            },
+          });
+        }
       }
     }
   }

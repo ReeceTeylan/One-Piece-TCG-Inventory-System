@@ -73,11 +73,20 @@ export function SalesWizardPage() {
     });
   };
   const addSlab = (s: any) => {
+    const isSealed = s.kind === 'SEALED';
     setCart((prev) => {
-      if (prev.find((l) => l.itemType === 'SLAB' && l.slabId === s.id)) { toast.error('Slab already in cart'); return prev; }
+      const found = prev.find((l) => l.itemType === 'SLAB' && l.slabId === s.id);
+      if (found) {
+        // A graded slab is one physical item; sealed stacks up to available stock.
+        if (!isSealed) { toast.error('Slab already in cart'); return prev; }
+        if (found.quantity >= found.max) { toast.error('Reached available stock'); return prev; }
+        return prev.map((l) => (l === found ? { ...l, quantity: l.quantity + 1 } : l));
+      }
       return [...prev, {
-        key: `slab-${s.id}`, itemType: 'SLAB', slabId: s.id, name: s.name, sub: `${s.gradingCompany} ${Number(s.grade)}`,
-        imageUrl: s.images?.[0]?.url, unitPrice: Number(s.sellPrice), unitCost: Number(s.buyCost), quantity: 1, max: 1,
+        key: `slab-${s.id}`, itemType: 'SLAB', slabId: s.id, name: s.name,
+        sub: isSealed ? (s.setName || 'Sealed') : `${s.gradingCompany} ${Number(s.grade)}`,
+        imageUrl: s.images?.[0]?.url, unitPrice: Number(s.sellPrice), unitCost: Number(s.buyCost),
+        quantity: 1, max: isSealed ? (s.quantity ?? 1) : 1,
       }];
     });
   };
@@ -173,7 +182,11 @@ export function SalesWizardPage() {
                 <ProductRow key={c.id} img={c.images?.[0]?.url} name={c.name} sub={`${c.cardNumber} · ${c.quantity} in stock`} price={c.postedPrice} onAdd={() => addRaw(c)} />
               ))}
               {slabs.data?.data.map((s) => (
-                <ProductRow key={s.id} img={s.images?.[0]?.url} name={s.name} sub={`${s.gradingCompany} ${Number(s.grade)} · cert ${s.slabNumber}`} price={s.sellPrice} badge="SLAB" onAdd={() => addSlab(s)} />
+                <ProductRow key={s.id} img={s.images?.[0]?.url} name={s.name}
+                  sub={s.kind === 'SEALED'
+                    ? `${s.setName || 'Sealed product'} · ${s.quantity} in stock`
+                    : `${s.gradingCompany} ${Number(s.grade)} · cert ${s.slabNumber}`}
+                  price={s.sellPrice} badge={s.kind === 'SEALED' ? 'SEALED' : 'SLAB'} onAdd={() => addSlab(s)} />
               ))}
               {(raw.isLoading || slabs.isLoading) && <div className="flex justify-center py-6"><Spinner /></div>}
               {!raw.isLoading && !slabs.isLoading && !raw.data?.data.length && !slabs.data?.data.length && (
@@ -183,7 +196,7 @@ export function SalesWizardPage() {
           </Card>
           <Card className="flex flex-col p-5">
             <h3 className="mb-2 text-sm font-semibold">Cart <span className="text-muted-foreground">· {cart.length} item(s)</span></h3>
-            <div className="flex-1 space-y-2 overflow-y-auto">
+            <div className="max-h-[420px] flex-1 space-y-2 overflow-y-auto pr-1">
               {cart.length ? cart.map((l) => (
                 <div key={l.key} className="flex items-center gap-2.5 border-b py-2 last:border-0">
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-10 w-[30px]" />
