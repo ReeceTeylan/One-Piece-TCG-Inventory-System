@@ -27,6 +27,11 @@ enum ItemType {
   SLAB
 }
 
+enum ProductKind {
+  SLAB
+  SEALED
+}
+
 enum StockStatus {
   AVAILABLE
   LOW
@@ -164,24 +169,31 @@ model SlabCard {
   character      String?
   color          String?
   rarity         String?
-  gradingCompany String      // PSA, BGS, CGC, SGC
-  slabNumber     String      @unique // certification number — globally unique
-  grade          Decimal     @db.Decimal(3, 1)
+  kind           ProductKind @default(SLAB)
+  gradingCompany String?     // PSA, BGS, CGC, SGC — null for SEALED
+  slabNumber     String?     @unique // cert number — null for SEALED
+  grade          Decimal?    @db.Decimal(3, 1) // null for SEALED
   buyCost        Decimal     @db.Decimal(12, 2)
   sellPrice      Decimal     @db.Decimal(12, 2)
+  quantity       Int         @default(1)
+  avgSellPrice   Decimal?    @db.Decimal(12, 2)
+  totalSold      Int         @default(0)
   status         StockStatus @default(AVAILABLE)
   notes          String?
   isPinned       Boolean     @default(false)
   soldAt         DateTime?
   images         CardImage[]
   saleItems      SaleItem[]
+  restockLogs    RestockLog[]
   favorites      Favorite[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
   @@index([status])
+  @@index([kind])
   @@index([grade])
   @@index([gradingCompany])
+  @@index([quantity])
   @@index([name])
   @@map("slab_cards")
 }
@@ -293,8 +305,10 @@ model InventoryLog {
 // ------------------- RESTOCK LOGS ------------------
 model RestockLog {
   id            String   @id @default(cuid())
-  rawCard       RawCard  @relation(fields: [rawCardId], references: [id], onDelete: Cascade)
-  rawCardId     String
+  rawCard       RawCard?  @relation(fields: [rawCardId], references: [id], onDelete: Cascade)
+  rawCardId     String?
+  slab          SlabCard? @relation(fields: [slabId], references: [id], onDelete: Cascade)
+  slabId        String?
   quantityAdded Int
   buyCost       Decimal  @db.Decimal(12, 2)
   datePurchased DateTime @default(now())
@@ -303,6 +317,7 @@ model RestockLog {
   createdAt     DateTime @default(now())
 
   @@index([rawCardId])
+  @@index([slabId])
   @@map("restock_logs")
 }
 
