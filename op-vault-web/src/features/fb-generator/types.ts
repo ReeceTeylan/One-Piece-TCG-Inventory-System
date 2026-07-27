@@ -71,7 +71,7 @@ export interface GenMode {
 
 export const MODES: Record<GenType, GenMode> = {
   RAW:    { type: 'RAW',    label: 'Raw Cards',       cols: 5, rows: 4, perPage: 20, aspectW: 5,  aspectH: 7  },
-  SLAB:   { type: 'SLAB',   label: 'Slabs',           cols: 4, rows: 3, perPage: 12, aspectW: 68, aspectH: 97 },
+  SLAB:   { type: 'SLAB',   label: 'Slabs & Sealed',  cols: 4, rows: 3, perPage: 12, aspectW: 68, aspectH: 97 },
   SEALED: { type: 'SEALED', label: 'Sealed Products', cols: 5, rows: 4, perPage: 20, aspectW: 5,  aspectH: 7  },
 };
 
@@ -93,9 +93,11 @@ export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB', pro
     };
   }
   const s = item as SlabCard;
+  const isSealed = s.kind === 'SEALED';
   return {
     key: `slab-${s.id}`, id: s.id, itemType, name: s.name, cardNumber: s.slabNumber ?? '',
-    price: Number(s.sellPrice), quantity: 1, imageUrl: s.images?.[0]?.url,
-    grade: `${s.gradingCompany} ${Number(s.grade)}`, note: s.notes ?? undefined, badge: 'none',
+    price: Number(s.sellPrice), quantity: isSealed ? s.quantity : 1, imageUrl: s.images?.[0]?.url,
+    grade: isSealed ? undefined : `${s.gradingCompany} ${Number(s.grade)}`,
+    note: s.notes ?? undefined, badge: 'none',
   };
 } 

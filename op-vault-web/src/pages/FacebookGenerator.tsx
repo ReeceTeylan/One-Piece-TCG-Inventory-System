@@ -5,7 +5,8 @@ import { GeneratorWorkspace } from '@/features/fb-generator/GeneratorWorkspace';
 import { PagedWorkspace } from '@/features/fb-generator/PagedWorkspace';
 import { MODES, type GenType } from '@/features/fb-generator/types';
 
-const TABS: GenType[] = ['RAW', 'SLAB', 'SEALED'];
+// Sealed products live in the slabs table now, so the Slabs tab covers both.
+const TABS: GenType[] = ['RAW', 'SLAB'];
 
 export function FacebookGeneratorPage() {
   const [active, setActive] = useState<GenType>('RAW');
