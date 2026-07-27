@@ -74,7 +74,7 @@ export class ReportsService {
       this.table(doc,
         [{ header: 'Name', width: 170 }, { header: 'Company', width: 70 }, { header: 'Cert', width: 90 },
          { header: 'Grade', width: 50, align: 'right' }, { header: 'Cost', width: 70, align: 'right' }, { header: 'Price', width: 70, align: 'right' }],
-        slabs.map((s) => [s.name, s.gradingCompany, s.slabNumber, n(s.grade), n(s.buyCost).toFixed(2), n(s.sellPrice).toFixed(2)]));
+        slabs.map((s) => [s.name, s.kind === 'SEALED' ? 'Sealed' : (s.gradingCompany ?? ''), s.slabNumber ?? '—', n(s.grade), n(s.buyCost).toFixed(2), n(s.sellPrice).toFixed(2)]));
       doc.moveDown(0.6).fontSize(11).font('Helvetica-Bold').text(`Total inventory value: PHP ${totalValue.toFixed(2)}`);
     });
   }
