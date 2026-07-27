@@ -224,9 +224,9 @@ export function SalesWizardPage() {
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-12 w-9" />
                   <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{l.name}</b><span className="text-[11px] text-muted-foreground">{l.sub}</span></div>
                   <div className="flex items-center overflow-hidden rounded-md border">
-                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.itemType === 'SLAB'} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
+                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
                     <span className="w-7 text-center text-[13px] font-semibold tabular-nums">{l.quantity}</span>
-                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.itemType === 'SLAB' || l.quantity >= l.max} onClick={() => setQty(l.key, 1)}><Plus className="size-3.5" /></button>
+                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1 || l.quantity >= l.max} onClick={() => setQty(l.key, 1)}><Plus className="size-3.5" /></button>
                   </div>
                   <Input type="number" value={l.unitPrice} onChange={(e) => setPrice(l.key, Number(e.target.value))} className="h-8 w-24 text-right" />
                   <Button variant="ghost" size="icon" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 /></Button>

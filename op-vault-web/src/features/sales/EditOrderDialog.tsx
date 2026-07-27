@@ -29,6 +29,8 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
   const { raw, slabs } = useProductSearch(prodDebounced);
   
   const [cart, setCart] = useState<CartLine[]>([]);
+  const [discount, setDiscount] = useState(0);
+  const [shippingFee, setShippingFee] = useState(0);
 
   const { data: fullSale, isLoading: saleLoading } = useQuery({
     queryKey: ['sale-detail', sale?.id],
@@ -47,27 +49,34 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
           rawCardId: item.rawCardId,
           slabId: item.slabId,
           name: isSlab ? (item.slab?.name || 'Deleted Slab') : (item.rawCard?.name || 'Deleted Card'),
-          sub: isSlab 
-            ? `${item.slab?.gradingCompany || 'Unknown'} ${Number(item.slab?.grade || 0)}` 
+          sub: isSlab
+            ? (item.slab?.kind === 'SEALED'
+                ? (item.slab?.setName || 'Sealed')
+                : `${item.slab?.gradingCompany || 'Unknown'} ${Number(item.slab?.grade || 0)}`)
             : (item.rawCard?.cardNumber || 'N/A'),
           imageUrl: isSlab ? item.slab?.images?.[0]?.url : item.rawCard?.images?.[0]?.url,
           unitPrice: Number(item.unitPrice),
           unitCost: Number(item.unitCost || 0),
           quantity: item.quantity,
           // CRITICAL: True max = what's left in inventory + what's already held by this sale line
-          max: isSlab ? 1 : ((item.rawCard?.quantity || 0) + item.quantity),
+          max: isSlab
+            ? (item.slab?.kind === 'SEALED' ? (item.slab?.quantity || 0) + item.quantity : 1)
+            : ((item.rawCard?.quantity || 0) + item.quantity),
         };
       });
       setCart(initialCart);
+      setDiscount(Number(fullSale.discount || 0));
+      setShippingFee(Number(fullSale.shippingFee || 0));
     } else {
       setCart([]);
+      setDiscount(0);
+      setShippingFee(0);
       setProdSearch('');
     }
   }, [open, fullSale]);
 
   const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
-  // Assuming discount and shippingFee are retained from the original order
-  const grandTotal = subtotal - Number(sale?.discount || 0) + Number(sale?.shippingFee || 0);
+  const grandTotal = subtotal - discount + shippingFee;
 
   // --- Reused Wizard Cart Mechanics ---
   const addRaw = (c: any) => {
@@ -85,11 +94,19 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
   };
 
   const addSlab = (s: any) => {
+    const isSealed = s.kind === 'SEALED';
     setCart((prev) => {
-      if (prev.find((l) => l.itemType === 'SLAB' && l.slabId === s.id)) { toast.error('Slab already in cart'); return prev; }
+      const found = prev.find((l) => l.itemType === 'SLAB' && l.slabId === s.id);
+      if (found) {
+        if (!isSealed) { toast.error('Slab already in cart'); return prev; }
+        if (found.quantity >= found.max) { toast.error('Reached available stock'); return prev; }
+        return prev.map((l) => (l === found ? { ...l, quantity: l.quantity + 1 } : l));
+      }
       return [...prev, {
-        key: `slab-${s.id}`, itemType: 'SLAB', slabId: s.id, name: s.name, sub: `${s.gradingCompany} ${Number(s.grade)}`,
-        imageUrl: s.images?.[0]?.url, unitPrice: Number(s.sellPrice), unitCost: Number(s.buyCost), quantity: 1, max: 1,
+        key: `slab-${s.id}`, itemType: 'SLAB', slabId: s.id, name: s.name,
+        sub: isSealed ? (s.setName || 'Sealed') : `${s.gradingCompany} ${Number(s.grade)}`,
+        imageUrl: s.images?.[0]?.url, unitPrice: Number(s.sellPrice), unitCost: Number(s.buyCost),
+        quantity: 1, max: isSealed ? (s.quantity ?? 1) : 1,
       }];
     });
   };
@@ -110,9 +127,11 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
         slabId: l.slabId,
         quantity: l.quantity,
         unitPrice: l.unitPrice,
-      }))
+      })),
+      discount,
+      shippingFee,
     };
-
+    if (discount > subtotal) return toast.error('Discount cannot exceed subtotal');
     try {
       await editItems.mutateAsync({ saleId: sale.id, data: payload });
       toast.success('Order items updated successfully');
@@ -143,7 +162,11 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
                 <ProductRow key={`search-raw-${c.id}`} img={c.images?.[0]?.url} name={c.name} sub={`${c.cardNumber} · ${c.quantity} in stock`} price={c.postedPrice} onAdd={() => addRaw(c)} />
               ))}
               {slabs.data?.data.map((s: any) => (
-                <ProductRow key={`search-slab-${s.id}`} img={s.images?.[0]?.url} name={s.name} sub={`${s.gradingCompany} ${Number(s.grade)} · cert ${s.slabNumber}`} price={s.sellPrice} badge="SLAB" onAdd={() => addSlab(s)} />
+                <ProductRow key={`search-slab-${s.id}`} img={s.images?.[0]?.url} name={s.name}
+                  sub={s.kind === 'SEALED'
+                    ? `${s.setName || 'Sealed product'} · ${s.quantity} in stock`
+                    : `${s.gradingCompany} ${Number(s.grade)} · cert ${s.slabNumber}`}
+                  price={s.sellPrice} badge={s.kind === 'SEALED' ? 'SEALED' : 'SLAB'} onAdd={() => addSlab(s)} />
               ))}
               {(raw.isLoading || slabs.isLoading) && <div className="flex justify-center py-6"><Spinner /></div>}
               {!raw.isLoading && !slabs.isLoading && !raw.data?.data.length && !slabs.data?.data.length && (
@@ -167,18 +190,29 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
                     <span className="text-[11px] text-muted-foreground">{l.sub}</span>
                   </div>
                   <div className="flex items-center overflow-hidden rounded-md border bg-background">
-                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.itemType === 'SLAB'} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
+                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
                     <span className="w-7 text-center text-[13px] font-semibold tabular-nums">{l.quantity}</span>
-                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.itemType === 'SLAB' || l.quantity >= l.max} onClick={() => setQty(l.key, 1)}><Plus className="size-3.5" /></button>
+                    <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1 || l.quantity >= l.max} onClick={() => setQty(l.key, 1)}><Plus className="size-3.5" /></button>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 className="size-4" /></Button>
                 </div>
               )) : <p className="py-10 text-center text-sm text-muted-foreground">Order has no items</p>}
             </div>
 
-            <div className="mt-4 pt-4 border-t">
-              <div className="flex items-center justify-between mb-4 text-base font-bold">
-                <span>Updated Grand Total</span>
+          <div className="mt-4 pt-4 border-t">
+              <div className="flex items-center justify-between py-1 text-sm">
+                <span>Subtotal</span><b className="tabular-nums">{peso(subtotal)}</b>
+              </div>
+              <div className="flex items-center justify-between py-1 text-sm">
+                <span>Discount</span>
+                <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value) || 0)} className="h-7 w-24 text-right" />
+              </div>
+              <div className="flex items-center justify-between py-1 text-sm">
+                <span>Shipping fee</span>
+                <Input type="number" value={shippingFee} onChange={(e) => setShippingFee(Number(e.target.value) || 0)} className="h-7 w-24 text-right" />
+              </div>
+              <div className="flex items-center justify-between my-3 pt-3 border-t text-base font-bold">
+                <span>Updated Grand Total</span>  
                 <span className="tabular-nums">{pesoF(grandTotal)}</span>
               </div>
               <Button className="w-full" onClick={handleSave} disabled={editItems.isPending}>

@@ -44,7 +44,7 @@ export function SlabsPage() {
     // implicit available-only default so "All status" really means all.
     inStock: false,
     sortBy, sortOrder,
-  });
+  }); 
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SlabCard | null>(null);
