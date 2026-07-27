@@ -112,12 +112,13 @@ export class SalesService {
           include: { items: true, payments: true, shipment: { include: { items: true } }, customer: true },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 },
+      // Render (US) → Supabase (ap-south-1) is a cross-region round trip per query,
+      // and a large cart runs dozens of them sequentially inside one transaction.
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60000, maxWait: 10000 },
     );
   }
-
   // ===================================================================
-  // EDIT SALE ITEMS — revise a pre-shipment order in place (same record).
+  // EDIT SALE ITEMS
   // Only allowed while the shipment is TO_PACK or READY. Reverses old
   // inventory, rebuilds items via applySaleLine, recomputes totals/status.
   // amountPaid is preserved (over/underpayment handled in person).
@@ -210,7 +211,7 @@ export class SalesService {
           include: { items: true, payments: true, shipment: { include: { items: true } }, customer: true },
         });
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 15000 },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 60000, maxWait: 10000 },
     );
   }
   
