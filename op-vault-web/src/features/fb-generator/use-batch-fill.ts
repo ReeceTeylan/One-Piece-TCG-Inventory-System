@@ -4,11 +4,13 @@ import { rawCardsService } from '@/services';
 import { apiError } from '@/lib/api';
 import { toFbCard } from './types';
 import type { FbCard } from './types';
+import { usePromo } from './use-promo';
 
 // Fetches every in-stock raw card, sorted by postedPrice (highest first),
 // converted to FbCard via the shared toFbCard so batch cards behave like picker cards.
 export function useBatchFill() {
   const [loading, setLoading] = useState(false);
+  const { data: promo } = usePromo();
 
   const fetchAllRawSortedByValue = useCallback(async (): Promise<FbCard[]> => {
     setLoading(true);
@@ -25,7 +27,7 @@ export function useBatchFill() {
       const collect = (rows: any[]) => {
         for (const c of rows) {
           if (c.quantity > 0 && c.status !== 'SOLD' && c.status !== 'OUT') {
-            const card = toFbCard(c, 'RAW');
+            const card = toFbCard(c, 'RAW', promo);
             if (seen.has(card.key)) continue; // guard against paginated duplicates
             seen.add(card.key);
             all.push(card);
@@ -50,7 +52,7 @@ export function useBatchFill() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [promo]);
 
   return { fetchAllRawSortedByValue, loading };
 }
