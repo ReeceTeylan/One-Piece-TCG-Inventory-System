@@ -20,8 +20,11 @@ import { WizardSteps } from '@/features/sales/WizardSteps';
 import { useSaleMutations, useProductSearch, useCustomerLookup } from '@/features/sales/use-sales';
 import { CartLine, cartSubtotal, cartProfit, lineTotal } from '@/features/sales/cart';
 import type { Customer } from '@/types';
+import { usePromo } from '@/features/fb-generator/use-promo';
+import { promoPrice } from '@/lib/promo';
 
 export function SalesWizardPage() {
+  const { data: promo } = usePromo();
   const navigate = useNavigate();
   const { complete } = useSaleMutations();
   const [step, setStep] = useState(1);
@@ -65,7 +68,7 @@ export function SalesWizardPage() {
       }
       return [...prev, {
         key: `raw-${c.id}`, itemType: 'RAW', rawCardId: c.id, name: c.name, sub: c.cardNumber,
-        imageUrl: c.images?.[0]?.url, unitPrice: Number(c.postedPrice), unitCost: Number(c.buyCost), quantity: 1, max: c.quantity,
+        imageUrl: c.images?.[0]?.url, unitPrice: promoPrice(c.postedPrice, promo, 'RAW'), unitCost: Number(c.buyCost), quantity: 1, max: c.quantity,
       }];
     });
   };

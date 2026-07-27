@@ -28,7 +28,12 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
 
   const info = (
     <>
-      {showPrice && <div style={{ fontSize: fs * 1.15, fontWeight: 800, color: textColor, lineHeight: 1.1 }}>{peso(card.price)}</div>}
+      {showPrice && (
+        <div style={{ fontSize: fs * 1.15, fontWeight: 800, color: textColor, lineHeight: 1.1 }}>
+          {card.originalPrice && <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: fs * 0.7, marginRight: fs * 0.32 }}>{peso(card.originalPrice)}</span>}
+          {peso(card.price)}
+        </div>
+      )}
       {(showQty || config.showCardNumber || showNote) && (
         <div style={{ display: 'flex', gap: fs * 0.5, flexWrap: 'wrap', marginTop: fs * 0.15 }}>
           {showQty && <span style={{ fontSize: fs * 0.72, fontWeight: 600, color: subColor }}>Qty {card.quantity}</span>}
@@ -70,7 +75,12 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
               borderRadius: 999, padding: `${fs * 0.24}px ${fs * 0.8}px`,
               boxShadow: '0 1px 4px rgba(0,0,0,.28)',
             }}>
-              {peso(card.price)}
+              {card.originalPrice ? (
+                <>
+                  <span style={{ textDecoration: 'line-through', opacity: 0.5, fontSize: fs * 0.7, fontWeight: 700, marginRight: fs * 0.32 }}>{peso(card.originalPrice)}</span>
+                  <span>{peso(card.price)}</span>
+                </>
+              ) : peso(card.price)}
             </div>
           )}
           {hasSecondary && (
@@ -93,6 +103,7 @@ export function FbCardTile({ card, config, scale = 1, aspect = '5 / 7', inSet = 
           {showPrice && (
             <div className="absolute" style={{ bottom: fs * 0.6, right: fs * 0.6, padding: `${fs * 0.25}px ${fs * 0.5}px`, borderRadius: 6 * scale,
               background: dark ? 'rgba(0,0,0,.6)' : 'rgba(255,255,255,.7)', fontSize: fs * 1.05, fontWeight: 800, color: textColor }}>
+              {card.originalPrice && <span style={{ textDecoration: 'line-through', opacity: 0.55, fontSize: fs * 0.68, marginRight: fs * 0.3 }}>{peso(card.originalPrice)}</span>}
               {peso(card.price)}
             </div>
           )}

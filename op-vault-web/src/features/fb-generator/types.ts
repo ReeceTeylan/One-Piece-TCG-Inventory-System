@@ -1,4 +1,6 @@
 import type { RawCard, SlabCard } from '@/types';
+import { promoPrice } from '@/lib/promo';
+import type { Promo } from '@/types';
 
 export type OverlayTheme = 'dark' | 'light';
 export type TextPosition = 'pill' | 'bottom' | 'top' | 'bottom-split';
@@ -25,6 +27,7 @@ export interface FbCard {
   name: string;
   cardNumber: string;
   price: number;
+  originalPrice?: number;
   quantity: number;
   imageUrl?: string;
   grade?: string;
@@ -78,12 +81,15 @@ export const RESOLUTIONS = [
   { label: '4K', width: 2160 },
 ] as const;
 
-export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB'): FbCard {
+export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB', promo?: Promo | null): FbCard {
   if (itemType === 'RAW') {
     const c = item as RawCard;
+    const base = Number(c.postedPrice);
+    const sale = promoPrice(base, promo, 'RAW');
     return {
       key: `raw-${c.id}`, id: c.id, itemType, name: c.name, cardNumber: c.cardNumber,
-      price: Number(c.postedPrice), quantity: c.quantity, imageUrl: c.images?.[0]?.url, note: c.notes ?? undefined, badge: 'none',
+      price: sale, originalPrice: sale < base ? base : undefined,
+      quantity: c.quantity, imageUrl: c.images?.[0]?.url, note: c.notes ?? undefined, badge: 'none',
     };
   }
   const s = item as SlabCard;

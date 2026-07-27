@@ -9,6 +9,7 @@ import { CardThumb } from '@/components/common/CardImage';
 import { useFbInventory } from './use-fb-inventory';
 import { toFbCard } from './types';
 import type { FbCard } from './types';
+import { usePromo } from './use-promo';
 
 // Live inventory picker scoped to a single inventory type (RAW or SLAB).
 export function InventoryPicker({ type, selectedKeys, onAdd }: {
@@ -17,6 +18,7 @@ export function InventoryPicker({ type, selectedKeys, onAdd }: {
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search);
   const { data, isLoading } = useFbInventory(debounced, type);
+  const { data: promo } = usePromo();
 
   return (
     <div className="flex h-full flex-col">
@@ -28,7 +30,7 @@ export function InventoryPicker({ type, selectedKeys, onAdd }: {
         {isLoading ? <div className="flex justify-center py-6"><Spinner /></div>
           : !data?.data.length ? <p className="py-8 text-center text-sm text-muted-foreground">No items found.</p>
           : data.data.map((item: any) => {
-            const card = toFbCard(item, type);
+            const card = toFbCard(item, type, promo);
             const selected = selectedKeys.has(card.key);
             return (
               <div key={card.key} className="flex items-center gap-2.5 rounded-lg border p-2">
