@@ -26,6 +26,7 @@ import { FacebookGeneratorModule } from './modules/facebook-generator/facebook-g
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { HealthModule } from './modules/health/health.module';
+import { PromosModule } from './modules/promos/promos.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { HealthModule } from './modules/health/health.module';
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     PrismaModule,
     HealthModule,
+    PromosModule,
     AuthModule,
     UsersModule,
     RawCardsModule,
