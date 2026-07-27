@@ -55,5 +55,6 @@ export interface DashboardData {
   counts: { totalRawCards: number; totalSlabs: number; waitingToShip: number };
   generatedAt: string;
 }
+export interface Promo { id: string; percentage: string; startsAt: string; endsAt: string; endedAt: string | null; note?: string | null; createdAt: string; }
 export interface TrendPoint { date: string; revenue: number; profit: number; orders: number; cardsSold: number; }
 export interface Settings { storeName: string; logoUrl: string | null; currency: string; defaultShippingFee: number; lowStockThreshold: number; postedPriceFormula: string; }

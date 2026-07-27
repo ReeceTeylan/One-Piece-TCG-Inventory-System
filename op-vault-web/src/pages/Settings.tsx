@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useState } from 'react';
-import { authService } from '@/services';
+import { authService, promosService } from '@/services';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { apiError } from '@/lib/api';
 import { useSettings, useSettingsMutation } from '@/features/settings/use-settings';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { isPromoActive, promoTimeLeft, formatTimeLeft } from '@/lib/promo';
 
 export function SettingsPage() {
   const { data, isLoading } = useSettings();
@@ -57,6 +59,7 @@ export function SettingsPage() {
       )}
 
       <ChangePasswordCard />
+      <PromoCard />
     </>
   );
 }
@@ -104,6 +107,74 @@ function ChangePasswordCard() {
           {busy ? 'Updating…' : 'Change password'}
         </Button>
       </div>
+    </Card>
+  );
+}
+
+function PromoCard() {
+  const qc = useQueryClient();
+  const { data: promo, isLoading } = useQuery({
+    queryKey: ['promo-active'],
+    queryFn: promosService.active,
+    refetchInterval: 60_000,
+  });
+  const [percentage, setPercentage] = useState('10');
+  const [hours, setHours] = useState('24');
+  const [busy, setBusy] = useState(false);
+
+  const active = isPromoActive(promo);
+
+  const start = async () => {
+    const pct = Number(percentage);
+    const hrs = Number(hours);
+    if (!(pct > 0 && pct < 100)) { toast.error('Percentage must be between 1 and 99'); return; }
+    if (!(hrs >= 0.5)) { toast.error('Duration must be at least 30 minutes'); return; }
+    setBusy(true);
+    try {
+      await promosService.create({ percentage: pct, durationHours: hrs });
+      await qc.invalidateQueries({ queryKey: ['promo-active'] });
+      toast.success(`${pct}% off started for ${hrs} hour(s)`);
+    } catch (e) { toast.error(apiError(e).message); }
+    finally { setBusy(false); }
+  };
+
+  const end = async () => {
+    setBusy(true);
+    try {
+      await promosService.end();
+      await qc.invalidateQueries({ queryKey: ['promo-active'] });
+      toast.success('Promo ended');
+    } catch (e) { toast.error(apiError(e).message); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Card className="mt-4 max-w-md p-5">
+      <h3 className="mb-4 text-sm font-bold">Store-wide sale</h3>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Checking…</p>
+      ) : active ? (
+        <>
+          <div className="mb-4 rounded-lg border border-success/30 bg-success/5 p-3">
+            <div className="text-lg font-bold text-success">{Number(promo!.percentage)}% off raw cards</div>
+            <div className="text-xs text-muted-foreground">Ends in {formatTimeLeft(promoTimeLeft(promo))}</div>
+          </div>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={end} disabled={busy}>{busy ? 'Ending…' : 'End sale now'}</Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-muted-foreground">Applies to raw cards only. Prices in inventory stay unchanged.</p>
+          <div className="mb-3 grid grid-cols-2 gap-3">
+            <div><Label>Percent off</Label><Input type="number" min={1} max={99} value={percentage} onChange={(e) => setPercentage(e.target.value)} className="mt-1" /></div>
+            <div><Label>Duration (hours)</Label><Input type="number" min={0.5} step={0.5} value={hours} onChange={(e) => setHours(e.target.value)} className="mt-1" /></div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={start} disabled={busy}>{busy ? 'Starting…' : 'Start sale'}</Button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }

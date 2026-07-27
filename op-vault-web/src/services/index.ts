@@ -1,7 +1,7 @@
 import { api, unwrap, Paginated } from '@/lib/api';
 import type {
   RawCard, SlabCard, Customer, Sale, Payment, Shipment, Notification,
-  DashboardData, TrendPoint, Settings, CardImage,
+  DashboardData, TrendPoint, Settings, CardImage, Promo,
 } from '@/types';
 
 const list = <T,>(url: string, params?: Record<string, any>) =>
@@ -71,6 +71,13 @@ export const notificationsService = {
 export const settingsService = {
   get: () => one<Settings>('/settings'),
   update: (dto: Partial<Settings>) => api.patch('/settings', dto).then(unwrap<Settings>),
+};
+export const promosService = {
+  active: () => one<Promo | null>('/promos/active'),
+  history: () => one<Promo[]>('/promos/history'),
+  create: (dto: { percentage: number; durationHours: number; note?: string }) =>
+    api.post('/promos', dto).then(unwrap<Promo>),
+  end: () => api.patch('/promos/end').then(unwrap<Promo>),
 };
 export const favoritesService = {
   list: () => one<any[]>('/favorites'),
