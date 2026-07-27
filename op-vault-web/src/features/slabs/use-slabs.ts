@@ -11,6 +11,12 @@ export function useSlabMutations() {
     create: useMutation({ mutationFn: slabsService.create, onSuccess: invalidate }),
     update: useMutation({ mutationFn: (v: { id: string; dto: any }) => slabsService.update(v.id, v.dto), onSuccess: invalidate }),
     remove: useMutation({ mutationFn: slabsService.remove, onSuccess: invalidate }),
+    // Sealed products only — backend rejects graded slabs.
+    restock: useMutation({
+      mutationFn: (v: { id: string; quantityAdded: number; buyCost: number }) =>
+        slabsService.restock(v.id, { quantityAdded: v.quantityAdded, buyCost: v.buyCost }),
+      onSuccess: invalidate,
+    }),
     upload: useMutation({ mutationFn: (v: { file: File; id: string }) => imagesService.upload(v.file, 'SLAB', v.id), onSuccess: invalidate }),
   };
 }

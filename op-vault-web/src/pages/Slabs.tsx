@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Upload, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Upload, Pencil, Trash2, Loader2, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
 import type { SlabCard } from '@/types';
 import { useSlabs, useSlabMutations, GRADES } from '@/features/slabs/use-slabs';
 import { SlabForm } from '@/features/slabs/SlabForm';
+import { SlabRestockDialog } from '@/features/slabs/SlabRestockDialog';
 
 export function SlabsPage() {
   const { isOwner } = useAuth();
@@ -30,6 +31,7 @@ export function SlabsPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [grade, setGrade] = useState('');
+  const [kind, setKind] = useState('');
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
   const debounced = useDebounce(search);
@@ -37,12 +39,13 @@ export function SlabsPage() {
 
   const { data, isLoading, isError } = useSlabs({
     page, limit: 20, search: debounced || undefined, status: status || undefined,
-    grade: grade || undefined, sortBy, sortOrder,
+    grade: grade || undefined, kind: kind || undefined, sortBy, sortOrder,
   });
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<SlabCard | null>(null);
   const [toDelete, setToDelete] = useState<SlabCard | null>(null);
+  const [toRestock, setToRestock] = useState<SlabCard | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const rows = data?.data ?? [];
@@ -125,17 +128,22 @@ export function SlabsPage() {
 
   return (
     <>
-      <PageHeader title="Slab Inventory" subtitle={`${data?.meta.total ?? 0} graded cards`}
-        actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus /> Add slab</Button>} />
+      <PageHeader title="Slabs & Sealed" subtitle={`${data?.meta.total ?? 0} items`}
+        actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus /> Add item</Button>} />
 
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search name, cert #, set…" />
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="">All status</option><option value="AVAILABLE">Available</option><option value="SOLD">Sold</option>
         </Select>
-        <Select value={grade} onChange={(e) => { setGrade(e.target.value); setPage(1); }}>
-          <option value="">All grades</option>{GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+        <Select value={kind} onChange={(e) => { setKind(e.target.value); setPage(1); }}>
+          <option value="">Slabs & sealed</option><option value="SLAB">Slabs only</option><option value="SEALED">Sealed only</option>
         </Select>
+        {kind !== 'SEALED' && (
+          <Select value={grade} onChange={(e) => { setGrade(e.target.value); setPage(1); }}>
+            <option value="">All grades</option>{GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+          </Select>
+        )}
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>
           <option value="createdAt:desc">Recently added</option>
           <option value="name:asc">Name A–Z</option>
@@ -181,7 +189,8 @@ export function SlabsPage() {
                   checked={allSelected} ref={(el) => { if (el) el.indeterminate = !allSelected && someSelected; }}
                   onChange={toggleAll} className="size-4 cursor-pointer align-middle" />
               </TH>
-              <TH>Slab</TH><TH>Company</TH><TH>Cert #</TH><TH className="text-right">Grade</TH>
+              <TH>Item</TH><TH>Company</TH><TH>Cert #</TH><TH className="text-right">Grade</TH>
+              <TH className="text-right">Qty</TH>
               <TH className="text-right">Cost</TH><TH className="text-right">Price</TH><TH>Status</TH><TH></TH>
             </TR></THead>
             <TBody>
@@ -198,14 +207,24 @@ export function SlabsPage() {
                       <div><b className="font-semibold">{s.name}</b><span className="block text-[11.5px] text-muted-foreground">{s.setName || '—'}</span></div>
                     </div>
                   </TD>
-                  <TD><span className="rounded border bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">{s.gradingCompany}</span></TD>
-                  <TD className="tabular-nums">{s.slabNumber}</TD>
-                  <TD className="text-right"><Badge variant="info">{Number(s.grade)}</Badge></TD>
+                  <TD>
+                    <span className="rounded border bg-muted px-2 py-0.5 text-[11px] font-bold text-muted-foreground">
+                      {s.kind === 'SEALED' ? 'SEALED' : s.gradingCompany}
+                    </span>
+                  </TD>
+                  <TD className="tabular-nums">{s.slabNumber || '—'}</TD>
+                  <TD className="text-right">{s.grade ? <Badge variant="info">{Number(s.grade)}</Badge> : '—'}</TD>
+                  <TD className="text-right tabular-nums">{s.kind === 'SEALED' ? s.quantity : '—'}</TD>
                   <TD className="text-right tabular-nums">{peso(s.buyCost)}</TD>
                   <TD className="text-right font-semibold tabular-nums">{peso(s.sellPrice)}</TD>
                   <TD><Badge variant={s.status === 'SOLD' ? 'default' : stockVariant(s.status)}>{s.status === 'SOLD' ? 'Sold' : stockLabel(s.status)}</Badge></TD>
                   <TD>
                     <div className="flex justify-end gap-1">
+                      {s.kind === 'SEALED' && (
+                        <Button variant="ghost" size="sm" onClick={() => setToRestock(s)} aria-label="Add stock">
+                          <PackagePlus className="size-4" /> Qty
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" onClick={() => openImage(s.id)} aria-label="Upload image"><Upload /></Button>
                       <Button variant="ghost" size="icon" onClick={() => { setEditing(s); setFormOpen(true); }} aria-label="Edit"><Pencil /></Button>
                       {isOwner && <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setToDelete(s)} aria-label="Delete"><Trash2 /></Button>}
@@ -220,8 +239,10 @@ export function SlabsPage() {
       </Card>
 
       <SlabForm open={formOpen} onOpenChange={setFormOpen} editing={editing} />
+      <SlabRestockDialog item={toRestock} onOpenChange={(o) => !o && setToRestock(null)} />
       <ConfirmDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)} destructive
-        title="Delete slab" description={`Delete "${toDelete?.name}" (cert ${toDelete?.slabNumber})? This cannot be undone.`}
+        title={toDelete?.kind === 'SEALED' ? 'Delete sealed product' : 'Delete slab'}
+        description={`Delete "${toDelete?.name}"${toDelete?.slabNumber ? ` (cert ${toDelete.slabNumber})` : ''}? This cannot be undone.`}
         confirmLabel="Delete" loading={remove.isPending} onConfirm={confirmDelete} />
       <ConfirmDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen} destructive
         title={`Delete ${selected.size} slabs?`} description="The selected slabs on this page will be permanently removed. This cannot be undone."

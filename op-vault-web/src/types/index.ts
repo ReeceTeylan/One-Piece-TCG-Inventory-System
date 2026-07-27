@@ -16,9 +16,13 @@ export interface RawCard {
   status: StockStatus; notes?: string; isPinned: boolean; totalSold: number; lastSoldAt?: string;
   images?: CardImage[]; createdAt: string; updatedAt: string;
 }
+export type ProductKind = 'SLAB' | 'SEALED';
 export interface SlabCard {
   id: string; name: string; cardNumber?: string; setName?: string; character?: string; rarity?: string;
-  gradingCompany: string; slabNumber: string; grade: string; buyCost: string; sellPrice: string;
+  kind: ProductKind;
+  gradingCompany?: string | null; slabNumber?: string | null; grade?: string | null;
+  quantity: number; avgSellPrice?: string | null; totalSold: number;
+  buyCost: string; sellPrice: string;
   status: StockStatus; notes?: string; isPinned: boolean; images?: CardImage[]; createdAt: string;
 }
 export interface Customer {

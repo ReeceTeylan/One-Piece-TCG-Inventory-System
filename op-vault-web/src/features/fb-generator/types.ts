@@ -94,8 +94,8 @@ export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB', pro
   }
   const s = item as SlabCard;
   return {
-    key: `slab-${s.id}`, id: s.id, itemType, name: s.name, cardNumber: s.slabNumber,
+    key: `slab-${s.id}`, id: s.id, itemType, name: s.name, cardNumber: s.slabNumber ?? '',
     price: Number(s.sellPrice), quantity: 1, imageUrl: s.images?.[0]?.url,
     grade: `${s.gradingCompany} ${Number(s.grade)}`, note: s.notes ?? undefined, badge: 'none',
   };
-}
+} 

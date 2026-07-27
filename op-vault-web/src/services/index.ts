@@ -23,6 +23,9 @@ export const slabsService = {
   get: (id: string) => one<SlabCard>(`/slabs/${id}`),
   create: (dto: any) => api.post('/slabs', dto).then(unwrap<SlabCard>),
   update: (id: string, dto: any) => api.patch(`/slabs/${id}`, dto).then(unwrap<SlabCard>),
+  // Sealed products only — backend rejects graded slabs with SLAB_NOT_STACKABLE.
+  restock: (id: string, dto: { quantityAdded: number; buyCost: number }) =>
+    api.post(`/slabs/${id}/restock`, dto).then(unwrap<SlabCard>),
   remove: (id: string) => api.delete(`/slabs/${id}`).then(unwrap),
 };
 export const customersService = {
