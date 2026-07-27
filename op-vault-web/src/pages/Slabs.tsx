@@ -29,7 +29,7 @@ export function SlabsPage() {
   const { isOwner } = useAuth();
   const { remove, upload } = useSlabMutations();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('AVAILABLE');
   const [grade, setGrade] = useState('');
   const [kind, setKind] = useState('');
   const [sort, setSort] = useState('createdAt:desc');
@@ -39,7 +39,11 @@ export function SlabsPage() {
 
   const { data, isLoading, isError } = useSlabs({
     page, limit: 20, search: debounced || undefined, status: status || undefined,
-    grade: grade || undefined, kind: kind || undefined, sortBy, sortOrder,
+    grade: grade || undefined, kind: kind || undefined,
+    // The status dropdown is the only filter — opt out of the backend's
+    // implicit available-only default so "All status" really means all.
+    inStock: false,
+    sortBy, sortOrder,
   });
 
   const [formOpen, setFormOpen] = useState(false);
