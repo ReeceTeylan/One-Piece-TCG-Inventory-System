@@ -355,6 +355,20 @@ model ActivityLog {
   @@map("activity_logs")
 }
 
+// ---------------------- PROMOS ---------------------
+model Promo {
+  id         String    @id @default(cuid())
+  percentage Decimal   @db.Decimal(5, 2) // e.g. 5.00 = 5% off
+  startsAt   DateTime  @default(now())
+  endsAt     DateTime
+  endedAt    DateTime? // set when ended early; null while running
+  note       String?
+  createdAt  DateTime  @default(now())
+
+  @@index([endsAt])
+  @@map("promos")
+}
+
 // --------------------- SETTINGS --------------------
 model Setting {
   key       String   @id
