@@ -52,7 +52,7 @@ export function CardThumb({ url, alt, className, gallery, zoomable = true }: { u
   // to the full image rather than showing a broken-image icon.
   const src = thumbFailed ? full : thumbUrl(url);
   if (!src || error) {
-    return <div className={cn('grid place-items-center rounded border bg-muted text-muted-foreground', className)}><ImageOff className="size-4" /></div>;
+    return <div className={cn('grid shrink-0 place-items-center rounded border bg-muted text-muted-foreground', className)}><ImageOff className="size-4" /></div>;
   }
   const onOpen = () => {
     if (!zoomable) return;
@@ -66,6 +66,6 @@ export function CardThumb({ url, alt, className, gallery, zoomable = true }: { u
       onClick={zoomable ? onOpen : undefined}
       role={zoomable ? 'button' : undefined} tabIndex={zoomable ? 0 : undefined}
       onKeyDown={zoomable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } } : undefined}
-      className={cn('rounded border object-cover', zoomable && 'cursor-zoom-in', className)} />
+      className={cn('shrink-0 rounded border object-cover', zoomable && 'cursor-zoom-in', className)} />
   );
 }

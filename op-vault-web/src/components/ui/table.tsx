@@ -1,7 +1,9 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 export const Table = ({ className, ...p }: React.HTMLAttributes<HTMLTableElement>) => (
-  <div className="w-full overflow-x-auto"><table className={cn('w-full text-sm', className)} {...p} /></div>);
+  // min-w-full lets the table grow past the viewport and scroll instead of
+  // squeezing columns; w-full would cap it at the container width.
+  <div className="w-full overflow-x-auto"><table className={cn('min-w-full text-sm', className)} {...p} /></div>);
 export const THead = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <thead {...p} />;
 export const TBody = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <tbody {...p} />;
 export const TR = ({ className, ...p }: React.HTMLAttributes<HTMLTableRowElement>) => <tr className={cn('border-b transition-colors hover:bg-muted/50', className)} {...p} />;
