@@ -62,6 +62,12 @@ export function DashboardPage() {
       targetMonth: targetMonth || undefined
     }) 
   });
+  // Lifetime monthly series, for the "best month" summary. Independent of the
+  // daily chart's month filter.
+  const monthly = useQuery({  
+    queryKey: ['trends', 'monthly'],
+    queryFn: () => analyticsService.trends({ granularity: 'monthly', points: 12 }),
+  });
   const d = dash.data;
 
   return (
@@ -134,7 +140,7 @@ export function DashboardPage() {
             </div>
           </div>
           {trends.isLoading ? <Skeleton className="h-[230px] w-full" />
-            : trends.data ? <TrendChart data={trends.data} metric={metric} />
+            : trends.data ? <TrendChart data={trends.data} metric={metric} monthly={monthly.data} />
             : <ErrorState message="No trend data." />}
           <p className="mt-2 text-[11.5px] text-muted-foreground">Hover any point for date, revenue, profit, cards sold, quantity & growth.</p>
         </CardContent>

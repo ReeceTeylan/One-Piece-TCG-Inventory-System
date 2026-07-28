@@ -34,25 +34,35 @@ function Summary({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function TrendChart({ data, metric = 'revenue' }: { data: TrendPoint[]; metric?: Metric }) {
+export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendPoint[]; metric?: Metric; monthly?: TrendPoint[] }) {
   // attach previous-point profit for growth calc
   const enriched = data.map((d, i) => ({ ...d, _prevProfit: i > 0 ? data[i - 1].profit : 0 }));
   const color = metric === 'profit' ? 'hsl(var(--success))' : 'hsl(var(--ring))';
   const gradId = `trend-fill-${metric}`;
 
   const values = data.map((d) => Number(d[metric] ?? 0));
-  const total = values.reduce((a, b) => a + b, 0);
-  const avg = values.length ? total / values.length : 0;
+  const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
   const bestIdx = values.length ? values.reduce((best, v, i) => (v > values[best] ? i : best), 0) : -1;
   const fmt = (v: number) => (metric === 'cardsSold' ? String(Math.round(v)) : peso(v));
+
+  // Sales are lumpy, so "how many days actually had a sale" says more than an average.
+  const activeDays = values.filter((v) => v > 0).length;
+
+  const monthlyVals = (monthly ?? []).map((m) => Number(m[metric] ?? 0));
+  const bestMonthIdx = monthlyVals.length
+    ? monthlyVals.reduce((best, v, i) => (v > monthlyVals[best] ? i : best), 0)
+    : -1;
 
   return (
     <div>
       {bestIdx >= 0 && (
         <div className="mb-3 flex flex-wrap gap-x-8 gap-y-3 border-b pb-3">
-          <Summary label={`Total ${metric === 'cardsSold' ? 'sold' : metric}`} value={fmt(total)} />
-          <Summary label="Daily average" value={fmt(avg)} />
           <Summary label="Best day" value={`${fmt(values[bestIdx])} · ${fmtDate(data[bestIdx].date)}`} />
+          {bestMonthIdx >= 0 && (
+            <Summary label="Best month"
+              value={`${fmt(monthlyVals[bestMonthIdx])} · ${new Date(monthly![bestMonthIdx].date).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}`} />
+          )}
+          <Summary label="Days with sales" value={`${activeDays} of ${values.length}`} />
         </div>
       )}
       <ResponsiveContainer width="100%" height={260}>
