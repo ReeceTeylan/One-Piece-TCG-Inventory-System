@@ -48,9 +48,9 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* Multi-Page Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.max(0, currentIndex - 1)]?.id)} disabled={currentIndex === 0 || isExporting}>
             <ChevronLeft className="size-4" />

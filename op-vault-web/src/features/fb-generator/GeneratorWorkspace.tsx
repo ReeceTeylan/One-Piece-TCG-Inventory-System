@@ -131,14 +131,14 @@ export function GeneratorWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         {tabs ?? <span />}
-        <div className="flex items-center gap-2">
-          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution">
+        <div className="flex items-center gap-1.5">
+          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
           </Select>
-          <Button variant="outline" onClick={clearAll} disabled={!cards.length}>Clear</Button>
-          <Button onClick={exportPng} disabled={exporting || !cards.length}><Download /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
+          <Button variant="outline" size="sm" onClick={clearAll} disabled={!cards.length}>Clear</Button>
+          <Button size="sm" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
         </div>
       </div>
 
