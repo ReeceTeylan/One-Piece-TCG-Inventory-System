@@ -106,13 +106,21 @@ export function DashboardPage() {
             
             <div className="flex items-center gap-3">
               {/* NEW: Native HTML5 Month Selector */}
-              <Input
-                type="month"
-                value={targetMonth}
-                onChange={(e) => setTargetMonth(e.target.value)}
-                className="h-8 w-auto text-xs"
-                aria-label="Select month"
-              />
+              <div className="flex items-center gap-1.5">
+                <Input
+                  type="month"
+                  value={targetMonth}
+                  onChange={(e) => setTargetMonth(e.target.value)}
+                  className="h-8 w-[140px] text-xs [color-scheme:dark]"
+                  aria-label="Select month"
+                />
+                {targetMonth && (
+                  <button onClick={() => setTargetMonth('')}
+                    className="text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                    Clear
+                  </button>
+                )}
+              </div>
 
               {/* EXISTING: Metric Toggles */}
               <div className="flex gap-1 rounded-md border bg-muted p-0.5">

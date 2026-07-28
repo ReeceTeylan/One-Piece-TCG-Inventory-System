@@ -1,6 +1,8 @@
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, ReferenceLine } from 'recharts';
 import type { TrendPoint } from '@/types';
 import { peso, fmtDate } from '@/lib/utils';
+
+type Metric = 'revenue' | 'profit' | 'cardsSold';
 
 // Custom tooltip: Revenue, Profit, Cards Sold, Quantity, % growth vs previous point.
 function ChartTooltip({ active, payload }: any) {
@@ -23,21 +25,57 @@ function ChartTooltip({ active, payload }: any) {
   );
 }
 
-export function TrendChart({ data, metric = 'revenue' }: { data: TrendPoint[]; metric?: 'revenue' | 'profit' | 'cardsSold' }) {
+function Summary({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-[15px] font-bold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+export function TrendChart({ data, metric = 'revenue' }: { data: TrendPoint[]; metric?: Metric }) {
   // attach previous-point profit for growth calc
   const enriched = data.map((d, i) => ({ ...d, _prevProfit: i > 0 ? data[i - 1].profit : 0 }));
   const color = metric === 'profit' ? 'hsl(var(--success))' : 'hsl(var(--ring))';
+  const gradId = `trend-fill-${metric}`;
+
+  const values = data.map((d) => Number(d[metric] ?? 0));
+  const total = values.reduce((a, b) => a + b, 0);
+  const avg = values.length ? total / values.length : 0;
+  const bestIdx = values.length ? values.reduce((best, v, i) => (v > values[best] ? i : best), 0) : -1;
+  const fmt = (v: number) => (metric === 'cardsSold' ? String(Math.round(v)) : peso(v));
+
   return (
-    <ResponsiveContainer width="100%" height={230}>
-      <LineChart data={enriched} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-        <XAxis dataKey="date" tickFormatter={(d) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
-          tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} minTickGap={24} />
-        <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} width={48}
-          tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
-        <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '3 3' }} />
-        <Line type="monotone" dataKey={metric} stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-      </LineChart>
-    </ResponsiveContainer>
+    <div>
+      {bestIdx >= 0 && (
+        <div className="mb-3 flex flex-wrap gap-x-8 gap-y-3 border-b pb-3">
+          <Summary label={`Total ${metric === 'cardsSold' ? 'sold' : metric}`} value={fmt(total)} />
+          <Summary label="Daily average" value={fmt(avg)} />
+          <Summary label="Best day" value={`${fmt(values[bestIdx])} · ${fmtDate(data[bestIdx].date)}`} />
+        </div>
+      )}
+      <ResponsiveContainer width="100%" height={260}>
+        <AreaChart data={enriched} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <defs>
+            {/* Fading fill gives the line some mass without adding a new colour. */}
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="2 6" stroke="hsl(var(--border))" vertical={false} />
+          <XAxis dataKey="date" tickFormatter={(d) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })}
+            tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} minTickGap={24} />
+          <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} width={48}
+            tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v)} />
+          <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'hsl(var(--border))', strokeDasharray: '3 3' }} />
+          {/* Average line makes it obvious at a glance which days beat the norm. */}
+          <ReferenceLine y={avg} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" strokeOpacity={0.5} />
+          <Area type="monotone" dataKey={metric} stroke={color} strokeWidth={2.5} fill={`url(#${gradId})`}
+            dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: 'hsl(var(--card))' }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
