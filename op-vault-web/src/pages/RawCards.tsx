@@ -134,7 +134,7 @@ export function RawCardsPage() {
   };
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="Raw Cards" subtitle={query.data ? `${query.data.meta.total} titles` : undefined}
         actions={
           <div className="flex items-center gap-2">
@@ -195,12 +195,12 @@ export function RawCardsPage() {
         </div>
       )}
 
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {query.isLoading ? <TableSkeleton />
         : query.isError ? <ErrorState message="Failed to load raw cards." />
         : !query.data?.data.length ? <EmptyState message="No cards match your filters." />
         : (
-          <>
+          <div className="flex min-h-0 flex-1 flex-col">
             <Table>
               <THead><TR>
                 <TH className="w-8">
@@ -286,7 +286,7 @@ export function RawCardsPage() {
     <span className="text-xs font-medium">/ {query.data.meta.totalPages}</span>
   </div>
 </div>
-          </>
+          </div>
         )}
       </Card>
 

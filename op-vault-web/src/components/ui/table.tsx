@@ -1,9 +1,9 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 export const Table = ({ className, ...p }: React.HTMLAttributes<HTMLTableElement>) => (
-  // Bounded height means the table scrolls internally and the page doesn't —
-  // so the scrollbar sits against the table, not the browser edge.
-  <div className="max-h-[70vh] w-full overflow-auto"><table className={cn('min-w-full text-sm', className)} {...p} /></div>);
+  // flex-1 + min-h-0 means the table takes exactly the space left over after the
+  // page header, filters and pagination — no magic number to keep in sync.
+  <div className="min-h-0 w-full flex-1 overflow-auto"><table className={cn('min-w-full text-sm', className)} {...p} /></div>);
 export const THead = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <thead {...p} />;
 export const TBody = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <tbody {...p} />;
 export const TR = ({ className, ...p }: React.HTMLAttributes<HTMLTableRowElement>) => <tr className={cn('border-b transition-colors hover:bg-muted/50', className)} {...p} />;
