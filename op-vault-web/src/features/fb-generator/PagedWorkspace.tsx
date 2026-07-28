@@ -51,7 +51,7 @@ export function PagedWorkspace({ mode }: { mode: GenMode }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* Multi-Page Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-3 shadow-sm">
         <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export function PagedWorkspace({ mode }: { mode: GenMode }) {
       </div>
 
       {/* The Controlled Workspace */}
-      <div className={isExporting ? 'pointer-events-none opacity-60 transition-opacity' : ''}>
+      <div className={`flex min-h-0 flex-1 flex-col ${isExporting ? 'pointer-events-none opacity-60 transition-opacity' : ''}`}>
         <GeneratorWorkspace
           mode={mode}
           cards={currentPage.cards}

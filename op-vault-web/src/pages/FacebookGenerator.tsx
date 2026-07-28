@@ -12,7 +12,7 @@ export function FacebookGeneratorPage() {
   const [active, setActive] = useState<GenType>('RAW');
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title="Facebook Post Generator" subtitle="Separate generators for raw cards and slabs & sealed" />
 
       <div className="mb-4 flex gap-1 rounded-lg border bg-muted p-0.5 w-fit">
@@ -26,7 +26,7 @@ export function FacebookGeneratorPage() {
 
       {/* Keep every workspace mounted so each tab preserves its own layout & settings. */}
       {TABS.map((t) => (
-        <div key={t} className={active === t ? '' : 'hidden'}>
+        <div key={t} className={active === t ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
           {t === 'RAW' ? (
             <PagedWorkspace mode={MODES[t]} />
           ) : (

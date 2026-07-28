@@ -128,9 +128,8 @@ export function GeneratorWorkspace({
   };
 
   return (
-    <>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">{cols} × {maxRows} grid · {perPage} per page · {mode.label.toLowerCase()}</p>
+    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
+      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
         <div className="flex items-center gap-2">
           <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
@@ -140,15 +139,15 @@ export function GeneratorWorkspace({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[280px_1fr_260px]">
-        <Card className="order-2 flex max-h-[75vh] flex-col p-4 xl:order-1">
+      <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[280px_1fr_260px] xl:overflow-hidden">
+        <Card className="order-2 flex max-h-[60vh] flex-col p-4 xl:order-1 xl:max-h-none xl:min-h-0">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Layers className="size-4" /> {mode.type === 'SEALED' ? 'Add product' : 'Inventory'}</h3>
           {mode.type === 'SEALED'
             ? <SealedForm onAdd={addCard} />
             : <InventoryPicker type={mode.type} selectedKeys={selectedKeys} onAdd={addCard} />}
         </Card>
 
-        <Card className="order-1 p-4 xl:order-2">
+        <Card className="order-1 flex flex-col p-4 xl:order-2 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-bold">Preview <span className="text-muted-foreground">· {cards.length}/{perPage}</span></h3>
           </div>
@@ -165,7 +164,7 @@ export function GeneratorWorkspace({
           )}
 
           {!cards.length ? (
-            <EmptyState message={mode.type === 'SEALED' ? 'Add sealed products from the left to build your post.' : 'Add items from the inventory panel to build your post.'} />
+            <EmptyState message="Add items from the inventory panel." />
           ) : (
             <div className="w-full">
               <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'mx-auto bg-[#0b0b0d]' : 'mx-auto bg-white'}
@@ -201,17 +200,15 @@ export function GeneratorWorkspace({
               </div>
             </div>
           )}
-          <p className="mt-3 text-xs text-muted-foreground">Click to select · group ≥2 into a set · drag the grip to reorder · tag cycles Reserved / Sold · square PNG at {RESOLUTIONS.find((r) => r.width === resolution)?.label}.</p>
-        </Card>
-
-        <Card className="order-3 max-h-[75vh] overflow-y-auto p-4">
+          </Card>
+        <Card className="order-3 max-h-[60vh] overflow-y-auto p-4 xl:max-h-none xl:min-h-0">
           <h3 className="mb-3 text-sm font-bold">Overlay controls</h3>
           <ControlsPanel config={config} setConfig={setConfig} />
 
           <div className="mt-4 border-t pt-3">
             <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Sets ({sets.length})</h4>
             {!sets.length ? (
-              <p className="text-xs text-muted-foreground">Select items in the preview, then “Group as set” for a spanning price banner.</p>
+              <p className="text-xs text-muted-foreground">No sets yet.</p>
             ) : (
               <div className="space-y-2">
                 {sets.map((s, i) => (
@@ -232,6 +229,6 @@ export function GeneratorWorkspace({
           </div>
         </Card>
       </div>
-    </>
+    </div>
   );
 }
