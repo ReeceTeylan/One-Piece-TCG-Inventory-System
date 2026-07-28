@@ -22,7 +22,9 @@ export class SupabaseStorageProvider implements StorageProvider {
   async save(key: string, data: Buffer, contentType: string): Promise<StoredImage> {
     const { error } = await this.client.storage
       .from(this.bucket)
-      .upload(key, data, { contentType, upsert: true, cacheControl: '3600' });
+      // Keys are UUID-based and a replacement upload always writes a new key, so the
+      // bytes at a given URL never change — safe to cache forever and skip revalidation.
+      .upload(key, data, { contentType, upsert: true, cacheControl: '31536000, immutable' });
     if (error) {
       this.logger.error(`Supabase upload failed for ${key}: ${error.message}`);
       throw error;
