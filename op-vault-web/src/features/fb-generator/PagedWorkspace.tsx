@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { GeneratorWorkspace } from './GeneratorWorkspace';
 import { usePagedGenerator } from './usePagedGenerator';
 import { useBatchFill } from './use-batch-fill';
@@ -9,31 +9,28 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import type { GenMode } from './types';
 
-export function PagedWorkspace({ mode }: { mode: GenMode }) {
+export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode }) {
   const {
     pages, currentPage, currentPageId, currentIndex, totalCards,
     setCurrent, autoFill, addPage, removePage, setCardsFor, setSetsFor
   } = usePagedGenerator(mode.perPage);
+  const { fetchAllRawSortedByValue, loading } = useBatchFill();
+  const [isExporting, setIsExporting] = useState(false);
 
-    const { fetchAllRawSortedByValue, loading } = useBatchFill();
-    const [isExporting, setIsExporting] = useState(false);
-
-    const handleAutoFill = async () => {
-        const allCards = await fetchAllRawSortedByValue();
-        if (allCards) autoFill(allCards);
-    };
+  const handleAutoFill = async () => {
+    const allCards = await fetchAllRawSortedByValue();
+    if (allCards) autoFill(allCards);
+  };
 
   const exportAll = async () => {
     setIsExporting(true);
     const zip = new JSZip();
     const originalId = currentPageId;
-
     try {
       for (let i = 0; i < pages.length; i++) {
         setCurrent(pages[i].id);
         // Wait for React to render the new props and the DOM to paint
         await new Promise(resolve => setTimeout(resolve, 400));
-
         const exportNode = document.getElementById('fb-export-node');
         if (exportNode) {
           const dataUrl = await toPng(exportNode, { quality: 1, pixelRatio: 2 });
@@ -64,24 +61,26 @@ export function PagedWorkspace({ mode }: { mode: GenMode }) {
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.min(pages.length - 1, currentIndex + 1)]?.id)} disabled={currentIndex === pages.length - 1 || isExporting}>
             <ChevronRight className="size-4" />
           </Button>
-          
+
           <div className="mx-2 h-4 w-px bg-border" />
-          
+
           <Button variant="ghost" size="sm" onClick={addPage} disabled={isExporting}>
-            <Plus className="mr-1 size-4" /> Add Page
+            <Plus className="mr-1 size-4" /> Add
           </Button>
           <Button variant="ghost" size="sm" onClick={() => removePage(currentPageId)} disabled={pages.length === 1 || isExporting} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
             <Trash2 className="mr-1 size-4" /> Remove
           </Button>
+
+          {tabs && <><div className="mx-2 h-4 w-px bg-border" />{tabs}</>}
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="mr-2 text-xs text-muted-foreground">{totalCards} total items</span>
+          <span className="mr-2 text-xs text-muted-foreground">{totalCards} items</span>
           <Button variant="outline" size="sm" onClick={handleAutoFill} disabled={loading || isExporting}>
-            <Zap className="mr-1 size-4" /> {loading ? 'Fetching...' : 'Auto-fill'}
+            <Zap className="mr-1 size-4" /> {loading ? 'Loading…' : 'Auto-fill'}
           </Button>
           <Button size="sm" onClick={exportAll} disabled={isExporting || totalCards === 0}>
-            <Download className="mr-1 size-4" /> {isExporting ? 'Exporting Batch...' : 'Export All (ZIP)'}
+            <Download className="mr-1 size-4" /> {isExporting ? 'Exporting…' : 'Export ZIP'}
           </Button>
         </div>
       </div>

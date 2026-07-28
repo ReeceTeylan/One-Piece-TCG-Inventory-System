@@ -20,12 +20,14 @@ import { computeSetBanners, groupContiguous, newId } from './set-utils';
 
 export function GeneratorWorkspace({
   mode,
+  tabs,
   cards: cardsProp,
   onCardsChange,
   sets: setsProp,
   onSetsChange,
 }: {
   mode: GenMode;
+  tabs?: React.ReactNode;
   cards?: FbCard[];
   onCardsChange?: React.Dispatch<React.SetStateAction<FbCard[]>>;
   sets?: FbSet[];
@@ -129,7 +131,8 @@ export function GeneratorWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
-      <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        {tabs ?? <span />}
         <div className="flex items-center gap-2">
           <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
