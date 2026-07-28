@@ -30,8 +30,9 @@ export class ImagesService {
       .resize(1000, 1400, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 82 })
       .toBuffer();
+    // 63x88mm card ratio, same as the main image — a square crop cuts the card's sides off.
     const thumb = await sharp(file.buffer)
-      .resize(300, 300, { fit: 'cover', position: 'attention' })
+      .resize(300, 420, { fit: 'inside', withoutEnlargement: true })
       .webp({ quality: 75 })
       .toBuffer();
 

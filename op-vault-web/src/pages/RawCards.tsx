@@ -221,10 +221,10 @@ export function RawCardsPage() {
                         checked={selected.has(c.id)} onChange={() => toggleOne(c.id)}
                         className="size-4 cursor-pointer align-middle" />
                     </TD>
-                    <TD>
+                    <TD className="min-w-[180px]">
                       <div className="flex items-center gap-2.5">
                         <div className="relative shrink-0">
-                          <CardThumb url={c.images?.[0]?.url} alt={c.name} className="h-[46px] w-[34px]" />
+                          <CardThumb url={c.images?.[0]?.url} alt={c.name} className="aspect-[63/88] w-[34px]" />
                           {busyId === c.id && (
                             <div className="absolute inset-0 grid place-items-center rounded bg-black/50">
                               <Loader2 className="size-4 animate-spin text-white" />
