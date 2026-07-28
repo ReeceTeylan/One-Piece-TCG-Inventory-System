@@ -26,7 +26,7 @@ export function ActivityLogsPage() {
       <div className="mb-3.5 flex items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Filter by action…" />
       </div>
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No activity yet." /> : (
           <Table>
             <THead><TR><TH>Action</TH><TH>Entity</TH><TH>User</TH><TH>When</TH></TR></THead>

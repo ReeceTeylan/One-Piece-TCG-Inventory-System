@@ -34,7 +34,7 @@ export function FavoritesPage() {
   ];
 
   return (
-    <>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <PageHeader title="Favorites" subtitle="Pinned & favorite cards" />
 
       <h3 className="mb-2.5 text-sm font-bold">Pinned to dashboard</h3>
@@ -72,6 +72,6 @@ export function FavoritesPage() {
           ))}
         </div>
       ) : <EmptyState message="No favorites yet." />}
-    </>
+    </div>
   );
 }

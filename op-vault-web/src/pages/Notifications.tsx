@@ -38,9 +38,9 @@ export function NotificationsPage() {
         ))}
       </div>
 
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No notifications." /> : (
-          <div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {data.data.map((n) => (
               <div key={n.id} className={cn('flex items-start gap-3 border-b px-4 py-3 last:border-0', !n.isRead && 'bg-muted/40')}>
                 <span className="mt-1 grid size-8 shrink-0 place-items-center rounded-full bg-muted"><Bell className="size-4 text-muted-foreground" /></span>

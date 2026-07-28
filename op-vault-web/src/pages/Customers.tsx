@@ -46,7 +46,7 @@ export function CustomersPage() {
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search name, FB, contact…" />
       </div>
 
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No customers found." /> : (
           <Table>
             <THead><TR><TH>Name</TH><TH>Facebook</TH><TH>Contact</TH><TH className="text-right">Orders</TH><TH>Since</TH><TH></TH></TR></THead>

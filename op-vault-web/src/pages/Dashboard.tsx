@@ -71,7 +71,7 @@ export function DashboardPage() {
   const d = dash.data;
 
   return (
-    <div>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <PageHeader title="Dashboard" subtitle="Business snapshot"
         actions={<Button onClick={() => navigate('/sales')}><Plus className="size-4" /> New sale</Button>} />
 

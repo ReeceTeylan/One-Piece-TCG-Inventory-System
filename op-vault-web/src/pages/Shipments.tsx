@@ -50,7 +50,7 @@ export function ShipmentsPage() {
         </Select>
       </div>
 
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No shipments." /> : (
           <Table>
             <THead><TR><TH>Reference</TH><TH>Customer</TH><TH>Courier</TH><TH className="text-right">Value</TH><TH>Tracking</TH><TH>Status</TH><TH>Date</TH><TH></TH></TR></THead>

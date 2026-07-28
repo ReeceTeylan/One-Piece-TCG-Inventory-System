@@ -38,7 +38,7 @@ export function PaymentsPage() {
       <div className="mb-3.5 flex items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search reference, customer…" />
       </div>
-      <Card>
+      <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !rows.length ? <EmptyState message="No outstanding balances." /> : (
           <Table>
             <THead><TR><TH>Reference</TH><TH>Customer</TH><TH className="text-right">Total</TH><TH className="text-right">Paid</TH><TH className="text-right">Balance</TH><TH>Status</TH><TH>Date</TH><TH></TH></TR></THead>
