@@ -7,8 +7,10 @@ export class PaginationDto {
   @Type(() => Number) @IsInt() @Min(1) @IsOptional()
   page = 1;
 
-  @ApiPropertyOptional({ default: 20, maximum: 100 })
-  @Type(() => Number) @IsInt() @Min(1) @Max(100) @IsOptional()
+  // 500 covers a full-inventory fetch (FB generator picker, batch auto-fill)
+  // while still blocking an unbounded scan.
+  @ApiPropertyOptional({ default: 20, maximum: 500 })
+  @Type(() => Number) @IsInt() @Min(1) @Max(500) @IsOptional()
   limit = 20;
 
   @ApiPropertyOptional()
