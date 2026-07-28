@@ -66,6 +66,6 @@ export function CardThumb({ url, alt, className, gallery, zoomable = true }: { u
       onClick={zoomable ? onOpen : undefined}
       role={zoomable ? 'button' : undefined} tabIndex={zoomable ? 0 : undefined}
       onKeyDown={zoomable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } } : undefined}
-      className={cn('shrink-0 rounded border object-cover', zoomable && 'cursor-zoom-in', className)} />
+      className={cn('shrink-0 rounded border object-contain', zoomable && 'cursor-zoom-in', className)} />
   );
 }
