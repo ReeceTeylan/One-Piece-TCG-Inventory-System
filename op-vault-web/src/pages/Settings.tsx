@@ -36,7 +36,7 @@ export function SettingsPage() {
   };
 
   return (
-    <>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <PageHeader title="Settings" subtitle="Store configuration" />
       {isLoading ? <Skeleton className="h-64 w-full max-w-2xl" /> : (
         <form onSubmit={handleSubmit(submit)} className="grid max-w-3xl gap-4 md:grid-cols-2">
@@ -60,7 +60,7 @@ export function SettingsPage() {
 
       <ChangePasswordCard />
       <PromoCard />
-    </>
+    </div>
   );
 }
 

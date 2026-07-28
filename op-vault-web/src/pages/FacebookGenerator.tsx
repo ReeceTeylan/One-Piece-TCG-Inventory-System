@@ -12,8 +12,8 @@ export function FacebookGeneratorPage() {
   const [active, setActive] = useState<GenType>('RAW');
 
   return (
-    <>
-      <PageHeader title="Facebook Post Generator" subtitle="Separate generators for raw cards, slabs & sealed products" />
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <PageHeader title="Facebook Post Generator" subtitle="Separate generators for raw cards and slabs & sealed" />
 
       <div className="mb-4 flex gap-1 rounded-lg border bg-muted p-0.5 w-fit">
         {TABS.map((t) => (
@@ -34,6 +34,6 @@ export function FacebookGeneratorPage() {
           )}
         </div>
       ))}
-    </>
+    </div>
   );
 }
