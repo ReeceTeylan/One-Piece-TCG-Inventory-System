@@ -11,7 +11,7 @@ export const NAV: NavGroup[] = [
   { title: 'Overview', items: [{ to: '/', label: 'Dashboard', icon: LayoutDashboard }] },
   { title: 'Inventory', items: [
     { to: '/raw-cards', label: 'Raw Cards', icon: Layers },
-    { to: '/slabs', label: 'Slab Inventory', icon: Award },
+    { to: '/slabs', label: 'Slabs & Sealed', icon: Award },
   ] },
   { title: 'Sales', items: [
     { to: '/customers', label: 'Customers', icon: Users },

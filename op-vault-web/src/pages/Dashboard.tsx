@@ -9,22 +9,43 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendChart } from '@/components/common/TrendChart';
 import { ErrorState } from '@/components/common/DataState';
-import { peso } from '@/lib/utils';
+import { peso, cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 
-function Stat({ label, value, delta }: { label: string; value: string; delta?: number }) {
+function Delta({ value }: { value: number }) {
+  const up = value >= 0;
   return (
-    <Card><CardContent className="p-4">
-      <div className="text-[11.5px] font-semibold text-muted-foreground">{label}</div>
-      <div className="mt-2 text-[23px] font-bold tracking-tight tnum">{value}</div>
-      {delta !== undefined && (
-        <div className="mt-1 flex items-center gap-1 text-[11.5px]">
-          {delta >= 0 ? <TrendingUp className="size-3.5 text-success" /> : <TrendingDown className="size-3.5 text-destructive" />}
-          <span className={delta >= 0 ? 'font-semibold text-success' : 'font-semibold text-destructive'}>{Math.abs(delta).toFixed(1)}%</span>
-          <span className="text-muted-foreground">vs prev</span>
-        </div>
-      )}
-    </CardContent></Card>
+    <div className="mt-1.5 flex items-center gap-1 text-[11.5px]">
+      {up ? <TrendingUp className="size-3.5 text-success" /> : <TrendingDown className="size-3.5 text-destructive" />}
+      <span className={cn('font-semibold', up ? 'text-success' : 'text-destructive')}>{Math.abs(value).toFixed(1)}%</span>
+      <span className="text-muted-foreground">vs prev</span>
+    </div>
+  );
+}
+
+function HeroStat({ label, value, delta, onClick }: { label: string; value: string; delta?: number; onClick?: () => void }) {
+  return (
+    <Card onClick={onClick}
+      className={cn('relative overflow-hidden', onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
+      <CardContent className="p-5">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+        <div className="mt-2.5 text-[32px] font-bold leading-none tracking-tight tnum">{value}</div>
+        {/* Spacer keeps all three hero cards the same height when a delta is absent. */}
+        {delta !== undefined ? <Delta value={delta} /> : <div className="mt-1.5 h-[17px]" />}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ label, value, onClick, highlight }: { label: string; value: string; onClick?: () => void; highlight?: boolean }) {
+  return (
+    <Card onClick={onClick} className={cn(onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
+      <CardContent className="p-3.5">
+        <div className="text-[11px] font-semibold text-muted-foreground">{label}</div>
+        <div className={cn('mt-1.5 text-[19px] font-bold tracking-tight tnum', highlight && 'text-primary')}>{value}</div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -48,22 +69,35 @@ export function DashboardPage() {
       <PageHeader title="Dashboard" subtitle="Business snapshot"
         actions={<Button onClick={() => navigate('/sales')}><Plus className="size-4" /> New sale</Button>} />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-        {!d ? Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-[92px]" />) : (
-          <>
+      {!d ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[118px]" />)}
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            {Array.from({ length: 7 }).map((_, i) => <Skeleton key={i} className="h-[72px]" />)}
+          </div>
+        </>
+      ) : (
+        <>
+          {/* The money story, up top and unmissable. */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <HeroStat label="Revenue this month" value={peso(d.revenue.month)} delta={d.growth.revenueMonth} onClick={() => navigate('/sales-history')} />
+            <HeroStat label="Profit this month" value={peso(d.profit.month)} delta={d.growth.profitMonth} onClick={() => navigate('/sales-history')} />
+            <HeroStat label="Avg daily profit" value={peso(d.avgDailyProfit)} />
+          </div>
+          {/* Supporting numbers. "Waiting to ship" leads because it's the only one that asks you to do something. */}
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+            <Stat label="Waiting to ship" value={String(d.counts.waitingToShip)} highlight={d.counts.waitingToShip > 0} onClick={() => navigate('/shipments')} />
             <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} />
-            <Stat label="Total raw cards" value={String(d.counts.totalRawCards)} />
-            <Stat label="Total slabs" value={String(d.counts.totalSlabs)} />
-            <Stat label="Avg daily profit" value={peso(d.avgDailyProfit)} />
-            <Stat label="Revenue month" value={peso(d.revenue.month)} delta={d.growth.revenueMonth} />
-            <Stat label="Profit month" value={peso(d.profit.month)} delta={d.growth.profitMonth} />
             <Stat label="Profit margin" value={`${d.inventory.profitMargin}%`} />
-            <Stat label="Waiting to ship" value={String(d.counts.waitingToShip)} />
-            <Stat label="Total posted price" value={peso(d.inventory.totalPostedPrice)} />
+            <Stat label="Raw cards" value={String(d.counts.totalRawCards)} onClick={() => navigate('/raw-cards')} />
+            <Stat label="Slabs & sealed" value={String(d.counts.totalSlabs)} onClick={() => navigate('/slabs')} />
+            <Stat label="Total posted" value={peso(d.inventory.totalPostedPrice)} />
             <Stat label="Total spent" value={peso(d.inventory.totalSpent)} />
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      )}
 
       <Card className="mt-5">
         <CardContent className="p-4">

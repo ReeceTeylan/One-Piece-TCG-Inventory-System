@@ -74,7 +74,8 @@ export class AnalyticsService {
     const inventory = await this.inventory();
     const [totalRaw, totalSlabs, waitingToShip] = await Promise.all([
       this.prisma.rawCard.aggregate({ _sum: { quantity: true } }),
-      this.prisma.slabCard.count({ where: { status: { not: 'SOLD' } } }),
+      // Sum units, not rows — one sealed row can hold many copies.
+      this.prisma.slabCard.aggregate({ _sum: { quantity: true }, where: { status: { not: 'SOLD' } } }),
       this.prisma.shipment.count({ where: { status: { in: ['TO_PACK', 'READY'] } } }),
     ]);
 
@@ -92,7 +93,7 @@ export class AnalyticsService {
       inventory,
       counts: {
         totalRawCards: num(totalRaw._sum.quantity),
-        totalSlabs,
+        totalSlabs: num(totalSlabs._sum.quantity),
         waitingToShip,
       },
       generatedAt: now.toISOString(),
@@ -113,8 +114,8 @@ export class AnalyticsService {
 
     const [slabValue] = await this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any }[]>(
       Prisma.sql`SELECT 
-        COALESCE(SUM("buyCost"),0) AS "totalSpent",
-        COALESCE(SUM("sellPrice"),0) AS "totalPosted"
+        COALESCE(SUM(quantity * "buyCost"),0) AS "totalSpent",
+        COALESCE(SUM(quantity * "sellPrice"),0) AS "totalPosted"
       FROM slab_cards WHERE status <> 'SOLD'`,
     );
 
@@ -270,23 +271,50 @@ export class AnalyticsService {
   }
 
   /** Slab-specific analytics. */
+  /** Slab & sealed analytics. Sales figures come from sale_items (actual sale
+   *  prices at the time of sale), not from each row's current sellPrice. */
   async slabs() {
-    const [available, sold] = await this.prisma.$transaction([
-      this.prisma.slabCard.count({ where: { status: { not: 'SOLD' } } }),
-      this.prisma.slabCard.findMany({ where: { status: 'SOLD' } }),
+    const [availableAgg, totals, gradeRow, topRow] = await Promise.all([
+      this.prisma.slabCard.aggregate({ _sum: { quantity: true }, where: { status: { not: 'SOLD' } } }),
+      this.prisma.$queryRaw<{ units: any; revenue: any; profit: any }[]>(Prisma.sql`
+        SELECT COALESCE(SUM(si.quantity),0)                    AS units,
+               COALESCE(SUM(si."unitPrice" * si.quantity),0)   AS revenue,
+               COALESCE(SUM(si."lineProfit"),0)                AS profit
+        FROM sale_items si
+        JOIN sales s ON s.id = si."saleId"
+        WHERE si."itemType" = 'SLAB' AND s.status NOT IN ('CANCELLED','REFUNDED')`),
+      this.prisma.$queryRaw<{ avggrade: any }[]>(Prisma.sql`
+        SELECT COALESCE(AVG(sc.grade),0) AS avggrade
+        FROM sale_items si
+        JOIN sales s ON s.id = si."saleId"
+        JOIN slab_cards sc ON sc.id = si."slabId"
+        WHERE si."itemType" = 'SLAB'
+          AND s.status NOT IN ('CANCELLED','REFUNDED')
+          AND sc.kind = 'SLAB' AND sc.grade IS NOT NULL`),
+      this.prisma.$queryRaw<{ slabid: string; profit: any }[]>(Prisma.sql`
+        SELECT si."slabId" AS slabid, SUM(si."lineProfit") AS profit
+        FROM sale_items si
+        JOIN sales s ON s.id = si."saleId"
+        WHERE si."itemType" = 'SLAB' AND s.status NOT IN ('CANCELLED','REFUNDED')
+          AND si."slabId" IS NOT NULL
+        GROUP BY si."slabId"
+        ORDER BY profit DESC
+        LIMIT 1`),
     ]);
-    const soldRevenue = sold.reduce((a, s) => a + num(s.sellPrice), 0);
-    const soldProfit = sold.reduce((a, s) => a + (num(s.sellPrice) - num(s.buyCost)), 0);
-    const avgGrade = sold.length ? sold.reduce((a, s) => a + num(s.grade), 0) / sold.length : 0;
-    const highestProfit = [...sold].sort((a, b) =>
-      (num(b.sellPrice) - num(b.buyCost)) - (num(a.sellPrice) - num(a.buyCost)))[0] ?? null;
+
+    const t = totals[0];
+    const topId = topRow[0]?.slabid;
+    const highestProfitSlab = topId
+      ? await this.prisma.slabCard.findUnique({ where: { id: topId } })
+      : null;
+
     return {
-      totalAvailable: available,
-      slabsSold: sold.length,
-      slabRevenue: soldRevenue,
-      slabProfit: soldProfit,
-      averageGradeSold: Number(avgGrade.toFixed(1)),
-      highestProfitSlab: highestProfit,
+      totalAvailable: num(availableAgg._sum.quantity),
+      slabsSold: num(t?.units),
+      slabRevenue: num(t?.revenue),
+      slabProfit: num(t?.profit),
+      averageGradeSold: Number(num(gradeRow[0]?.avggrade).toFixed(1)),
+      highestProfitSlab,
     };
   }
 
