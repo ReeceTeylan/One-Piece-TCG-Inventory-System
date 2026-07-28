@@ -142,7 +142,7 @@ export function GeneratorWorkspace({
         </div>
       </div>
 
-      <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[360px_1fr_260px] xl:overflow-hidden">
+      <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_1fr_260px] xl:overflow-hidden">
         <Card className="order-2 flex max-h-[60vh] flex-col p-4 xl:order-1 xl:max-h-none xl:min-h-0">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Layers className="size-4" /> {mode.type === 'SEALED' ? 'Add product' : 'Inventory'}</h3>
           {mode.type === 'SEALED'
