@@ -14,7 +14,7 @@ export function AppLayout() {
         <Topbar onToggleSidebar={() => setCollapsed((c) => !c)} onToggleMobile={() => setMobileOpen((o) => !o)} />
         {/* min-h-0 lets children shrink below their content height so the table,
             not the page, is what scrolls. */}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-5 md:p-6"><Outlet /></main>
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"><Outlet /></main>
       </div>
     </div>
   );
