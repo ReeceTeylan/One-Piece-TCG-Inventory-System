@@ -45,9 +45,6 @@ export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendP
   const bestIdx = values.length ? values.reduce((best, v, i) => (v > values[best] ? i : best), 0) : -1;
   const fmt = (v: number) => (metric === 'cardsSold' ? String(Math.round(v)) : peso(v));
 
-  // Sales are lumpy, so "how many days actually had a sale" says more than an average.
-  const activeDays = values.filter((v) => v > 0).length;
-
   const monthlyVals = (monthly ?? []).map((m) => Number(m[metric] ?? 0));
   const bestMonthIdx = monthlyVals.length
     ? monthlyVals.reduce((best, v, i) => (v > monthlyVals[best] ? i : best), 0)
@@ -62,7 +59,7 @@ export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendP
             <Summary label="Best month"
               value={`${fmt(monthlyVals[bestMonthIdx])} · ${new Date(monthly![bestMonthIdx].date).toLocaleDateString('en-PH', { month: 'short', year: 'numeric' })}`} />
           )}
-          <Summary label="Days with sales" value={`${activeDays} of ${values.length}`} />
+          <Summary label="Daily average" value={fmt(avg)} />
         </div>
       )}
       <ResponsiveContainer width="100%" height={260}>

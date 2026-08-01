@@ -11,33 +11,45 @@ const ACTIVE = { notIn: ['CANCELLED', 'REFUNDED'] as any };
 export class AnalyticsService {
   constructor(private prisma: PrismaService, private settings: SettingsService) {}
 
-  private periodStart(range: 'today' | 'week' | 'month' | 'year'): Date {
-    const d = new Date();
-    if (range === 'today') d.setHours(0, 0, 0, 0);
-    else if (range === 'week') d.setDate(d.getDate() - 7);
-    else if (range === 'month') d.setMonth(d.getMonth() - 1);
-    else d.setFullYear(d.getFullYear() - 1);
-    return d;
-  }
+  /**
+   * Revenue + profit + order count for a period, with boundaries evaluated in
+   * Manila time inside SQL — the same rule the trend chart uses, so the two
+   * never disagree about which day a sale belongs to.
+   *
+   * `unit` is a calendar period ('day' | 'week' | 'month' | 'year'); `offset`
+   * steps back that many periods (0 = current, 1 = previous).
+   */
+  private async totalsForPeriod(unit: 'day' | 'week' | 'month' | 'year', offset = 0) {
+    const bounds = Prisma.sql`
+      s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
+        >= date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval
+      AND s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
+        < date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval + '1 ${unit}'::interval
+    `;
 
-  /** Revenue + profit + order count for a rolling range. */
-  private async totalsSince(start: Date, end?: Date) {
-    const createdAt: Prisma.DateTimeFilter = { gte: start };
-    if (end) createdAt.lt = end;
-    const agg = await this.prisma.sale.aggregate({
-      where: { status: ACTIVE, createdAt },
-      _sum: { grandTotal: true, totalProfit: true },
-      _count: { _all: true },
-    });
-    const cardsSold = await this.prisma.saleItem.aggregate({
-      _sum: { quantity: true },
-      where: { sale: { status: ACTIVE, createdAt } },
-    });
+    const [row] = await this.prisma.$queryRaw<{ revenue: any; profit: any; orders: any; cards: any }[]>(Prisma.sql`
+      SELECT
+        COALESCE(SUM(s."grandTotal"), 0)  AS revenue,
+        COALESCE(SUM(s."totalProfit"), 0) AS profit,
+        COUNT(s.id)                       AS orders,
+        COALESCE((
+          SELECT SUM(si.quantity) FROM sale_items si WHERE si."saleId" IN (
+            SELECT s2.id FROM sales s2 WHERE s2.status NOT IN ('CANCELLED','REFUNDED')
+              AND s2."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
+                >= date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval
+              AND s2."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
+                < date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval + '1 ${unit}'::interval
+          )
+        ), 0) AS cards
+      FROM sales s
+      WHERE s.status NOT IN ('CANCELLED','REFUNDED') AND ${bounds}
+    `);
+
     return {
-      revenue: num(agg._sum.grandTotal),
-      profit: num(agg._sum.totalProfit),
-      orders: agg._count._all,
-      cardsSold: num(cardsSold._sum.quantity),
+      revenue: num(row?.revenue),
+      profit: num(row?.profit),
+      orders: num(row?.orders),
+      cardsSold: num(row?.cards),
     };
   }
 
@@ -53,22 +65,13 @@ export class AnalyticsService {
     const OPERATION_START = new Date(2026, 6, 11); // July 11, 2026 (month is 0-based)
     const msPerDay = 24 * 60 * 60 * 1000;
     const daysOperating = Math.max(1, Math.floor((now.getTime() - OPERATION_START.getTime()) / msPerDay) + 1);
-    const startToday = this.periodStart('today');
-    const startWeek = this.periodStart('week');
-    const startMonth = this.periodStart('month');
-    const startYear = this.periodStart('year');
-
-    // previous comparable windows for growth
-    const prevWeekStart = new Date(startWeek); prevWeekStart.setDate(prevWeekStart.getDate() - 7);
-    const prevMonthStart = new Date(startMonth); prevMonthStart.setMonth(prevMonthStart.getMonth() - 1);
-
     const [today, week, month, year, prevWeek, prevMonth] = await Promise.all([
-      this.totalsSince(startToday),
-      this.totalsSince(startWeek),
-      this.totalsSince(startMonth),
-      this.totalsSince(startYear),
-      this.totalsSince(prevWeekStart, startWeek),
-      this.totalsSince(prevMonthStart, startMonth),
+      this.totalsForPeriod('day'),
+      this.totalsForPeriod('week'),
+      this.totalsForPeriod('month'),
+      this.totalsForPeriod('year'),
+      this.totalsForPeriod('week', 1),
+      this.totalsForPeriod('month', 1),
     ]);
 
     const inventory = await this.inventory();
