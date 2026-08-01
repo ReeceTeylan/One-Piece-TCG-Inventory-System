@@ -10,8 +10,8 @@ export function Sidebar({ collapsed, mobileOpen, onNavigate }: { collapsed: bool
   return (
     <aside className={cn(
       'flex flex-col bg-sidebar text-sidebar-foreground transition-all duration-200',
-      collapsed ? 'w-[60px]' : 'w-[236px]',
-      'fixed inset-y-0 left-0 z-40 md:static md:translate-x-0',
+      collapsed ? 'md:w-[60px]' : 'md:w-[236px]',
+      'w-[236px] shrink-0 fixed inset-y-0 left-0 z-40 md:static md:translate-x-0',
       mobileOpen ? 'translate-x-0' : '-translate-x-full',
     )}>
       {/* Brand Header */}

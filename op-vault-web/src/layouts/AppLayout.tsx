@@ -10,7 +10,9 @@ export function AppLayout() {
     <div className="flex h-screen overflow-hidden">
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onNavigate={() => setMobileOpen(false)} />
       {mobileOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      {/* min-w-0 lets this column shrink below its content width — without it the
+          sidebar's width pushes the page sideways on mobile. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onToggleSidebar={() => setCollapsed((c) => !c)} onToggleMobile={() => setMobileOpen((o) => !o)} />
         {/* min-h-0 lets children shrink below their content height so the table,
             not the page, is what scrolls. */}
