@@ -20,29 +20,32 @@ export class AnalyticsService {
    * steps back that many periods (0 = current, 1 = previous).
    */
   private async totalsForPeriod(unit: 'day' | 'week' | 'month' | 'year', offset = 0) {
-    const bounds = Prisma.sql`
-      s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
-        >= date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval
-      AND s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
-        < date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval + '1 ${unit}'::interval
-    `;
+    // date_trunc's first argument and interval literals must be inline, not bound
+    // parameters. `unit` and `offset` are internal (never user input), so this is safe.
+    const u = Prisma.raw(`'${unit}'`);
+    const back = Prisma.raw(`interval '${offset} ${unit}'`);
+    const one = Prisma.raw(`interval '1 ${unit}'`);
 
     const [row] = await this.prisma.$queryRaw<{ revenue: any; profit: any; orders: any; cards: any }[]>(Prisma.sql`
+      WITH bounds AS (
+        SELECT date_trunc(${u}, now() AT TIME ZONE 'Asia/Manila') - ${back} AS lo,
+               date_trunc(${u}, now() AT TIME ZONE 'Asia/Manila') - ${back} + ${one} AS hi
+      ),
+      period_sales AS (
+        SELECT s.id, s."grandTotal", s."totalProfit"
+        FROM sales s, bounds b
+        WHERE s.status NOT IN ('CANCELLED','REFUNDED')
+          AND s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' >= b.lo
+          AND s."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila' <  b.hi
+      )
       SELECT
-        COALESCE(SUM(s."grandTotal"), 0)  AS revenue,
-        COALESCE(SUM(s."totalProfit"), 0) AS profit,
-        COUNT(s.id)                       AS orders,
+        COALESCE((SELECT SUM("grandTotal")  FROM period_sales), 0) AS revenue,
+        COALESCE((SELECT SUM("totalProfit") FROM period_sales), 0) AS profit,
+        (SELECT COUNT(*) FROM period_sales)                        AS orders,
         COALESCE((
-          SELECT SUM(si.quantity) FROM sale_items si WHERE si."saleId" IN (
-            SELECT s2.id FROM sales s2 WHERE s2.status NOT IN ('CANCELLED','REFUNDED')
-              AND s2."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
-                >= date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval
-              AND s2."createdAt" AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Manila'
-                < date_trunc(${unit}, now() AT TIME ZONE 'Asia/Manila') - ${`${offset} ${unit}`}::interval + '1 ${unit}'::interval
-          )
+          SELECT SUM(si.quantity) FROM sale_items si
+          WHERE si."saleId" IN (SELECT id FROM period_sales)
         ), 0) AS cards
-      FROM sales s
-      WHERE s.status NOT IN ('CANCELLED','REFUNDED') AND ${bounds}
     `);
 
     return {
