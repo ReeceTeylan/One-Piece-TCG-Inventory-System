@@ -52,7 +52,9 @@ function Stat({ label, value, onClick, highlight }: { label: string; value: stri
 export function DashboardPage() {
   const navigate = useNavigate();
   const [metric, setMetric] = useState<'revenue' | 'profit' | 'cardsSold'>('profit');
-  const [targetMonth, setTargetMonth] = useState(''); 
+  // Default to the current calendar month, matching the "this month" stat cards.
+  const currentMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 7);
+  const [targetMonth, setTargetMonth] = useState(currentMonth);
   const dash = useQuery({ queryKey: ['dashboard'], queryFn: analyticsService.dashboard });
   const trends = useQuery({ 
     queryKey: ['trends', 'daily', targetMonth], 
