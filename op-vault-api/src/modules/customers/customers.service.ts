@@ -66,11 +66,13 @@ export class CustomersService {
       ) t
     `);
 
-    const data = rows.map((r) => ({
+    // `orders` arrives as a BigInt from COUNT() and can't be JSON-serialized —
+    // drop it and expose the converted value via _count instead.
+    const data = rows.map(({ orders, ...r }) => ({
       ...r,
       profit: Number(r.profit),
       spent: Number(r.spent),
-      _count: { sales: Number(r.orders) },
+      _count: { sales: Number(orders) },
     }));
     return paginate(data, Number(count), query);
   }
