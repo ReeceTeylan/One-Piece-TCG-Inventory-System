@@ -257,7 +257,7 @@ export function RawCardsPage() {
                 ))}
               </TBody>
             </Table>
-            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t pt-4">
+            <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
   {/* Existing Pagination component */}
   <Pagination 
     page={page} 
@@ -267,8 +267,8 @@ export function RawCardsPage() {
   />
 
   {/* New Jump-to-Page Input */}
-  <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
-    <span>Go to page:</span>
+  <div className="hidden items-center gap-1.5 pr-3 text-xs text-muted-foreground sm:flex">
+    <span>Go to page</span>
     <Input
       type="number"
       min={1}
@@ -287,7 +287,7 @@ export function RawCardsPage() {
         }
       }}
       placeholder={page.toString()}
-      className="w-16 h-9 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+      className="h-8 w-12 text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
     />
     <span className="text-xs font-medium">/ {query.data.meta.totalPages}</span>
   </div>
