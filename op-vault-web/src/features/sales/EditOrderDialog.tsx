@@ -229,14 +229,18 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
 // Reusing ProductRow from the Wizard
 function ProductRow({ img, name, sub, price, badge, onAdd }: { img?: string; name: string; sub: string; price: string | number; badge?: string; onAdd: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-2">
+    <div className="flex items-center gap-2.5 rounded-lg border p-2">
       <CardThumb url={img} alt={name} className="h-12 w-9" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5"><b className="truncate text-[13px]">{name}</b>{badge && <Badge variant="info">{badge}</Badge>}</div>
-        <span className="text-[11px] text-muted-foreground">{sub}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <b className="truncate text-[13px]">{name}</b>
+          {badge && <Badge variant="info" className="shrink-0">{badge}</Badge>}
+        </div>
+        <span className="block truncate text-[11px] text-muted-foreground">{sub}</span>
+        <b className="block text-[13px] tabular-nums sm:hidden">{peso(price)}</b>
       </div>
-      <b className="tabular-nums text-[13px]">{peso(price)}</b>
-      <Button size="sm" onClick={onAdd}>Add</Button>
+      <b className="hidden shrink-0 tabular-nums text-[13px] sm:block">{peso(price)}</b>
+      <Button size="sm" className="shrink-0" onClick={onAdd}>Add</Button>
     </div>
   );
 }

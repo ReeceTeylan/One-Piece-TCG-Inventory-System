@@ -32,7 +32,7 @@ export function AnalyticsPage() {
   const sl = slabs.data;
 
   return (
-    <>
+    <div className="min-h-0 flex-1 overflow-y-auto">
       <PageHeader title="Analytics" subtitle="Inventory, sales, cards & slabs performance" />
 
       <StatGrid title="Inventory" loading={inventory.isLoading} items={[
@@ -61,7 +61,7 @@ export function AnalyticsPage() {
             <div key={c.id} className="flex items-center gap-3 border-b py-2 last:border-0">
               <span className="grid size-5 place-items-center rounded bg-muted text-[11px] font-bold text-muted-foreground">{i + 1}</span>
               <div className="min-w-0 flex-1"><p className="truncate text-[13px] font-medium">{c.name}</p><p className="text-[11px] text-muted-foreground">{c.rarity} · {c.totalSold} sold</p></div>
-              <b className="tabular-nums text-[13px]">{peso(c.postedPrice)}</b>
+              <b className="shrink-0 tabular-nums text-[13px]">{peso(c.postedPrice)}</b>
             </div>
           )) : <p className="py-6 text-center text-sm text-muted-foreground">No data</p>}
         </Card>
@@ -79,8 +79,8 @@ export function AnalyticsPage() {
         <Card className="p-4">
           <h3 className="mb-2 text-sm font-bold">Highest profit cards</h3>
           {cards.data?.highestProfit?.length ? cards.data.highestProfit.map((c: any) => (
-            <div key={c.rawcardid} className="flex items-center justify-between border-b py-2 last:border-0">
-              <span className="text-[13px]">{c.name}</span><b className="tabular-nums text-[13px] text-success">{peso(c.profit)}</b>
+            <div key={c.rawcardid} className="flex items-center justify-between gap-2 border-b py-2 last:border-0">
+              <span className="min-w-0 truncate text-[13px]">{c.name}</span><b className="shrink-0 tabular-nums text-[13px] text-success">{peso(c.profit)}</b>
             </div>
           )) : <p className="py-6 text-center text-sm text-muted-foreground">No data</p>}
         </Card>
@@ -88,18 +88,18 @@ export function AnalyticsPage() {
         <Card className="p-4">
           <h3 className="mb-2 text-sm font-bold">Stock health</h3>
           {cards.data?.lowStock?.map((c: any) => (
-            <div key={c.id} className="flex items-center justify-between border-b py-2 last:border-0">
-              <span className="text-[13px]">{c.name}</span><Badge variant="warning">{c.quantity} left</Badge>
+            <div key={c.id} className="flex items-center justify-between gap-2 border-b py-2 last:border-0">
+              <span className="min-w-0 truncate text-[13px]">{c.name}</span><Badge variant="warning" className="shrink-0">{c.quantity} left</Badge>
             </div>
           ))}
           {cards.data?.deadStock?.slice(0, 4).map((c: any) => (
-            <div key={c.id} className="flex items-center justify-between border-b py-2 last:border-0">
-              <span className="text-[13px]">{c.name}</span><Badge variant="default">Dead</Badge>
+            <div key={c.id} className="flex items-center justify-between gap-2 border-b py-2 last:border-0">
+              <span className="min-w-0 truncate text-[13px]">{c.name}</span><Badge variant="default" className="shrink-0">Dead</Badge>
             </div>
           ))}
           {!cards.data?.lowStock?.length && !cards.data?.deadStock?.length && <p className="py-6 text-center text-sm text-muted-foreground">All healthy</p>}
         </Card>
       </div>
-    </>
+    </div>
   );
 }

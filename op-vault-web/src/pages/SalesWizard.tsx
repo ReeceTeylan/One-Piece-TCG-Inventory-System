@@ -171,8 +171,8 @@ export function SalesWizardPage() {
       )}
 
       {step === 2 && (
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <Card className="p-5">
+        <div className="grid min-h-0 gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Card className="min-w-0 p-5">
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} placeholder="Search raw cards or slabs…" className="pl-9" />
@@ -201,8 +201,8 @@ export function SalesWizardPage() {
                 <div key={l.key} className="flex items-center gap-2.5 border-b py-2 last:border-0">
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-10 w-[30px]" />
                   <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{l.name}</b><span className="text-[11px] text-muted-foreground">{l.sub} · {peso(l.unitPrice)}</span></div>
-                  <b className="tabular-nums text-[13px]">×{l.quantity}</b>
-                  <Button variant="ghost" size="icon" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 /></Button>
+                  <b className="shrink-0 tabular-nums text-[13px]">×{l.quantity}</b>
+                  <Button variant="ghost" size="icon" className="shrink-0" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 /></Button>
                 </div>
               )) : <p className="py-10 text-center text-sm text-muted-foreground">Cart is empty</p>}
             </div>
@@ -220,16 +220,16 @@ export function SalesWizardPage() {
             <h3 className="mb-3 text-sm font-semibold">Order items</h3>
             <div className="space-y-2">
               {cart.map((l) => (
-                <div key={l.key} className="flex items-center gap-2.5 border-b py-2.5 last:border-0">
+                <div key={l.key} className="flex flex-wrap items-center gap-2.5 border-b py-2.5 last:border-0">
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-12 w-9" />
-                  <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{l.name}</b><span className="text-[11px] text-muted-foreground">{l.sub}</span></div>
-                  <div className="flex items-center overflow-hidden rounded-md border">
+                  <div className="min-w-0 flex-1 basis-40"><b className="block truncate text-[13px]">{l.name}</b><span className="block truncate text-[11px] text-muted-foreground">{l.sub}</span></div>
+                  <div className="flex shrink-0 items-center overflow-hidden rounded-md border">
                     <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
                     <span className="w-7 text-center text-[13px] font-semibold tabular-nums">{l.quantity}</span>
                     <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1 || l.quantity >= l.max} onClick={() => setQty(l.key, 1)}><Plus className="size-3.5" /></button>
                   </div>
-                  <Input type="number" value={l.unitPrice} onChange={(e) => setPrice(l.key, Number(e.target.value))} className="h-8 w-24 text-right" />
-                  <Button variant="ghost" size="icon" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 /></Button>
+                  <Input type="number" value={l.unitPrice} onChange={(e) => setPrice(l.key, Number(e.target.value))} className="h-8 w-24 shrink-0 text-right" />
+                  <Button variant="ghost" size="icon" className="shrink-0" onClick={() => removeLine(l.key)} aria-label="Remove"><Trash2 /></Button>
                 </div>
               ))}
             </div>
@@ -295,14 +295,19 @@ export function SalesWizardPage() {
 
 function ProductRow({ img, name, sub, price, badge, onAdd }: { img?: string; name: string; sub: string; price: string | number; badge?: string; onAdd: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border p-2">
+    <div className="flex items-center gap-2.5 rounded-lg border p-2">
       <CardThumb url={img} alt={name} className="h-12 w-9" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5"><b className="truncate text-[13px]">{name}</b>{badge && <Badge variant="info">{badge}</Badge>}</div>
-        <span className="text-[11px] text-muted-foreground">{sub}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <b className="truncate text-[13px]">{name}</b>
+          {badge && <Badge variant="info" className="shrink-0">{badge}</Badge>}
+        </div>
+        <span className="block truncate text-[11px] text-muted-foreground">{sub}</span>
+        {/* Price sits under the name on narrow screens so the Add button always fits. */}
+        <b className="block text-[13px] tabular-nums sm:hidden">{peso(price)}</b>
       </div>
-      <b className="tabular-nums text-[13px]">{peso(price)}</b>
-      <Button size="sm" onClick={onAdd}>Add</Button>
+      <b className="hidden shrink-0 tabular-nums text-[13px] sm:block">{peso(price)}</b>
+      <Button size="sm" className="shrink-0" onClick={onAdd}>Add</Button>
     </div>
   );
 }
