@@ -109,4 +109,68 @@ export class CustomersService {
     await this.audit.log({ userId, action: 'customer.delete', entityType: 'Customer', entityId: id });
     return { message: 'Customer deleted' };
   }
+
+/** Customers sharing a name (case-insensitive), with their order counts. */
+  async duplicates() {
+    const rows = await this.prisma.$queryRaw<{ name: string; ids: string[]; count: bigint }[]>(Prisma.sql`
+      SELECT lower(trim(name)) AS name,
+             array_agg(id ORDER BY "createdAt") AS ids,
+             count(*) AS count
+      FROM customers
+      GROUP BY lower(trim(name))
+      HAVING count(*) > 1
+      ORDER BY count DESC, name
+    `);
+
+    // Pull the full records so the UI can show contact details and order counts.
+    const allIds = rows.flatMap((r) => r.ids);
+    if (!allIds.length) return [];
+    const customers = await this.prisma.customer.findMany({
+      where: { id: { in: allIds } },
+      include: { _count: { select: { sales: true } } },
+    });
+    const byId = new Map(customers.map((c) => [c.id, c]));
+
+    return rows.map((r) => ({
+      name: r.name,
+      count: Number(r.count),
+      customers: r.ids.map((id) => byId.get(id)).filter(Boolean),
+    }));
+  }
+
+  /**
+   * Move every sale from `mergeIds` onto `keepId`, then delete the emptied
+   * records. Fills in any contact details the kept record is missing.
+   */
+  async merge(keepId: string, mergeIds: string[], userId: string) {
+    const ids = mergeIds.filter((id) => id !== keepId);
+    if (!ids.length) throw new ConflictException({ code: 'NOTHING_TO_MERGE', message: 'No other customers selected.' });
+
+    return this.prisma.$transaction(async (tx) => {
+      const keep = await tx.customer.findUnique({ where: { id: keepId } });
+      if (!keep) throw new NotFoundException('Customer to keep not found');
+
+      const others = await tx.customer.findMany({ where: { id: { in: ids } } });
+      if (others.length !== ids.length) throw new NotFoundException('One or more customers not found');
+
+      const moved = await tx.sale.updateMany({ where: { customerId: { in: ids } }, data: { customerId: keepId } });
+
+      // Backfill blank fields on the kept record from the ones being removed.
+      const facebookName = keep.facebookName || others.find((o) => o.facebookName)?.facebookName || null;
+      const contactNumber = keep.contactNumber || others.find((o) => o.contactNumber)?.contactNumber || null;
+      if (facebookName !== keep.facebookName || contactNumber !== keep.contactNumber) {
+        await tx.customer.update({ where: { id: keepId }, data: { facebookName, contactNumber } });
+      }
+
+      await tx.customer.deleteMany({ where: { id: { in: ids } } });
+
+      await this.audit.log(
+        { userId, action: 'customer.merge', entityType: 'Customer', entityId: keepId,
+          metadata: { merged: ids, salesMoved: moved.count } },
+        tx,
+      );
+
+      return { message: `Merged ${ids.length} customer(s), moved ${moved.count} sale(s)`, keepId };
+    });
+  }
 }

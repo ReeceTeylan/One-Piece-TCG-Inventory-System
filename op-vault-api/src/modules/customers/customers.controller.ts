@@ -15,12 +15,18 @@ export class CustomersController {
   constructor(private service: CustomersService) {}
 
   @Get() findAll(@Query() query: QueryCustomerDto) { return this.service.findAll(query); }
+  // Must precede ':id' or Nest treats "duplicates" as an id.
+  @Get('duplicates') @Roles(Role.OWNER) duplicates() { return this.service.duplicates(); }
   @Get(':id') findOne(@Param('id') id: string) { return this.service.findOne(id); }
   @Get(':id/purchases') purchases(@Param('id') id: string) { return this.service.purchaseHistory(id); }
   @Get(':id/statistics') stats(@Param('id') id: string) { return this.service.statistics(id); }
 
   @Post() create(@Body() dto: CreateCustomerDto, @CurrentUser('id') userId: string) {
     return this.service.create(dto, userId);
+  }
+  @Post('merge') @Roles(Role.OWNER)
+  merge(@Body() dto: { keepId: string; mergeIds: string[] }, @CurrentUser('id') userId: string) {
+    return this.service.merge(dto.keepId, dto.mergeIds, userId);
   }
   @Patch(':id') update(@Param('id') id: string, @Body() dto: UpdateCustomerDto, @CurrentUser('id') userId: string) {
     return this.service.update(id, dto, userId);
