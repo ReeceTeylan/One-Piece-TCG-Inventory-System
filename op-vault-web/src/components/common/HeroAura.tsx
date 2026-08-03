@@ -1,24 +1,31 @@
 /**
  * Ambient motion layer for the dashboard hero cards.
- * Renders a rotating conic beam masked to the border ring, two drifting
- * aurora blobs, and a bobbing straw hat watermark.
+ *
+ * The border light is a RELAY: one shared 6s timeline, each card lit during
+ * its own 2s slot, so the beam appears to travel across the row card-to-card.
+ * `index` must match the card's left-to-right position or the relay breaks.
  *
  * Must be the FIRST child of a `relative overflow-hidden` Card, and the
  * CardContent after it needs `relative` or the text sits underneath.
  */
-export function HeroAura({ label }: { label: string }) {
-  // Desync each card off its label so the row never animates in lockstep.
-  // Negative delays start mid-cycle — no staggered fade-in on mount.
-  const seed = [...label].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const beamDelay = -((seed % 70) / 10);
-  const driftA = -((seed % 170) / 10);
-  const driftB = -((seed % 230) / 10);
-  const hatDelay = -((seed % 40) / 10);
+const TOTAL = 6; // full relay cycle, seconds
+const SEGMENT = 2; // per-card lit slot
+
+export function HeroAura({ index }: { index: number }) {
+  // Negative delay starts each card mid-timeline: no staggered fade-in on mount.
+  const sweepDelay = -(TOTAL - index * SEGMENT);
+  const driftA = -(index * 5.5);
+  const driftB = -(index * 8.5);
+  const hatDelay = -(index * 1.7);
 
   return (
     <>
       <style>{`
-        @keyframes hero-beam { to { transform: rotate(360deg); } }
+        @keyframes hero-sweep {
+          0%   { transform: translateX(-120%) skewX(-14deg); }
+          33%  { transform: translateX(220%)  skewX(-14deg); }
+          100% { transform: translateX(220%)  skewX(-14deg); }
+        }
         @keyframes hero-drift-a {
           0%, 100% { transform: translate3d(-14%, -6%, 0) scale(1); }
           33%      { transform: translate3d(34%, 14%, 0) scale(1.3); }
@@ -37,25 +44,28 @@ export function HeroAura({ label }: { label: string }) {
         }
       `}</style>
 
-      {/* 1. Border beam. Wrapper centers + clips; inner square does the rotating
-             so the centering transform can't fight the animation transform. */}
-      <div className="pointer-events-none absolute inset-0 grid place-items-center overflow-hidden rounded-[inherit]">
+      {/* 1. The travelling light. Rendered full-bleed, then masked to the ring. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
         <div
-          className="hero-anim aspect-square w-[180%]"
+          className="hero-anim absolute inset-y-0 left-0 w-1/2"
           style={{
             background:
-              'conic-gradient(from 0deg, transparent 0deg, transparent 248deg, rgba(56,160,255,.75) 306deg, rgba(186,232,255,1) 338deg, rgba(56,160,255,.75) 356deg, transparent 360deg)',
-            animation: 'hero-beam 7s linear infinite',
-            animationDelay: `${beamDelay}s`,
+              'linear-gradient(90deg, transparent 0%, rgba(56,160,255,.55) 38%, rgba(200,240,255,1) 52%, rgba(56,160,255,.55) 66%, transparent 100%)',
+            animation: `hero-sweep ${TOTAL}s linear infinite`,
+            animationDelay: `${sweepDelay}s`,
           }}
         />
       </div>
 
-      {/* 2. Mask: covers everything but a 1px ring of the beam. */}
+      {/* 2. Mask — leaves only a 1px ring of the light above. */}
       <div className="pointer-events-none absolute inset-px rounded-[inherit] bg-card" />
 
-      {/* 3. Aurora blobs, inside the mask. */}
+      {/* 3. Interior: aurora drift + a soft echo of the sweep, all inside the mask. */}
       <div className="pointer-events-none absolute inset-px overflow-hidden rounded-[inherit]">
+        <div
+          className="hero-anim absolute inset-y-0 left-0 w-1/2 bg-sky-300/[.13] blur-2xl"
+          style={{ animation: `hero-sweep ${TOTAL}s linear infinite`, animationDelay: `${sweepDelay}s` }}
+        />
         <div
           className="hero-anim absolute -left-10 -top-10 size-44 rounded-full bg-sky-500/25 blur-3xl"
           style={{ animation: 'hero-drift-a 17s ease-in-out infinite', animationDelay: `${driftA}s` }}

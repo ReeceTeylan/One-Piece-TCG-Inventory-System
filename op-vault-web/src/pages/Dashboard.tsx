@@ -26,11 +26,11 @@
     );
   }
 
-  function HeroStat({ label, value, delta, onClick }: { label: string; value: number; delta?: number; onClick?: () => void }) {
+  function HeroStat({ label, value, delta, index, onClick }: { label: string; value: number; delta?: number; index: number; onClick?: () => void }) {
   return (
     <Card onClick={onClick}
       className={cn('relative overflow-hidden', onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
-      <HeroAura label={label} />
+      <HeroAura index={index} />
       <CardContent className="relative p-5">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
         <Gear5Number value={value} format={peso}
@@ -94,9 +94,9 @@
           <>
             {/* The money story, up top and unmissable. */}
             <div className="grid gap-3 sm:grid-cols-3">
-              <HeroStat label="Revenue this month" value={d.revenue.month} delta={d.growth.revenueMonth} onClick={() => navigate('/sales-history')} />
-            <HeroStat label="Profit this month" value={d.profit.month} delta={d.growth.profitMonth} onClick={() => navigate('/sales-history')} />
-            <HeroStat label="Avg daily profit" value={d.avgDailyProfit} />
+            <HeroStat index={0} label="Revenue this month" value={d.revenue.month} delta={d.growth.revenueMonth} onClick={() => navigate('/sales-history')} />
+            <HeroStat index={1} label="Profit this month" value={d.profit.month} delta={d.growth.profitMonth} onClick={() => navigate('/sales-history')} />
+            <HeroStat index={2} label="Avg daily profit" value={d.avgDailyProfit} />
             </div>
             {/* Supporting numbers. "Waiting to ship" leads because it's the only one that asks you to do something. */}
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
