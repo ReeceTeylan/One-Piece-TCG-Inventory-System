@@ -80,13 +80,20 @@ export class RawCardsService {
       };
     }
     if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { cardNumber: { contains: query.search, mode: 'insensitive' } },
-        { setName: { contains: query.search, mode: 'insensitive' } },
-        { character: { contains: query.search, mode: 'insensitive' } },
-        { notes: { contains: query.search, mode: 'insensitive' } },
-      ];
+      const term = query.search.trim();
+      // Card numbers are stored as "OP13-114" but get typed as "OP13 114".
+      // For two-token terms only, also search the dash/space-swapped form.
+      // Gated so normal name searches ("monkey d luffy") don't fan out.
+      const terms = /^[a-z0-9]+[\s-][a-z0-9]+$/i.test(term)
+        ? Array.from(new Set([term, term.replace(/\s+/g, '-'), term.replace(/-/g, ' ')]))
+        : [term];
+      where.OR = terms.flatMap((t) => [
+        { name: { contains: t, mode: 'insensitive' as const } },
+        { cardNumber: { contains: t, mode: 'insensitive' as const } },
+        { setName: { contains: t, mode: 'insensitive' as const } },
+        { character: { contains: t, mode: 'insensitive' as const } },
+        { notes: { contains: t, mode: 'insensitive' as const } },
+      ]);
     }
     const sortable = ['name', 'postedPrice', 'quantity', 'createdAt', 'buyCost'];
     const sortBy = sortable.includes(query.sortBy ?? '') ? query.sortBy! : 'createdAt';
