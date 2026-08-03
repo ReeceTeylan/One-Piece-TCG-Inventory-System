@@ -37,18 +37,42 @@ export class CustomersService {
   }
 
   async findAll(query: QueryCustomerDto) {
-    const where: Prisma.CustomerWhereInput = {};
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { facebookName: { contains: query.search, mode: 'insensitive' } },
-        { contactNumber: { contains: query.search, mode: 'insensitive' } },
-      ];
-    }
-    const sortable = ['name', 'createdAt'];
-    const sortBy = sortable.includes(query.sortBy ?? '') ? query.sortBy! : 'createdAt';
-    const { data, total } = await this.repo.findMany(where, { [sortBy]: query.sortOrder }, query.skip, query.limit);
-    return paginate(data, total, query);
+    const search = query.search?.trim();
+    const searchFilter = search
+      ? Prisma.sql`AND (c.name ILIKE ${`%${search}%`} OR c."facebookName" ILIKE ${`%${search}%`} OR c."contactNumber" ILIKE ${`%${search}%`})`
+      : Prisma.empty;
+
+    // Only customers with at least one real sale; ranked by profit generated.
+    const rows = await this.prisma.$queryRaw<any[]>(Prisma.sql`
+      SELECT c.id, c.name, c."facebookName", c."contactNumber", c.notes, c."createdAt", c."updatedAt",
+             COUNT(s.id)                        AS orders,
+             COALESCE(SUM(s."totalProfit"), 0)  AS profit,
+             COALESCE(SUM(s."grandTotal"), 0)   AS spent
+      FROM customers c
+      JOIN sales s ON s."customerId" = c.id AND s.status NOT IN ('CANCELLED','REFUNDED')
+      WHERE TRUE ${searchFilter}
+      GROUP BY c.id
+      ORDER BY profit DESC, c.name ASC
+      LIMIT ${query.limit} OFFSET ${query.skip}
+    `);
+
+    const [{ count }] = await this.prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+      SELECT COUNT(*) AS count FROM (
+        SELECT c.id
+        FROM customers c
+        JOIN sales s ON s."customerId" = c.id AND s.status NOT IN ('CANCELLED','REFUNDED')
+        WHERE TRUE ${searchFilter}
+        GROUP BY c.id
+      ) t
+    `);
+
+    const data = rows.map((r) => ({
+      ...r,
+      profit: Number(r.profit),
+      spent: Number(r.spent),
+      _count: { sales: Number(r.orders) },
+    }));
+    return paginate(data, Number(count), query);
   }
 
   async findOne(id: string) {

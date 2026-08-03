@@ -9,7 +9,7 @@ import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataS
 import { Pagination } from '@/components/common/Pagination';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SearchInput } from '@/components/common/Toolbar';
-import { fmtDate } from '@/lib/utils';
+import { fmtDate, peso } from '@/lib/utils';
 import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/contexts/auth-context';
 import { apiError } from '@/lib/api';
@@ -60,7 +60,7 @@ export function CustomersPage() {
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No customers found." /> : (
           <Table>
-            <THead><TR><TH>Name</TH><TH>Facebook</TH><TH>Contact</TH><TH className="text-right">Orders</TH><TH>Since</TH><TH></TH></TR></THead>
+            <THead><TR><TH>Name</TH><TH>Facebook</TH><TH>Contact</TH><TH className="text-right">Orders</TH><TH className="text-right">Profit</TH><TH>Since</TH><TH></TH></TR></THead>
             <TBody>
               {data.data.map((c) => (
                 <TR key={c.id} className="cursor-pointer" onClick={() => setDetail(c)}>
@@ -70,6 +70,7 @@ export function CustomersPage() {
                   <TD className="text-muted-foreground">{c.facebookName || '—'}</TD>
                   <TD className="tabular-nums">{c.contactNumber || '—'}</TD>
                   <TD className="text-right tabular-nums">{c._count?.sales ?? 0}</TD>
+                  <TD className="text-right font-semibold tabular-nums text-success">{peso(c.profit ?? 0)}</TD>
                   <TD>{fmtDate(c.createdAt)}</TD>
                   <TD onClick={(e) => e.stopPropagation()}>
                     <div className="flex justify-end gap-1">

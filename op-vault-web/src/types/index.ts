@@ -28,6 +28,8 @@ export interface SlabCard {
 export interface Customer {
   id: string; name: string; facebookName?: string; contactNumber?: string; notes?: string;
   createdAt: string; _count?: { sales: number };
+  // Aggregated from sales by the list endpoint; absent on single-customer fetches.
+  profit?: number; spent?: number;
 }
 export interface SaleItem {
   id: string; itemType: ItemType; rawCardId?: string; slabId?: string; nameSnapshot: string;
