@@ -215,8 +215,8 @@ export function SalesWizardPage() {
       )}
 
       {step === 3 && (
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-          <Card className="p-5">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[1.4fr_1fr]">
+          <Card className="min-w-0 p-5">
             <h3 className="mb-3 text-sm font-semibold">Order items</h3>
             <div className="space-y-2">
               {cart.map((l) => (
@@ -235,15 +235,15 @@ export function SalesWizardPage() {
             </div>
             <Button variant="ghost" size="sm" className="mt-3" onClick={() => setStep(2)}><Plus /> Add more products</Button>
           </Card>
-          <Card className="p-5">
+          <Card className="min-w-0 p-5">
             <h3 className="mb-3 text-sm font-semibold">Summary</h3>
-            <div className="mb-3 text-[13px] text-muted-foreground">{existing?.name ?? newCustomer.name} · {COURIERS.find((c) => c.value === courier)?.label}</div>
+            <div className="mb-3 truncate text-[13px] text-muted-foreground">{existing?.name ?? newCustomer.name} · {COURIERS.find((c) => c.value === courier)?.label}</div>
             <Row label="Subtotal" value={peso(subtotal)} />
-            <div className="flex items-center justify-between py-1.5 text-sm"><span>Discount</span>
-              <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="h-7 w-24 text-right" /></div>
+            <div className="flex items-center justify-between gap-2 py-1.5 text-sm"><span className="min-w-0 truncate">Discount</span>
+              <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="h-7 w-24 shrink-0 text-right" /></div>
             <Row label="Shipping fee" value={peso(Number(shippingFee || 0))} />
             <Row label="Est. profit" value={peso(profit)} valueClass="text-success" />
-            <div className="mt-2 flex items-center justify-between border-t pt-3 text-base font-bold"><span>Grand total</span><span className="tabular-nums">{pesoF(grandTotal)}</span></div>
+            <div className="mt-2 flex items-center justify-between gap-2 border-t pt-3 text-base font-bold"><span>Grand total</span><span className="shrink-0 tabular-nums">{pesoF(grandTotal)}</span></div>
             <div className="mt-4 flex gap-2">
               <Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft /> Back</Button>
               <Button className="flex-1" onClick={() => setStep(4)}>Proceed to payment <ArrowRight /></Button>
@@ -255,7 +255,7 @@ export function SalesWizardPage() {
       {step === 4 && (
         <Card className="max-w-md p-5">
           <h3 className="mb-3 text-sm font-semibold">Payment & confirmation</h3>
-          <div className="mb-4 flex items-center justify-between border-b pb-3 text-base font-bold"><span>Grand total</span><span className="tabular-nums">{pesoF(grandTotal)}</span></div>
+          <div className="mb-4 flex items-center justify-between gap-2 border-b pb-3 text-base font-bold"><span>Grand total</span><span className="shrink-0 tabular-nums">{pesoF(grandTotal)}</span></div>
           <div className="mb-3"><Label>Payment status</Label>
             <Select value={paymentStatus} onChange={(e) => { const v = e.target.value as any; setPaymentStatus(v); setAmountPaid(v === 'PAID' ? grandTotal : v === 'UNPAID' ? 0 : amountPaid); }} className="mt-1 w-full">
               <option value="PAID">Paid</option><option value="PARTIAL">Partially Paid</option><option value="UNPAID">Unpaid</option>
@@ -312,5 +312,5 @@ function ProductRow({ img, name, sub, price, badge, onAdd }: { img?: string; nam
   );
 }
 function Row({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
-  return <div className="flex justify-between py-1.5 text-sm"><span>{label}</span><b className={`tabular-nums ${valueClass ?? ''}`}>{value}</b></div>;
+  return <div className="flex justify-between gap-2 py-1.5 text-sm"><span className="min-w-0 truncate">{label}</span><b className={`shrink-0 tabular-nums ${valueClass ?? ''}`}>{value}</b></div>;
 }
