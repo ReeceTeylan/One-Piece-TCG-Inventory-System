@@ -230,14 +230,14 @@ export function RawCardsPage() {
                     <TD>
                       <div className="flex items-center gap-2.5">
                         <div className="relative shrink-0">
-                          <CardThumb url={c.images?.[0]?.url} alt={c.name} className="aspect-[63/88] w-[34px]" />
+                          <CardThumb url={c.images?.[0]?.url} alt={c.name} className="aspect-[63/88] w-[38px]" />
                           {busyId === c.id && (
                             <div className="absolute inset-0 grid place-items-center rounded bg-black/50">
                               <Loader2 className="size-4 animate-spin text-white" />
                             </div>
                           )}
                         </div>
-                        <div className="min-w-0"><div className="truncate font-medium">{c.name}</div><div className="text-xs text-muted-foreground">{c.cardNumber}</div></div>
+                        <div className="min-w-0 flex-1"><div className="truncate font-medium">{c.name}</div><div className="text-xs text-muted-foreground">{c.cardNumber}</div></div>
                       </div>
                     </TD>
                     <TD>{c.setName}</TD>
