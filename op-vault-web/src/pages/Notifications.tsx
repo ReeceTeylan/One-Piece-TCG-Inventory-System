@@ -57,7 +57,7 @@ export function NotificationsPage() {
             ))}
           </div>
         )}
-        {data && data.meta.totalPages > 1 && <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} />}
+        {data && data.meta.totalPages > 1 && <div className="flex border-t"><Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} /></div>}
       </Card>
     </>
   );

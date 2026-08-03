@@ -111,7 +111,7 @@ export function SalesHistoryPage() {
             </TBody>
           </Table>
         )}
-        {data && data.meta.totalPages > 1 && <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} />}
+        {data && data.meta.totalPages > 1 && <div className="flex border-t"><Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} /></div>}
       </Card>
 
       <ConfirmDialog open={!!action} onOpenChange={(o) => !o && setAction(null)} destructive={action?.type === 'refund'}

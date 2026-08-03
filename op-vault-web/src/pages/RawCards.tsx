@@ -257,8 +257,8 @@ export function RawCardsPage() {
                 ))}
               </TBody>
             </Table>
-            <div className="flex flex-col items-center justify-between gap-2 border-t pt-3 sm:flex-row">
-  {/* Existing Pagination component */}
+            <div className="flex items-center border-t">
+  {/* Pagination grows to fill the row; the jump box sits alongside it. */}
   <Pagination 
     page={page} 
     totalPages={query.data.meta.totalPages} 
