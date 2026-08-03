@@ -207,7 +207,7 @@ export function SlabsPage() {
                   </TD>
                   <TD>
                     <div className="flex items-center gap-3">
-                      <CardThumb url={s.images?.[0]?.url} alt={s.name} className="h-[52px] w-[38px]" />
+                      <CardThumb url={s.images?.[0]?.url} alt={s.name} className="aspect-[63/88] w-[38px]" />
                       <div><b className="font-semibold">{s.name}</b><span className="block text-[11.5px] text-muted-foreground">{s.setName || '—'}</span></div>
                     </div>
                   </TD>

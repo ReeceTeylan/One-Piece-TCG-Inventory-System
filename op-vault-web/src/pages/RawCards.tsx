@@ -227,7 +227,7 @@ export function RawCardsPage() {
                         checked={selected.has(c.id)} onChange={() => toggleOne(c.id)}
                         className="size-4 cursor-pointer align-middle" />
                     </TD>
-                    <TD className="min-w-[180px]">
+                    <TD>
                       <div className="flex items-center gap-2.5">
                         <div className="relative shrink-0">
                           <CardThumb url={c.images?.[0]?.url} alt={c.name} className="aspect-[63/88] w-[34px]" />
