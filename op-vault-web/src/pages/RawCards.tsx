@@ -257,7 +257,7 @@ export function RawCardsPage() {
                 ))}
               </TBody>
             </Table>
-            <div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
+            <div className="flex flex-col items-center justify-between gap-2 border-t pt-3 sm:flex-row">
   {/* Existing Pagination component */}
   <Pagination 
     page={page} 
