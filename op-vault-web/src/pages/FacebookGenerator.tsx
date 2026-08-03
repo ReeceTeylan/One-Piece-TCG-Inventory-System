@@ -24,6 +24,9 @@ export function FacebookGeneratorPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <p className="mb-3 rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground xl:hidden">
+        The post generator needs a wider screen — open OP-Vault on a desktop to build and export posts.
+      </p>
       {TABS.map((t) => (
         <div key={t} className={active === t ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
           {t === 'RAW'

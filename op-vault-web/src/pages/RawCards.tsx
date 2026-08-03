@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload } from 'lucide-react';
+import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload, SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -49,6 +49,7 @@ export function RawCardsPage() {
   const [restockCard, setRestockCard] = useState<RawCard | null>(null);
   const [deleteCard, setDeleteCard] = useState<RawCard | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [sortBy, sortOrder] = sort.split(':');
   const query = useRawCards({
@@ -138,16 +139,20 @@ export function RawCardsPage() {
       <PageHeader title="Raw Cards" subtitle={query.data ? `${query.data.meta.total} titles` : undefined}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setShowImport(true)}><Upload className="size-4" /> Import CSV</Button>
-            <Button onClick={() => setShowAdd(true)}><Plus className="size-4" /> Add raw card</Button>
+            <Button variant="outline" size="sm" onClick={() => setShowImport(true)}><Upload className="size-4" /> <span className="hidden sm:inline">Import CSV</span></Button>
+            <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Add raw card</span><span className="sm:hidden">Add</span></Button>
           </div>
         } />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <form onSubmit={onSearch} className="relative w-full max-w-xs">
+        <form onSubmit={onSearch} className="relative min-w-0 flex-1 sm:max-w-xs sm:flex-none">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name, number, set…" className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="pl-9" />
         </form>
+        <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setFiltersOpen((o) => !o)} aria-label="Filters">
+          <SlidersHorizontal className="size-4" />
+        </Button>
+        <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="IN_STOCK">Available</option><option value="OUT">Sold</option><option value="">All</option></Select>
         <Select value={rarity} onChange={(e) => { setRarity(e.target.value); setPage(1); }}><option value="">All rarities</option>{RARITIES.map((r) => <option key={r} value={r}>{r}</option>)}</Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>
@@ -165,6 +170,7 @@ export function RawCardsPage() {
           {(minPrice || maxPrice) && (
             <Button variant="ghost" size="sm" onClick={() => { setMinPrice(''); setMaxPrice(''); setPage(1); }}>Clear</Button>
           )}
+        </div>
         </div>
       </div>
 
@@ -261,7 +267,7 @@ export function RawCardsPage() {
   />
 
   {/* New Jump-to-Page Input */}
-  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+  <div className="hidden items-center gap-2 text-sm text-muted-foreground sm:flex">
     <span>Go to page:</span>
     <Input
       type="number"
