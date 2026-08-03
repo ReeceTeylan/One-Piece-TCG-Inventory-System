@@ -32,7 +32,7 @@
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
       {/* Gear 5 cream glow — only when the month is actually up vs prev. Down months stay cold. */}
       {up && (
-        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-[inherit] shadow-[inset_0_0_34px_-8px_rgba(255,241,204,0.5)] motion-reduce:animate-none" />
+        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-[inherit] shadow-[inset_0_0_50px_-4px_rgba(56,160,255,0.85),inset_0_0_14px_-6px_rgba(150,215,255,0.9)] motion-reduce:animate-none" />
       )}
       <CardContent className="relative p-5">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
