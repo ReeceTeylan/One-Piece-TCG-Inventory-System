@@ -171,13 +171,13 @@ export function SalesWizardPage() {
       )}
 
       {step === 2 && (
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[1.4fr_1fr]">
-          <Card className="min-w-0 p-5">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[1.4fr_1fr] lg:overflow-hidden">
+          <Card className="flex min-w-0 flex-col p-5 lg:min-h-0">
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} placeholder="Search raw cards or slabs…" className="pl-9" />
             </div>
-            <div className="max-h-[50vh] space-y-1.5 overflow-y-auto lg:max-h-[420px]">
+            <div className="max-h-[50vh] space-y-1.5 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
               {raw.data?.data.map((c) => (
                 <ProductRow key={c.id} img={c.images?.[0]?.url} name={c.name} sub={`${c.cardNumber} · ${c.quantity} in stock`} price={c.postedPrice} onAdd={() => addRaw(c)} />
               ))}
@@ -194,9 +194,9 @@ export function SalesWizardPage() {
               )}
             </div>
           </Card>
-          <Card className="order-first flex min-w-0 flex-col p-5 lg:order-none">
+          <Card className="order-first flex min-w-0 flex-col p-5 lg:order-none lg:min-h-0">
             <h3 className="mb-2 text-sm font-semibold">Cart <span className="text-muted-foreground">· {cart.length} item(s)</span></h3>
-            <div className="max-h-[420px] flex-1 space-y-2 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 lg:max-h-none">
               {cart.length ? cart.map((l) => (
                 <div key={l.key} className="flex items-center gap-2.5 border-b py-2 last:border-0">
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-10 w-[30px]" />
