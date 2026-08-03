@@ -12,6 +12,7 @@
   import { StrawHatLoader } from '@/components/common/StrawHatLoader';
   import { peso, cn } from '@/lib/utils';
   import { Gear5Number } from '@/components/ui/gear5-number';
+  import { HeroAura } from '@/components/common/HeroAura';
   import { Input } from '@/components/ui/input';
 
   function Delta({ value }: { value: number }) {
@@ -26,15 +27,10 @@
   }
 
   function HeroStat({ label, value, delta, onClick }: { label: string; value: number; delta?: number; onClick?: () => void }) {
-  const up = true;
   return (
     <Card onClick={onClick}
       className={cn('relative overflow-hidden', onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/50 via-primary/20 to-transparent" />
-      {/* Gear 5 cream glow — only when the month is actually up vs prev. Down months stay cold. */}
-      {up && (
-        <div className="pointer-events-none absolute inset-0 animate-pulse rounded-[inherit] shadow-[inset_0_0_50px_-4px_rgba(56,160,255,0.85),inset_0_0_14px_-6px_rgba(150,215,255,0.9)] motion-reduce:animate-none" />
-      )}
+      <HeroAura label={label} />
       <CardContent className="relative p-5">
         <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
         <Gear5Number value={value} format={peso}
