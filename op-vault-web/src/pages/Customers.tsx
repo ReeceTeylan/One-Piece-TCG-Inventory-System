@@ -14,7 +14,8 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { useAuth } from '@/contexts/auth-context';
 import { apiError } from '@/lib/api';
 import type { Customer } from '@/types';
-import { useCustomers, useCustomerMutations } from '@/features/customers/use-customers';
+import { useCustomers, useCustomerMutations, useCustomerDuplicates } from '@/features/customers/use-customers';
+import { MergeDuplicatesDialog } from '@/features/customers/MergeDuplicatesDialog';
 import { CustomerForm } from '@/features/customers/CustomerForm';
 import { CustomerDetail } from '@/features/customers/CustomerDetail';
 
@@ -30,6 +31,8 @@ export function CustomersPage() {
   const [editing, setEditing] = useState<Customer | null>(null);
   const [detail, setDetail] = useState<Customer | null>(null);
   const [toDelete, setToDelete] = useState<Customer | null>(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const { data: dupes } = useCustomerDuplicates();
 
   const confirmDelete = async () => {
     if (!toDelete) return;
@@ -45,6 +48,14 @@ export function CustomersPage() {
       <div className="mb-3.5 flex items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search name, FB, contact…" />
       </div>
+      {isOwner && !!dupes?.length && (
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/5 p-2.5">
+          <span className="text-[13px]">
+            <b>{dupes.length}</b> name{dupes.length === 1 ? '' : 's'} appear on more than one customer record.
+          </span>
+          <Button size="sm" variant="outline" onClick={() => setMergeOpen(true)}>Review &amp; merge</Button>
+        </div>
+      )}
 
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No customers found." /> : (
@@ -75,6 +86,7 @@ export function CustomersPage() {
         {data && data.meta.totalPages > 1 && <div className="flex border-t"><Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} /></div>}
       </Card>
 
+      <MergeDuplicatesDialog open={mergeOpen} onOpenChange={setMergeOpen} />
       <CustomerForm open={formOpen} onOpenChange={setFormOpen} editing={editing} />
       <CustomerDetail customer={detail} onOpenChange={(o) => !o && setDetail(null)} />
       <ConfirmDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)} destructive

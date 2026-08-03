@@ -36,6 +36,8 @@ export const customersService = {
   create: (dto: any) => api.post('/customers', dto).then(unwrap<Customer>),
   update: (id: string, dto: any) => api.patch(`/customers/${id}`, dto).then(unwrap<Customer>),
   remove: (id: string) => api.delete(`/customers/${id}`).then(unwrap),
+  duplicates: () => api.get('/customers/duplicates').then(unwrap<any[]>),
+  merge: (keepId: string, mergeIds: string[]) => api.post('/customers/merge', { keepId, mergeIds }).then(unwrap),
 };
 export const salesService = {
   list: (p?: Record<string, any>) => list<Sale>('/sales', p),
