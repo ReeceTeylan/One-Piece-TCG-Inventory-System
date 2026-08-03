@@ -9,6 +9,7 @@
   import { Skeleton } from '@/components/ui/skeleton';
   import { TrendChart } from '@/components/common/TrendChart';
   import { ErrorState } from '@/components/common/DataState';
+  import { StrawHatLoader } from '@/components/common/StrawHatLoader';
   import { peso, cn } from '@/lib/utils';
   import { Gear5Number } from '@/components/ui/gear5-number';
   import { Input } from '@/components/ui/input';
@@ -148,7 +149,7 @@
                 </div>
               </div>
             </div>
-            {trends.isLoading ? <Skeleton className="h-[230px] w-full" />
+            {trends.isLoading ? <StrawHatLoader className="h-[230px]" label="Loading trend…" />
               : trends.data ? <TrendChart data={trends.data} metric={metric} monthly={monthly.data} />
               : <ErrorState message="No trend data." />}
             <p className="mt-2 text-[11.5px] text-muted-foreground">Hover any point for date, revenue, profit, cards sold, quantity & growth.</p>
