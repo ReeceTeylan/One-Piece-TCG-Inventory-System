@@ -26,7 +26,7 @@
   }
 
   function HeroStat({ label, value, delta, onClick }: { label: string; value: number; delta?: number; onClick?: () => void }) {
-  const up = delta !== undefined && delta >= 0;
+  const up = true;
   return (
     <Card onClick={onClick}
       className={cn('relative overflow-hidden', onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
