@@ -3,7 +3,8 @@ import { cn } from '@/lib/utils';
 export const Table = ({ className, ...p }: React.HTMLAttributes<HTMLTableElement>) => (
   // flex-1 + min-h-0 means the table takes exactly the space left over after the
   // page header, filters and pagination — no magic number to keep in sync.
-  <div className="min-h-0 w-full flex-1 overflow-auto"><table className={cn('min-w-full text-sm', className)} {...p} /></div>);
+  // Thin, dark scrollbar so it doesn't sit as a bright block over the row actions.
+  <div className="min-h-0 w-full flex-1 overflow-auto [scrollbar-color:hsl(var(--border))_transparent] [scrollbar-width:thin] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar]:w-1.5"><table className={cn('min-w-full text-sm', className)} {...p} /></div>);
 export const THead = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <thead {...p} />;
 export const TBody = (p: React.HTMLAttributes<HTMLTableSectionElement>) => <tbody {...p} />;
 export const TR = ({ className, ...p }: React.HTMLAttributes<HTMLTableRowElement>) => <tr className={cn('border-b transition-colors hover:bg-muted/50', className)} {...p} />;
