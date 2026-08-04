@@ -292,7 +292,7 @@ export function RawCardsPage() {
                     <TD>{statusBadge(c.status)}</TD>
                     <TD>
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => setRestockCard(c)}><PackagePlus className="size-4" /> Qty</Button>
+                        <Button variant="ghost" size="icon" onClick={() => setRestockCard(c)} aria-label="Add quantity"><PackagePlus className="size-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => setEditCard(c)} aria-label="Edit"><Pencil className="size-4" /></Button>
                         {isOwner && <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeleteCard(c)} aria-label="Delete"><Trash2 className="size-4" /></Button>}
                       </div>

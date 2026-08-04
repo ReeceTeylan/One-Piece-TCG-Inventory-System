@@ -225,7 +225,7 @@ export function SlabsPage() {
               return (
                 <>
                   {s.kind === 'SEALED' && (
-                    <Button variant="ghost" size="sm" onClick={() => setToRestock(s)} aria-label="Add stock"><PackagePlus className="size-4" /> Qty</Button>
+                    <Button variant="ghost" size="icon" onClick={() => setToRestock(s)} aria-label="Add stock"><PackagePlus className="size-4" /></Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={() => openImage(s.id)} aria-label="Upload image"><Upload className="size-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => { setEditing(s); setFormOpen(true); }} aria-label="Edit"><Pencil className="size-4" /></Button>

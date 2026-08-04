@@ -22,7 +22,7 @@ export function CardGrid({ items, selected, onToggle, onOpen, actions, aspect = 
   return (
     // Scrolls internally so the page itself stays fixed, matching the Table.
     <div className="min-h-0 flex-1 overflow-y-auto p-3">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
         {items.map((it) => (
           <div key={it.id}
             data-selected={selected.has(it.id) || undefined}
@@ -47,7 +47,7 @@ export function CardGrid({ items, selected, onToggle, onOpen, actions, aspect = 
               </div>
             </div>
             {actions && (
-              <div className="flex items-center justify-center gap-0 border-t p-0.5 [&_button]:size-7 [&_button]:p-0 [&_svg]:size-3.5">{actions(it.id)}</div>
+              <div className="flex items-center justify-evenly border-t p-0.5 [&_button]:size-7 [&_button]:shrink-0 [&_button]:p-0 [&_span]:hidden [&_svg]:size-4">{actions(it.id)}</div>
             )}
           </div>
         ))}
