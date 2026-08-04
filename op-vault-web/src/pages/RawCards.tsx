@@ -41,7 +41,7 @@ export function RawCardsPage() {
   const [maxPrice, setMaxPrice] = useState('');
   const minDebounced = useDebounce(minPrice);
   const maxDebounced = useDebounce(maxPrice);
-  const [sort, setSort] = useState('createdAt:desc');
+  const [sort, setSort] = useState('postedPrice:desc');
   const [page, setPage] = useState(1);
   // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
   const [limit, setLimit] = useState(() => {

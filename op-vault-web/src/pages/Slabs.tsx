@@ -33,7 +33,7 @@ export function SlabsPage() {
   const [status, setStatus] = useState('AVAILABLE');
   const [grade, setGrade] = useState('');
   const [kind, setKind] = useState('');
-  const [sort, setSort] = useState('createdAt:desc');
+  const [sort, setSort] = useState('sellPrice:desc');
   const [page, setPage] = useState(1);
   // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
   const [limit, setLimit] = useState(() => {
