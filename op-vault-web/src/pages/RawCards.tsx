@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload, SlidersHorizontal } from 'lucide-react';
+import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload, SlidersHorizontal, LayoutGrid, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { CardThumb } from '@/components/common/CardImage';
 import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
+import { CardGrid } from '@/components/common/CardGrid';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
@@ -55,6 +56,9 @@ export function RawCardsPage() {
   const [deleteCard, setDeleteCard] = useState<RawCard | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<'list' | 'grid'>(
+    () => (localStorage.getItem('opv:rawcards:view') === 'grid' ? 'grid' : 'list'),
+  );
 
   const [sortBy, sortOrder] = sort.split(':');
   const query = useRawCards({
@@ -177,8 +181,16 @@ export function RawCardsPage() {
           )}
         </div>
         </div>
+        <div className="ml-auto flex gap-0.5 rounded-md border bg-muted p-0.5">
+          {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
+            <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:rawcards:view', v); }}
+              aria-label={`${v} view`} aria-pressed={view === v}
+              className={`rounded p-1.5 ${view === v ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>
+              <Icon className="size-4" />
+            </button>
+          ))}
+        </div>
       </div>
-
       {selected.size > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
           <span className="text-[13px] font-semibold">{selected.size} selected</span>
@@ -212,6 +224,33 @@ export function RawCardsPage() {
         : !query.data?.data.length ? <EmptyState message="No cards match your filters." />
         : (
           <div className="flex min-h-0 flex-1 flex-col">
+            {view === 'grid' ? (
+              <CardGrid
+                items={query.data.data.map((c) => ({
+                  id: c.id,
+                  imageUrl: c.images?.[0]?.url,
+                  title: c.name,
+                  subtitle: `${c.cardNumber} · ${c.setName}`,
+                  price: peso(c.postedPrice),
+                  meta: `×${c.quantity}`,
+                  badge: statusBadge(c.status),
+                }))}
+                selected={selected}
+                onToggle={toggleOne}
+                onOpen={(id) => { const c = rows.find((r) => r.id === id); if (c) setEditCard(c); }}
+                actions={(id) => {
+                  const c = rows.find((r) => r.id === id);
+                  if (!c) return null;
+                  return (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={() => setRestockCard(c)}><PackagePlus className="size-4" /> Qty</Button>
+                      <Button variant="ghost" size="icon" onClick={() => setEditCard(c)} aria-label="Edit"><Pencil className="size-4" /></Button>
+                      {isOwner && <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeleteCard(c)} aria-label="Delete"><Trash2 className="size-4" /></Button>}
+                    </>
+                  );
+                }}
+              />
+            ) : (
             <Table>
               <THead><TR>
                 <TH className="w-8">
@@ -262,6 +301,7 @@ export function RawCardsPage() {
                 ))}
               </TBody>
             </Table>
+            )}
             <div className="flex items-center border-t">
   {/* Pagination grows to fill the row; the jump box sits alongside it. */}
   <Pagination 

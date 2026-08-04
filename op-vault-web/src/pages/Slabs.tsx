@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Upload, Pencil, Trash2, Loader2, PackagePlus } from 'lucide-react';
+import { Plus, Upload, Pencil, Trash2, Loader2, PackagePlus, LayoutGrid, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
+import { CardGrid } from '@/components/common/CardGrid';
 import { CardThumb } from '@/components/common/CardImage';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SearchInput } from '@/components/common/Toolbar';
@@ -39,6 +40,9 @@ export function SlabsPage() {
     const saved = Number(localStorage.getItem('opv:slabs:limit'));
     return PAGE_SIZES.includes(saved) ? saved : 20;
   });
+  const [view, setView] = useState<'list' | 'grid'>(
+    () => (localStorage.getItem('opv:slabs:view') === 'grid' ? 'grid' : 'list'),
+  );
   const debounced = useDebounce(search);
   const [sortBy, sortOrder] = sort.split(':');
 
@@ -160,6 +164,15 @@ export function SlabsPage() {
           <option value="sellPrice:asc">Price low→high</option>
           <option value="grade:desc">Grade high→low</option>
         </Select>
+        <div className="ml-auto flex gap-0.5 rounded-md border bg-muted p-0.5">
+          {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
+            <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:slabs:view', v); }}
+              aria-label={`${v} view`} aria-pressed={view === v}
+              className={`rounded p-1.5 ${view === v ? 'bg-card shadow-sm' : 'text-muted-foreground'}`}>
+              <Icon className="size-4" />
+            </button>
+          ))}
+        </div>
       </div>
 
       {selected.size > 0 && (
@@ -190,7 +203,38 @@ export function SlabsPage() {
       )}
 
       <Card className="flex min-h-0 flex-1 flex-col">
-        {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : (
+        {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : view === 'grid' ? (
+          <CardGrid
+            items={data.data.map((s) => ({
+              id: s.id,
+              imageUrl: s.images?.[0]?.url,
+              title: s.name,
+              subtitle: s.kind === 'SEALED'
+                ? (s.setName || 'Sealed product')
+                : [s.gradingCompany, s.slabNumber].filter(Boolean).join(' · ') || (s.setName ?? ''),
+              price: peso(s.sellPrice),
+              meta: s.kind === 'SEALED' ? `×${s.quantity}` : (s.grade ? `Grade ${Number(s.grade)}` : undefined),
+              badge: <Badge variant={s.status === 'SOLD' ? 'default' : stockVariant(s.status)}>{s.status === 'SOLD' ? 'Sold' : stockLabel(s.status)}</Badge>,
+            }))}
+            selected={selected}
+            onToggle={toggleOne}
+            onOpen={(id) => { const s = rows.find((r) => r.id === id); if (s) { setEditing(s); setFormOpen(true); } }}
+            actions={(id) => {
+              const s = rows.find((r) => r.id === id);
+              if (!s) return null;
+              return (
+                <>
+                  {s.kind === 'SEALED' && (
+                    <Button variant="ghost" size="sm" onClick={() => setToRestock(s)} aria-label="Add stock"><PackagePlus className="size-4" /> Qty</Button>
+                  )}
+                  <Button variant="ghost" size="icon" onClick={() => openImage(s.id)} aria-label="Upload image"><Upload className="size-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setEditing(s); setFormOpen(true); }} aria-label="Edit"><Pencil className="size-4" /></Button>
+                  {isOwner && <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setToDelete(s)} aria-label="Delete"><Trash2 className="size-4" /></Button>}
+                </>
+              );
+            }}
+          />
+        ) : (
           <Table>
             <THead><TR>
               <TH className="w-8">
