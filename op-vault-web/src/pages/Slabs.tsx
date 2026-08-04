@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
-import { Pagination } from '@/components/common/Pagination';
+import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
 import { CardThumb } from '@/components/common/CardImage';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SearchInput } from '@/components/common/Toolbar';
@@ -34,11 +34,16 @@ export function SlabsPage() {
   const [kind, setKind] = useState('');
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
+  // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
+  const [limit, setLimit] = useState(() => {
+    const saved = Number(localStorage.getItem('opv:slabs:limit'));
+    return PAGE_SIZES.includes(saved) ? saved : 20;
+  });
   const debounced = useDebounce(search);
   const [sortBy, sortOrder] = sort.split(':');
 
   const { data, isLoading, isError } = useSlabs({
-    page, limit: 20, search: debounced || undefined, status: status || undefined,
+    page, limit, search: debounced || undefined, status: status || undefined,
     grade: grade || undefined, kind: kind || undefined,
     // The status dropdown is the only filter — opt out of the backend's
     // implicit available-only default so "All status" really means all.
@@ -239,7 +244,20 @@ export function SlabsPage() {
             </TBody>
           </Table>
         )}
-        {data && data.meta.totalPages > 1 && <div className="flex border-t"><Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} /></div>}
+        {/* Rendered even at one page — otherwise picking a large size hides the picker
+            that would let you get back to a small one. */}
+        {data && (
+          <div className="flex border-t">
+            <Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage}
+              limit={limit}
+              onLimit={(n) => {
+                setLimit(n);
+                setPage(1);
+                setSelected(new Set());
+                localStorage.setItem('opv:slabs:limit', String(n));
+              }} />
+          </div>
+        )}
       </Card>
 
       <SlabForm open={formOpen} onOpenChange={setFormOpen} editing={editing} />

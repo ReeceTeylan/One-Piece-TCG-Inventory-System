@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { CardThumb } from '@/components/common/CardImage';
-import { Pagination } from '@/components/common/Pagination';
+import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
@@ -42,6 +42,11 @@ export function RawCardsPage() {
   const maxDebounced = useDebounce(maxPrice);
   const [sort, setSort] = useState('createdAt:desc');
   const [page, setPage] = useState(1);
+  // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
+  const [limit, setLimit] = useState(() => {
+    const saved = Number(localStorage.getItem('opv:rawcards:limit'));
+    return PAGE_SIZES.includes(saved) ? saved : 15;
+  });
   const [pageInputVal, setPageInputVal] = useState('');
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -59,7 +64,7 @@ export function RawCardsPage() {
     rarity: rarity || undefined,
     minPrice: minDebounced !== '' ? Number(minDebounced) : undefined,
     maxPrice: maxDebounced !== '' ? Number(maxDebounced) : undefined,
-    sortBy, sortOrder, page, limit: 15,
+    sortBy, sortOrder, page, limit,
   });
   const { remove, upload } = useRawCardMutations();
   const { dragId, busyId, onDragOver, onDragLeave, onDrop } = useImageDrop({
@@ -264,6 +269,14 @@ export function RawCardsPage() {
     totalPages={query.data.meta.totalPages} 
     total={query.data.meta.total} 
     onPage={setPage} 
+    limit={limit}
+    onLimit={(n) => {
+      // Page 1 is the only page guaranteed to exist at the new size.
+      setLimit(n);
+      setPage(1);
+      setSelected(new Set());
+      localStorage.setItem('opv:rawcards:limit', String(n));
+    }}
   />
 
   {/* New Jump-to-Page Input */}

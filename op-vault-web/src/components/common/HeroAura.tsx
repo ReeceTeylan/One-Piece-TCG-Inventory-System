@@ -78,15 +78,26 @@ export function HeroAura({ index }: { index: number }) {
 
       {/* 4. Straw hat watermark. */}
       <svg
-        viewBox="0 0 100 70"
-        className="hero-anim pointer-events-none absolute -bottom-1 right-3 size-14 opacity-[.07]"
+        viewBox="0 0 120 80"
+        className="hero-anim pointer-events-none absolute -bottom-1 right-3 size-16 opacity-[.09]"
         style={{ animation: 'hero-hat 5s ease-in-out infinite', animationDelay: `${hatDelay}s` }}
         aria-hidden="true"
       >
-        <ellipse cx="50" cy="46" rx="44" ry="14" fill="#f3d9a4" />
-        <path d="M28 46 C28 17 72 17 72 46 Z" fill="#f3d9a4" />
-        <path d="M28 46 C28 17 72 17 72 46 Z" fill="none" stroke="#8a6a34" strokeWidth="2" />
-        <path d="M14 44 Q50 36 86 44" fill="none" stroke="#8a6a34" strokeWidth="1.5" />
+        <g strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 50 C7 44 20 41 36 41 C52 41 65 44 68 50 C67 56 60 61 36 61 C12 61 5 56 4 50 Z"
+            transform="translate(24,0) scale(1.33,1)" fill="#e3c084" stroke="#8a6a34" strokeWidth="1.4" />
+          <path d="M14 54 C30 66 90 66 106 54" fill="none" stroke="#b38f4f" strokeWidth="1.1" opacity=".7" />
+          <path d="M22 50 C38 61 82 61 98 50" fill="none" stroke="#b38f4f" strokeWidth="1.1" opacity=".55" />
+          <path d="M36 47 C36 26 84 26 84 47 C84 52 36 52 36 47 Z"
+            fill="#eed3a0" stroke="#8a6a34" strokeWidth="1.4" />
+          <path d="M36 37 C46 42 74 42 84 37" fill="none" stroke="#b38f4f" strokeWidth="1" opacity=".6" />
+          <path d="M37 31 C47 36 73 36 83 31" fill="none" stroke="#b38f4f" strokeWidth="1" opacity=".55" />
+          <path d="M40 26 C49 31 71 31 80 26" fill="none" stroke="#b38f4f" strokeWidth="1" opacity=".5" />
+          <path d="M46 21 C53 25 67 25 74 21" fill="none" stroke="#b38f4f" strokeWidth="1" opacity=".45" />
+          <path d="M36 40 C46 45 74 45 84 40 L84 48 C74 53 46 53 36 48 Z"
+            fill="#c0392b" stroke="#7d2419" strokeWidth="1.1" />
+          <path d="M46 29 C49 22 57 19 63 20" fill="none" stroke="#fbeccd" strokeWidth="1.8" opacity=".5" />
+        </g>
       </svg>
     </>
   );
