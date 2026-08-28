@@ -123,7 +123,7 @@ function PromoCard() {
         </>
       ) : (
         <>
-          <p className="mb-3 text-xs text-muted-foreground">Applies to raw cards only. Prices in inventory stay unchanged.</p>
+          <p className="mb-3 text-xs text-muted-foreground">Applies store-wide — raw cards, slabs, and sealed products. Prices in inventory stay unchanged.</p>
           <div className="mb-3 grid grid-cols-2 gap-3">
             <div><Label>Percent off</Label><Input type="number" min={1} max={99} value={percentage} onChange={(e) => setPercentage(e.target.value)} className="mt-1" /></div>
             <div><Label>Duration (hours)</Label><Input type="number" min={0.5} step={0.5} value={hours} onChange={(e) => setHours(e.target.value)} className="mt-1" /></div>

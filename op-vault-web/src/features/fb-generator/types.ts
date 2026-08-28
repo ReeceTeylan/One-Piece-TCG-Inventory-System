@@ -85,7 +85,7 @@ export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB', pro
   if (itemType === 'RAW') {
     const c = item as RawCard;
     const base = Number(c.postedPrice);
-    const sale = promoPrice(base, promo, 'RAW');
+    const sale = promoPrice(base, promo);
     return {
       key: `raw-${c.id}`, id: c.id, itemType, name: c.name, cardNumber: c.cardNumber,
       price: sale, originalPrice: sale < base ? base : undefined,
@@ -94,9 +94,12 @@ export function toFbCard(item: RawCard | SlabCard, itemType: 'RAW' | 'SLAB', pro
   }
   const s = item as SlabCard;
   const isSealed = s.kind === 'SEALED';
+  const base = Number(s.sellPrice);
+  const sale = promoPrice(base, promo);
   return {
     key: `slab-${s.id}`, id: s.id, itemType, name: s.name, cardNumber: s.slabNumber ?? '',
-    price: Number(s.sellPrice), quantity: isSealed ? s.quantity : 1, imageUrl: s.images?.[0]?.url,
+    price: sale, originalPrice: sale < base ? base : undefined,
+    quantity: isSealed ? s.quantity : 1, imageUrl: s.images?.[0]?.url,
     grade: isSealed ? undefined : `${s.gradingCompany} ${Number(s.grade)}`,
     note: s.notes ?? undefined, badge: 'none',
   };

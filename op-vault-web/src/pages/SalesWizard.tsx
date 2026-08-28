@@ -68,7 +68,7 @@ export function SalesWizardPage() {
       }
       return [...prev, {
         key: `raw-${c.id}`, itemType: 'RAW', rawCardId: c.id, name: c.name, sub: c.cardNumber,
-        imageUrl: c.images?.[0]?.url, unitPrice: promoPrice(c.postedPrice, promo, 'RAW'), unitCost: Number(c.buyCost), quantity: 1, max: c.quantity,
+        imageUrl: c.images?.[0]?.url, unitPrice: promoPrice(c.postedPrice, promo), unitCost: Number(c.buyCost), quantity: 1, max: c.quantity,
       }];
     });
   };
@@ -85,7 +85,7 @@ export function SalesWizardPage() {
       return [...prev, {
         key: `slab-${s.id}`, itemType: 'SLAB', slabId: s.id, name: s.name,
         sub: isSealed ? (s.setName || 'Sealed') : `${s.gradingCompany} ${Number(s.grade)}`,
-        imageUrl: s.images?.[0]?.url, unitPrice: Number(s.sellPrice), unitCost: Number(s.buyCost),
+        imageUrl: s.images?.[0]?.url, unitPrice: promoPrice(s.sellPrice, promo), unitCost: Number(s.buyCost),
         quantity: 1, max: isSealed ? (s.quantity ?? 1) : 1,
       }];
     });
