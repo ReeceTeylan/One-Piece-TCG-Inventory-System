@@ -58,24 +58,22 @@ export class ReportsService {
   }
 
   async inventory(res: Response) {
-    const cards = await this.prisma.rawCard.findMany({ orderBy: { name: 'asc' } });
-    const slabs = await this.prisma.slabCard.findMany({ where: { status: { not: 'SOLD' } }, orderBy: { name: 'asc' } });
-    const totalValue = cards.reduce((a, c) => a + n(c.buyCost) * c.quantity, 0)
-      + slabs.reduce((a, s) => a + n(s.buyCost), 0);
+    // Cost is proprietary and excluded from this export; only available stock is listed.
+    const cards = await this.prisma.rawCard.findMany({ where: { quantity: { gt: 0 } }, orderBy: { name: 'asc' } });
+    const slabs = await this.prisma.slabCard.findMany({ where: { status: { not: 'SOLD' }, quantity: { gt: 0 } }, orderBy: { name: 'asc' } });
     await this.stream(res, 'inventory-report.pdf', async (doc) => {
       await this.header(doc, 'Inventory Report');
       doc.fontSize(11).fillColor('#111').text('Raw Cards', { underline: false }).moveDown(0.3);
       this.table(doc,
-        [{ header: 'Name', width: 150 }, { header: 'No.', width: 70 }, { header: 'Rarity', width: 55 },
-         { header: 'Qty', width: 40, align: 'right' }, { header: 'Cost', width: 70, align: 'right' },
-         { header: 'Price', width: 70, align: 'right' }, { header: 'Status', width: 60 }],
-        cards.map((c) => [c.name, c.cardNumber, c.rarity, c.quantity, n(c.buyCost).toFixed(2), n(c.postedPrice).toFixed(2), c.status]));
-      doc.moveDown(0.6).fontSize(11).text('Slabs').moveDown(0.3);
+        [{ header: 'Name', width: 170 }, { header: 'No.', width: 80 }, { header: 'Rarity', width: 65 },
+         { header: 'Qty', width: 50, align: 'right' },
+         { header: 'Price', width: 80, align: 'right' }, { header: 'Status', width: 70 }],
+        cards.map((c) => [c.name, c.cardNumber, c.rarity, c.quantity, n(c.postedPrice).toFixed(2), c.status]));
+      doc.moveDown(0.6).fontSize(11).text('Slabs & Sealed').moveDown(0.3);
       this.table(doc,
-        [{ header: 'Name', width: 170 }, { header: 'Company', width: 70 }, { header: 'Cert', width: 90 },
-         { header: 'Grade', width: 50, align: 'right' }, { header: 'Cost', width: 70, align: 'right' }, { header: 'Price', width: 70, align: 'right' }],
-        slabs.map((s) => [s.name, s.kind === 'SEALED' ? 'Sealed' : (s.gradingCompany ?? ''), s.slabNumber ?? '—', n(s.grade), n(s.buyCost).toFixed(2), n(s.sellPrice).toFixed(2)]));
-      doc.moveDown(0.6).fontSize(11).font('Helvetica-Bold').text(`Total inventory value: PHP ${totalValue.toFixed(2)}`);
+        [{ header: 'Name', width: 190 }, { header: 'Company', width: 80 }, { header: 'Cert', width: 100 },
+         { header: 'Grade', width: 60, align: 'right' }, { header: 'Qty', width: 40, align: 'right' }, { header: 'Price', width: 85, align: 'right' }],
+        slabs.map((s) => [s.name, s.kind === 'SEALED' ? 'Sealed' : (s.gradingCompany ?? ''), s.slabNumber ?? '—', s.grade ? n(s.grade) : '—', s.quantity, n(s.sellPrice).toFixed(2)]));
     });
   }
 
