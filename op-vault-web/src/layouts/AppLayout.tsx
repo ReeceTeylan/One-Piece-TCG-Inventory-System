@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
+import { SailingProgress } from '@/components/common/Nautical';
 
 export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -14,6 +15,8 @@ export function AppLayout() {
           sidebar's width pushes the page sideways on mobile. */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Topbar onToggleSidebar={() => setCollapsed((c) => !c)} onToggleMobile={() => setMobileOpen((o) => !o)} />
+        {/* Zero-height anchor: the loading ship overlays the top of the page without shifting it. */}
+        <div className="relative h-0"><SailingProgress /></div>
         {/* min-h-0 lets children shrink below their content height so the table,
             not the page, is what scrolls. */}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"><Outlet /></main>

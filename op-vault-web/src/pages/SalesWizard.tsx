@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Spinner } from '@/components/ui/spinner';
 import { CardThumb } from '@/components/common/CardImage';
+import { TreasureBurst } from '@/components/common/Nautical';
+import { Gear5Number } from '@/components/ui/gear5-number';
 import { peso, pesoF } from '@/lib/utils';
 import { COURIERS, PAYMENT_METHODS } from '@/lib/status';
 import { apiError } from '@/lib/api';
@@ -276,12 +278,15 @@ export function SalesWizardPage() {
 
       {step === 5 && result && (
         <Card className="mx-auto max-w-md p-8 text-center">
-          <div className="mx-auto mb-4 grid size-14 place-items-center rounded-full bg-success/10"><CheckCircle2 className="size-8 text-success" /></div>
+          <div className="relative mx-auto mb-4 size-14">
+            <TreasureBurst />
+            <div className="gl-pop grid size-14 place-items-center rounded-full bg-success/10"><CheckCircle2 className="size-8 text-success" /></div>
+          </div>
           <h2 className="text-lg font-bold">Sale completed</h2>
           <p className="mt-1 text-sm text-muted-foreground">Transaction <b>{result.reference}</b></p>
           <div className="my-5 grid grid-cols-2 gap-3 text-left">
-            <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Grand total</div><div className="text-lg font-bold tabular-nums">{peso(result.grandTotal)}</div></div>
-            <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Profit</div><div className="text-lg font-bold tabular-nums text-success">{peso(result.totalProfit)}</div></div>
+            <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Grand total</div><Gear5Number value={Number(result.grandTotal)} format={peso} className="block text-lg font-bold tabular-nums" /></div>
+            <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Profit</div><Gear5Number value={Number(result.totalProfit)} format={peso} className="block text-lg font-bold tabular-nums text-success" /></div>
           </div>
           <div className="flex justify-center gap-2">
             <Button variant="outline" onClick={reset}>New sale</Button>

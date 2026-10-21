@@ -48,3 +48,40 @@
   body { @apply bg-background text-foreground; font-feature-settings: 'tnum'; }
 }
 .tnum { font-variant-numeric: tabular-nums; }
+
+/* ---------- Grand Line motion ----------
+   Shared keyframes for the nautical animations (SailingProgress, TreasureBurst,
+   EmptyState bottle, stock-count stamp, login sea). All switch off under
+   prefers-reduced-motion at the bottom of this block. */
+@keyframes gl-wave-drift { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes gl-sail       { 0% { left: -24px; } 100% { left: calc(100% + 8px); } }
+@keyframes gl-rock       { 0%, 100% { transform: rotate(-6deg) translateY(0); } 50% { transform: rotate(5deg) translateY(-1.5px); } }
+@keyframes gl-bob        { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-5px) rotate(6deg); } }
+@keyframes gl-stamp      { 0% { transform: scale(1.9) rotate(-14deg); opacity: 0; }
+                           55% { transform: scale(.9) rotate(-3deg); opacity: 1; }
+                           100% { transform: scale(1) rotate(0); opacity: 1; } }
+@keyframes gl-pop        { 0% { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes gl-coin       { 0%   { transform: translate(-50%, -50%) scale(.3) rotate(0); opacity: 0; }
+                           12%  { opacity: 1; }
+                           55%  { transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(calc(var(--rot) * .6)); }
+                           100% { transform: translate(calc(-50% + var(--tx) * 1.15), calc(-50% + var(--ty) + 90px)) scale(.9) rotate(var(--rot)); opacity: 0; } }
+@keyframes gl-coin-flip  { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(.25); } }
+@keyframes gl-rise       { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes gl-twinkle    { 0%, 100% { opacity: .15; } 50% { opacity: .8; } }
+
+.gl-wave-drift { animation: gl-wave-drift var(--gl-speed, 4s) linear infinite; }
+.gl-sail       { animation: gl-sail 2.6s ease-in-out infinite; }
+.gl-rock       { animation: gl-rock 1.3s ease-in-out infinite; transform-origin: 50% 90%; }
+.gl-bob        { animation: gl-bob 3.4s ease-in-out infinite; transform-origin: 50% 80%; }
+.gl-stamp      { animation: gl-stamp .38s cubic-bezier(.3, 1.4, .5, 1) both; }
+.gl-pop        { animation: gl-pop .5s cubic-bezier(.3, 1.5, .5, 1) both; }
+.gl-coin       { animation: gl-coin var(--dur, 1.3s) cubic-bezier(.2, .7, .4, 1) var(--delay, 0s) both; }
+.gl-coin-flip  { animation: gl-coin-flip .45s linear infinite; }
+.gl-rise       { animation: gl-rise .6s cubic-bezier(.2, .8, .3, 1) both; }
+.gl-twinkle    { animation: gl-twinkle var(--tw, 3s) ease-in-out var(--delay, 0s) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-wave-drift, .gl-sail, .gl-rock, .gl-bob, .gl-stamp, .gl-pop,
+  .gl-coin-flip, .gl-rise, .gl-twinkle { animation: none !important; }
+  .gl-coin, .gl-motion-only { display: none !important; }
+}

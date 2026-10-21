@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { apiError } from '@/lib/api';
+import { SeaScene } from '@/components/common/Nautical';
 
 const schema = z.object({ email: z.string().email('Enter a valid email'), password: z.string().min(1, 'Password required') });
 type Form = z.infer<typeof schema>;
@@ -44,9 +45,10 @@ export function LoginPage() {
   };
 
   return (
-    <div className="grid min-h-screen place-items-center bg-background p-5">
-      <form onSubmit={handleSubmit(onSubmit)} className="w-full max-w-sm rounded-xl border bg-card p-8 shadow-lg">
-        <div className="mb-4 grid size-12 place-items-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-900 text-xl font-extrabold text-white">OP</div>
+    <div className="relative grid min-h-screen place-items-center overflow-hidden bg-background p-5">
+      <SeaScene />
+      <form onSubmit={handleSubmit(onSubmit)} className="gl-rise relative z-10 w-full max-w-sm rounded-xl border bg-card/90 p-8 shadow-lg backdrop-blur">
+        <img src="/pwa-192x192.png" alt="RB's TCG" className="mb-4 size-14 rounded-xl ring-1 ring-border" />
         <h1 className="text-xl font-bold">OP-Vault</h1>
         <p className="mb-6 mt-1 text-sm text-muted-foreground">One Piece TCG inventory & sales control</p>
         <div className="space-y-3">

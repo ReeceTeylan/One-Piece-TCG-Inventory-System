@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Layers, Award, Users, ShoppingCart, CreditCard, Truck,
-  BarChart3, FileText, Star, Bell, ScrollText, Settings, Image, History,
+  BarChart3, FileText, Star, Bell, ScrollText, Settings, Image, History, ClipboardCheck,
 } from 'lucide-react';
 import type { Role } from '@/types';
 
@@ -12,6 +12,7 @@ export const NAV: NavGroup[] = [
   { title: 'Inventory', items: [
     { to: '/raw-cards', label: 'Raw Cards', icon: Layers },
     { to: '/slabs', label: 'Slabs & Sealed', icon: Award },
+    { to: '/stock-count', label: 'Stock Count', icon: ClipboardCheck },
   ] },
   { title: 'Sales', items: [
     { to: '/customers', label: 'Customers', icon: Users },

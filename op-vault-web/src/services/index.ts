@@ -28,6 +28,11 @@ export const slabsService = {
     api.post(`/slabs/${id}/restock`, dto).then(unwrap<SlabCard>),
   remove: (id: string) => api.delete(`/slabs/${id}`).then(unwrap),
 };
+export const stockCountService = {
+  // Sets an item to its counted quantity; 409 STOCK_CHANGED if it moved since loaded.
+  adjust: (dto: { itemType: 'RAW' | 'SLAB'; id: string; expectedQty: number; countedQty: number }) =>
+    api.post('/stock-count/adjust', dto).then(unwrap<{ changed: boolean; quantity: number; delta: number }>),
+};
 export const customersService = {
   list: (p?: Record<string, any>) => list<Customer>('/customers', p),
   get: (id: string) => one<Customer>(`/customers/${id}`),
