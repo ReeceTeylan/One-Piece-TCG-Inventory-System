@@ -1,0 +1,40 @@
+# Daily OP-Vault database backup (Supabase free tier has no automatic backups).
+# Saves a pg_dump file as a downloadable artifact on each run, kept for 30 days.
+# Needs one repo secret: SUPABASE_DB_URL = the Supabase *Session pooler* connection string.
+name: Database backup
+
+on:
+  schedule:
+    - cron: '0 18 * * *' # 18:00 UTC = 2:00 AM Philippine time, every day
+  workflow_dispatch: {}   # adds a "Run workflow" button for manual backups
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Dump database
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DATABASE_URL}" ]; then
+            echo "::error::Repo secret SUPABASE_DB_URL is not set"; exit 1
+          fi
+          FILE="opvault_$(TZ=Asia/Manila date +%F_%H%M).dump"
+          # postgres:17 image so pg_dump is never older than the Supabase server.
+          docker run --rm -e DATABASE_URL -v "$PWD:/out" postgres:17 \
+            sh -c "pg_dump \"\$DATABASE_URL\" --format=custom --no-owner --no-acl --schema=public --file=/out/$FILE"
+          ls -lh "$FILE"
+          echo "FILE=$FILE" >> "$GITHUB_ENV"
+
+      - name: Upload backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.FILE }}
+          path: ${{ env.FILE }}
+          retention-days: 30
+          if-no-files-found: error
