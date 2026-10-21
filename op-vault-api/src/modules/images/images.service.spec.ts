@@ -22,9 +22,11 @@ describe('ImagesService', () => {
     prisma = {
       rawCard: { findUnique: jest.fn() },
       slabCard: { findUnique: jest.fn() },
-      cardImage: { create: jest.fn().mockResolvedValue({ id: 'img1', url: 'http://x/uploads/cards/a.webp' }), findUnique: jest.fn(), delete: jest.fn() },
+      cardImage: { create: jest.fn().mockResolvedValue({ id: 'img1', url: 'http://x/uploads/cards/a.webp' }), findUnique: jest.fn(), delete: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      setting: { findUnique: jest.fn().mockResolvedValue({ key: 'gcashQrKey', value: 'payment/gcash-old.webp' }), upsert: jest.fn((a: any) => a) },
+      $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
     };
-    storage = { save: jest.fn().mockResolvedValue({ url: 'http://x/uploads/cards/a.webp', storageKey: 'cards/a.webp' }), delete: jest.fn() };
+    storage = { save: jest.fn().mockResolvedValue({ url: 'http://x/uploads/cards/a.webp', storageKey: 'cards/a.webp' }), delete: jest.fn().mockResolvedValue(undefined) };
     const moduleRef = await Test.createTestingModule({
       providers: [
         ImagesService,
@@ -48,5 +50,14 @@ describe('ImagesService', () => {
     expect(storage.save).toHaveBeenCalledTimes(2); // main + thumb
     expect(prisma.cardImage.create).toHaveBeenCalled();
     expect(res).toHaveProperty('thumbnailUrl');
+  });
+
+  it('stores the GCash QR outside cards/, saves its URL in settings and deletes the old one', async () => {
+    const res = await service.uploadPaymentQr({ buffer: Buffer.from('x') } as any, 'gcash');
+    const key = storage.save.mock.calls[0][0];
+    expect(key).toMatch(/^payment\/gcash-.+\.webp$/);
+    expect(prisma.setting.upsert.mock.calls.map((c: any) => [c[0].where.key, c[0].update.value]))
+      .toEqual([['gcashQrUrl', res.url], ['gcashQrKey', key]]);
+    expect(storage.delete).toHaveBeenCalledWith('payment/gcash-old.webp');
   });
 });

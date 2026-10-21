@@ -4,13 +4,14 @@ import { MarketPrice, Prisma, TcgplayerPrice } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { RawCardsService } from '../raw-cards/raw-cards.service';
 import { fetchYuyuteiCardPage, fetchYuyuteiSearch } from './yuyutei.client';
 import { parseYuyuteiCardPage, parseYuyuteiCardUrl, parseYuyuteiSearch, YuyuteiListing } from './yuyutei.parser';
-import { fetchGroups, fetchPrices, fetchProducts } from './tcgcsv.client';
+import { fetchGroups, fetchPrices, fetchProducts, TcgcsvGroup } from './tcgcsv.client';
 import { groupHasWanted, joinGroup, TcgRow } from './tcgcsv.parser';
 import {
-  comparePrice, damageReason, isEnglish, pickAutoListing, pickTcgListing, roundPrice,
+  comparePrice, damageReason, isEnglish, pickAutoListing, pickTcgListing, roundPrice, toYuyuteiRarity,
 } from './market-match';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 
@@ -25,6 +26,9 @@ const TCG_PREFIX = 'tcgp:';
 // "Changed today" window: a little over a day so the 3 AM sync's changes stay
 // visible until the next one lands.
 const CHANGE_WINDOW_MS = 26 * 60 * 60 * 1000;
+// Suggested price: a card number is fetched live at most once per 10 minutes.
+const LIVE_COOLDOWN_MS = 10 * 60 * 1000;
+const DEFAULT_ALERT_PCT = 20;
 
 export interface SyncState {
   running: boolean;
@@ -83,11 +87,17 @@ export class MarketPricesService {
   private priced: { key: string; rows: PricedRow[]; rates: Rates; all: Record<string, any> } | null = null;
   private pricing: Promise<NonNullable<MarketPricesService['priced']>> | null = null;
 
+  /** Suggested-price live lookups: last attempt per card number, and ones in progress. */
+  private liveTried = new Map<string, number>();
+  private liveInFlight = new Map<string, Promise<void>>();
+  private tcgGroupsCache: { at: number; groups: TcgcsvGroup[] } | null = null;
+
   constructor(
     private prisma: PrismaService,
     private settings: SettingsService,
     private audit: ActivityLogsService,
     private rawCards: RawCardsService,
+    private notifications: NotificationsService,
   ) {}
 
   // ----------------------------- sync -----------------------------
@@ -163,6 +173,7 @@ export class MarketPricesService {
       }
 
       if (englishNumbers.size) await this.syncTcgplayer(englishNumbers);
+      await this.notifyBigMoves(new Date(this.state.startedAt!));
     } catch (e: any) {
       this.state.lastError = e?.message ?? String(e);
       this.logger.error(`Price sync aborted: ${this.state.lastError}`);
@@ -205,21 +216,26 @@ export class MarketPricesService {
       this.state.done++;
     }
 
-    const fetchedAt = new Date();
-    const old = new Map((await this.prisma.tcgplayerPrice.findMany({
-      where: { listingKey: { in: rows.map((r) => r.listingKey) } }, select: { listingKey: true, priceUsd: true },
-    })).map((o) => [o.listingKey, Number(o.priceUsd)]));
     await this.prisma.$transaction([
-      ...rows.map((r) => {
-        const data = { ...r, priceUsd: new Prisma.Decimal(r.priceUsd.toFixed(2)), fetchedAt };
-        const change = changeFields(old.get(r.listingKey), r.priceUsd, 'prevPriceUsd', fetchedAt);
-        return this.prisma.tcgplayerPrice.upsert({ where: { listingKey: r.listingKey }, update: { ...data, ...change }, create: data });
-      }),
+      ...(await this.tcgUpserts(rows)),
       // Only prune when every set was read, so a TCGCSV hiccup never wipes prices.
       ...(groupFailures === 0 ? [this.prisma.tcgplayerPrice.deleteMany({
         where: { cardNumber: { in: [...wanted] }, listingKey: { notIn: rows.map((r) => r.listingKey) } },
       })] : []),
     ]);
+  }
+
+  /** Upserts for TCGplayer rows, recording the old price when it changed. */
+  private async tcgUpserts(rows: TcgRow[]) {
+    const fetchedAt = new Date();
+    const old = new Map((await this.prisma.tcgplayerPrice.findMany({
+      where: { listingKey: { in: rows.map((r) => r.listingKey) } }, select: { listingKey: true, priceUsd: true },
+    })).map((o) => [o.listingKey, Number(o.priceUsd)]));
+    return rows.map((r) => {
+      const data = { ...r, priceUsd: new Prisma.Decimal(r.priceUsd.toFixed(2)), fetchedAt };
+      const change = changeFields(old.get(r.listingKey), r.priceUsd, 'prevPriceUsd', fetchedAt);
+      return this.prisma.tcgplayerPrice.upsert({ where: { listingKey: r.listingKey }, update: { ...data, ...change }, create: data });
+    });
   }
 
   private async withRetry<T>(fetchPage: () => Promise<T>) {
@@ -472,6 +488,165 @@ export class MarketPricesService {
     return { total: market + fallback, market, fallback, matchedCards, fallbackCards: rows.length - matchedCards };
   }
 
+
+  // ----------------------------- movers & lookups -----------------------------
+
+  /** Biggest price moves since the last sync, one row per listing (for the dashboard). */
+  async movers(limit = 5) {
+    const { rows } = await this.loadPriced();
+    const moved = dedupeByListing(sortedByMove(rows.filter((r) => r.changePhp !== null)));
+    return {
+      changed: moved.length,
+      data: moved.slice(0, limit).map((r) => ({
+        id: r.id, name: r.name, cardNumber: r.cardNumber, rarity: r.rarity, imageUrl: r.imageUrl,
+        language: r.language, postedPrice: r.postedPrice, marketPhp: r.marketPhp, changePhp: r.changePhp,
+        changePct: changePct(r), priceChangedAt: r.listing?.priceChangedAt ?? null,
+      })),
+    };
+  }
+
+  /** Market price per raw card id, for the Raw Cards page and the Sales wizard. */
+  async forCards(ids: string[]) {
+    const { rows } = await this.loadPriced();
+    const want = new Set(ids);
+    const out: Record<string, {
+      marketPhp: number | null; matchPrice: number | null; diffPct: number | null; underpriced: boolean;
+      changePhp: number | null; language: 'JP' | 'EN'; source: RowListing['source'] | null; listingName: string | null;
+    }> = {};
+    for (const r of rows) {
+      if (!want.has(r.id)) continue;
+      out[r.id] = {
+        marketPhp: r.marketPhp, matchPrice: r.matchPrice, diffPct: r.diffPct, underpriced: r.underpriced,
+        changePhp: r.changePhp, language: r.language, source: r.listing?.source ?? null, listingName: r.listing?.name ?? null,
+      };
+    }
+    return out;
+  }
+
+  /**
+   * Suggested posted price for a card being added: the same listing the sync
+   * would pick for this number + rarity, converted at today's rate and rounded.
+   * Numbers we don't stock yet (or haven't priced in the last day) are fetched
+   * live once, then saved so the next lookup is instant.
+   */
+  async suggest(cardNumber: string, rarity: string, notes?: string | null) {
+    const num = norm(cardNumber);
+    const english = isEnglish(notes);
+    const damage = damageReason(notes);
+    const base = { cardNumber: num, rarity, language: english ? 'EN' as const : 'JP' as const, damage };
+    const empty = (reason: string, candidates = 0) => ({
+      ...base, found: false, reason, candidates, source: null, listingName: null, price: null, currency: null,
+      rate: null, marketPhp: null, suggested: null, url: null, fetchedAt: null,
+    });
+    if (!/^[A-Z0-9]+-\d{2,3}$/.test(num)) return empty('Enter a card number like OP01-120');
+
+    const { rates } = await this.rates();
+    const rate = english
+      ? (damage && rates.usdDamaged ? rates.usdDamaged : rates.usd)
+      : (damage && rates.jpyDamaged ? rates.jpyDamaged : rates.jpy);
+
+    let listing: { source: RowListing['source']; name: string; price: number; currency: 'JPY' | 'USD'; url: string; fetchedAt: Date } | null = null;
+    let candidates = 0;
+    if (english) {
+      let pool = await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: num } });
+      if (!isFresh(pool)) {
+        await this.liveLookup(`t:${num}`, () => this.liveTcgplayer(num));
+        pool = await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: num } });
+      }
+      candidates = pool.length;
+      const t = pickTcgListing({ cardNumber: num, rarity }, pool.map((p) => ({ ...p, priceUsd: Number(p.priceUsd) })));
+      if (t) listing = { source: 'TCGPLAYER', name: `${t.name} · ${t.subTypeName}`, price: t.priceUsd, currency: 'USD', url: t.url, fetchedAt: t.fetchedAt };
+    } else {
+      if (!toYuyuteiRarity(rarity)) return empty(`${rarity} cards can't be matched automatically. Save the card, then paste its Yuyu-tei link on Market Prices.`);
+      let pool = await this.prisma.marketPrice.findMany({ where: { cardNumber: num } });
+      if (!isFresh(pool)) {
+        await this.liveLookup(`y:${num}`, async () => {
+          const found = parseYuyuteiSearch(await fetchYuyuteiSearch(num)).filter((l) => l.cardNumber === num);
+          if (found.length) await this.saveListings(num, found);
+        });
+        pool = await this.prisma.marketPrice.findMany({ where: { cardNumber: num } });
+      }
+      candidates = pool.length;
+      const y = pickAutoListing({ cardNumber: num, rarity }, pool);
+      if (y) listing = { source: 'YUYUTEI', name: y.name, price: y.priceJpy, currency: 'JPY', url: y.url, fetchedAt: y.fetchedAt };
+    }
+
+    const where = english ? 'TCGplayer' : 'Yuyu-tei';
+    if (!listing) {
+      return empty(candidates ? `${where} has ${num} but no ${rarity} version` : `${where} has no listing for ${num}`, candidates);
+    }
+    const marketPhp = rate ? Math.round(listing.price * rate) : null;
+    return {
+      ...base, found: true,
+      reason: rate ? null : `Set the ${english ? '₱ per $1' : '₱ per ¥1'} rate in Settings to get a peso price`,
+      candidates, source: listing.source, listingName: listing.name, price: listing.price, currency: listing.currency,
+      rate, marketPhp, suggested: marketPhp !== null ? roundPrice(marketPhp) : null, url: listing.url, fetchedAt: listing.fetchedAt,
+    };
+  }
+
+  /** Runs a live fetch at most once per cooldown per key; concurrent callers share it. */
+  private async liveLookup(key: string, run: () => Promise<void>) {
+    const last = this.liveTried.get(key);
+    if (last && Date.now() - last < LIVE_COOLDOWN_MS) return;
+    let p = this.liveInFlight.get(key);
+    if (!p) {
+      p = run()
+        .catch((e) => this.logger.warn(`Live price lookup ${key} failed: ${e?.message ?? e}`))
+        .finally(() => {
+          this.liveInFlight.delete(key);
+          if (this.liveTried.size > 1000) this.liveTried.clear();
+          this.liveTried.set(key, Date.now());
+        });
+      this.liveInFlight.set(key, p);
+    }
+    await p;
+  }
+
+  /** English card not priced yet: read just its home set (OP01 for OP01-xxx) from TCGCSV. */
+  private async liveTcgplayer(num: string) {
+    if (!this.tcgGroupsCache || Date.now() - this.tcgGroupsCache.at > 24 * 3_600_000) {
+      this.tcgGroupsCache = { at: Date.now(), groups: await fetchGroups() };
+    }
+    const squash = (v: string) => v.toUpperCase().replace(/[\s-]/g, '');
+    const home = squash(num.split('-')[0]);
+    const group = this.tcgGroupsCache.groups.find((g) => squash(g.abbreviation ?? '') === home);
+    if (!group) return;
+    const products = await fetchProducts(group.groupId);
+    await sleep(TCGCSV_DELAY_MS);
+    const prices = await fetchPrices(group.groupId);
+    const rows = joinGroup(group, products, prices, new Set([num]));
+    if (rows.length) await this.prisma.$transaction(await this.tcgUpserts(rows));
+  }
+
+  /** One bell notification after a sync when cards moved more than the alert %. */
+  private async notifyBigMoves(since: Date) {
+    try {
+      const all = await this.settings.getAll();
+      const threshold = positive(all.priceAlertPct) ?? DEFAULT_ALERT_PCT;
+      const { rows } = await this.loadPriced();
+      const big = dedupeByListing(sortedByMove(rows.filter((r) => {
+        const at = r.listing?.priceChangedAt;
+        const pct = changePct(r);
+        return r.changePhp !== null && !!at && at >= since && pct !== null && Math.abs(pct) >= threshold;
+      })));
+      if (!big.length) return;
+      const peso = (n: number) => `₱${Math.abs(n).toLocaleString('en-PH')}`;
+      const line = (r: PricedRow) => {
+        const pct = changePct(r)!;
+        return `${r.name} (${r.cardNumber}) ${r.changePhp! > 0 ? '▲' : '▼'} ${peso(r.changePhp!)} (${pct > 0 ? '+' : ''}${pct}%)`;
+      };
+      const shown = big.slice(0, 4).map(line);
+      if (big.length > 4) shown.push(`+${big.length - 4} more`);
+      await this.notifications.emit({
+        type: 'SYSTEM',
+        title: `${big.length} card${big.length === 1 ? '' : 's'} moved more than ${threshold}%`,
+        body: shown.join(' · '),
+      });
+    } catch (e: any) {
+      this.logger.warn(`Price alert skipped: ${e?.message ?? e}`);
+    }
+  }
+
   // ----------------------------- match -----------------------------
 
   /** Set one card's posted price to its rounded market price (up or down). */
@@ -588,6 +763,35 @@ export class MarketPricesService {
     return saved;
   }
 }
+
+/** Peso change as a % of the old price, one decimal. */
+function changePct(r: { marketPhp: number | null; changePhp: number | null }): number | null {
+  if (r.marketPhp === null || r.changePhp === null) return null;
+  const before = r.marketPhp - r.changePhp;
+  return before > 0 ? Math.round((r.changePhp / before) * 1000) / 10 : null;
+}
+
+/** Biggest move first (copy; never sorts the cached array). */
+function sortedByMove<T extends PricedRow>(rows: T[]): T[] {
+  const copy = [...rows];
+  sortRows(copy, 'change');
+  return copy;
+}
+
+/** Keep the first row per listing, so a clean and a damaged copy of one card count once. */
+function dedupeByListing<T extends { listing: { listingKey: string } | null }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => {
+    const k = r.listing?.listingKey;
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+/** Every listing was fetched within the last day. */
+const isFresh = (rows: { fetchedAt: Date }[]) =>
+  rows.length > 0 && rows.every((r) => Date.now() - r.fetchedAt.getTime() < CHANGE_WINDOW_MS);
 
 function groupBy<T>(items: T[], key: (t: T) => string): Map<string, T[]> {
   const m = new Map<string, T[]>();

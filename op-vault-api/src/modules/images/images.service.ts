@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -69,6 +70,41 @@ export class ImagesService {
     return { ...image, thumbnailUrl: saved.url.replace('.webp', '_thumb.webp') };
   }
 
+  /**
+   * GCash / Maya QR for the sale receipt image. Stored losslessly (QR codes
+   * must stay sharp) outside cards/ so the orphan cleanup never touches it;
+   * its URL lives in settings as gcashQrUrl / mayaQrUrl.
+   */
+  async uploadPaymentQr(file: Express.Multer.File, method: PaymentQr) {
+    const data = await sharp(file.buffer)
+      .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+      .webp({ lossless: true })
+      .toBuffer();
+    const key = `payment/${method}-${randomUUID()}.webp`;
+    const saved = await this.storage.save(key, data, 'image/webp');
+    await this.replaceQrSetting(method, { url: saved.url, key });
+    return { method, url: saved.url };
+  }
+
+  async removePaymentQr(method: PaymentQr) {
+    await this.replaceQrSetting(method, null);
+    return { method, url: null };
+  }
+
+  private async replaceQrSetting(method: PaymentQr, next: { url: string; key: string } | null) {
+    const keyName = `${method}QrKey`;
+    const old = await this.prisma.setting.findUnique({ where: { key: keyName } });
+    const set = (key: string, value: string | null) => this.prisma.setting.upsert({
+      where: { key },
+      update: { value: value === null ? Prisma.JsonNull : value },
+      create: { key, value: value === null ? Prisma.JsonNull : value },
+    });
+    await this.prisma.$transaction([set(`${method}QrUrl`, next?.url ?? null), set(keyName, next?.key ?? null)]);
+    if (typeof old?.value === 'string' && old.value !== next?.key) {
+      await this.storage.delete(old.value).catch(() => undefined);
+    }
+  }
+
   async remove(id: string) {
     const image = await this.prisma.cardImage.findUnique({ where: { id } });
     if (!image) throw new NotFoundException('Image not found');
@@ -78,3 +114,5 @@ export class ImagesService {
     return { message: 'Image deleted' };
   }
 }
+
+export type PaymentQr = 'gcash' | 'maya';

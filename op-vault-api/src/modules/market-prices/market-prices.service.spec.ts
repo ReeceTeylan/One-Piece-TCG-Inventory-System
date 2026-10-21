@@ -5,6 +5,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { RawCardsService } from '../raw-cards/raw-cards.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import * as yuyuteiClient from './yuyutei.client';
 import { MarketPricesModule } from './market-prices.module';
 import { MarketPricesService } from './market-prices.service';
 
@@ -35,9 +37,11 @@ describe('MarketPricesService', () => {
   let prisma: any;
   let stamp: Record<string, unknown>;
   const rawUpdate = jest.fn().mockResolvedValue({});
+  const emit = jest.fn().mockResolvedValue({});
 
   beforeEach(async () => {
     rawUpdate.mockClear();
+    emit.mockClear();
     stamp = { rc_at: '2026-10-21T07:00:00Z', rc_n: BigInt(3) };
     prisma = {
       $queryRaw: jest.fn(() => Promise.resolve([stamp])), // the cache fingerprint
@@ -48,11 +52,17 @@ describe('MarketPricesService', () => {
         findUnique: jest.fn(({ where }: any) => Promise.resolve(CARDS.find((c) => c.id === where.id) ?? null)),
         update: jest.fn((a: any) => Promise.resolve(a)),
       },
-      marketPrice: { findMany: jest.fn().mockResolvedValue(YUYUTEI) },
+      marketPrice: {
+        findMany: jest.fn(({ where }: any = {}) => Promise.resolve(
+          where?.cardNumber && typeof where.cardNumber === 'string'
+            ? YUYUTEI.filter((l) => l.cardNumber === where.cardNumber) : YUYUTEI)),
+        upsert: jest.fn((a: any) => Promise.resolve(a)),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       tcgplayerPrice: { findMany: jest.fn().mockResolvedValue(TCG) },
     };
     const settings = { getAll: jest.fn().mockResolvedValue({
-      jpyToPhpRate: 0.38, jpyToPhpRateDamaged: 0.3, usdToPhpRate: 58, usdToPhpRateDamaged: null, underpricedPct: 90,
+      jpyToPhpRate: 0.38, jpyToPhpRateDamaged: 0.3, usdToPhpRate: 58, usdToPhpRateDamaged: null, underpricedPct: 90, priceAlertPct: 5,
     }) };
 
     @Global()
@@ -61,8 +71,9 @@ describe('MarketPricesService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: SettingsService, useValue: settings },
         { provide: ActivityLogsService, useValue: { log: jest.fn() } },
+        { provide: NotificationsService, useValue: { emit } },
       ],
-      exports: [PrismaService, SettingsService, ActivityLogsService],
+      exports: [PrismaService, SettingsService, ActivityLogsService, NotificationsService],
     })
     class FakeGlobals {}
 
@@ -146,6 +157,56 @@ describe('MarketPricesService', () => {
   it('raw inventory value = market × qty, 80% of posted when no market price', async () => {
     const v = await service.rawInventoryValue();
     expect(v).toEqual({ total: 122 + 96 + 38303, market: 122 + 96 + 38303, fallback: 0, matchedCards: 3, fallbackCards: 0 });
+  });
+
+  it('movers: biggest change first, one row per listing', async () => {
+    const m = await service.movers(5);
+    // The clean and the damaged Shanks share one Yuyu-tei listing, so it counts once.
+    expect(m.changed).toBe(1);
+    expect(m.data).toEqual([expect.objectContaining({ id: 'jp', changePhp: 8, changePct: 7 })]); // ₱114 → ₱122
+  });
+
+  it('forCards returns market prices only for the ids asked', async () => {
+    const r = await service.forCards(['en', 'missing']);
+    expect(Object.keys(r)).toEqual(['en']);
+    expect(r.en).toMatchObject({ marketPhp: 38303, matchPrice: 38300, source: 'TCGPLAYER', language: 'EN' });
+  });
+
+  it('suggest uses the stored listing when it is fresh, with the damaged rate from notes', async () => {
+    const spy = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch');
+    const clean = await service.suggest('op01-120', 'SEC');
+    expect(clean).toMatchObject({ found: true, source: 'YUYUTEI', price: 320, rate: 0.38, marketPhp: 122, suggested: 120 });
+    const damaged = await service.suggest('OP01-120', 'SEC', 'small dent');
+    expect(damaged).toMatchObject({ damage: 'dent', rate: 0.3, marketPhp: 96, suggested: 100 });
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('suggest fetches Yuyu-tei live once for a number it has never priced', async () => {
+    const spy = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch').mockResolvedValue('<html></html>');
+    const a = await service.suggest('OP05-119', 'SEC');
+    const b = await service.suggest('OP05-119', 'SEC');
+    expect(a).toMatchObject({ found: false, reason: 'Yuyu-tei has no listing for OP05-119' });
+    expect(b.found).toBe(false);
+    expect(spy).toHaveBeenCalledTimes(1); // cooldown: the second lookup doesn't hit Yuyu-tei again
+    spy.mockRestore();
+  });
+
+  it('suggest explains rarities that cannot be matched automatically', async () => {
+    const r = await service.suggest('OP01-120', 'Don');
+    expect(r.found).toBe(false);
+    expect(r.reason).toMatch(/paste its Yuyu-tei link/);
+  });
+
+  it('after a sync, one notification lists cards that moved more than the alert %', async () => {
+    await (service as any).notifyBigMoves(new Date(Date.now() - 60_000));
+    expect(emit).toHaveBeenCalledTimes(1);
+    expect(emit.mock.calls[0][0]).toMatchObject({
+      type: 'SYSTEM', title: '1 card moved more than 5%', body: 'Shanks JP (OP01-120) ▲ ₱8 (+7%)',
+    });
+    emit.mockClear();
+    await (service as any).notifyBigMoves(new Date(Date.now() + 60_000)); // nothing changed after this time
+    expect(emit).not.toHaveBeenCalled();
   });
 });
 

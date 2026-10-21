@@ -20,6 +20,15 @@ const DEFAULTS = {
   usdToPhpRate: null as number | null,
   jpyToPhpRateDamaged: null as number | null,
   usdToPhpRateDamaged: null as number | null,
+  // After each sync, one notification lists cards that moved at least this %.
+  priceAlertPct: 20,
+  // Receipt image: a short line under the totals (e.g. GCash number), and the
+  // GCash / Maya QR images (uploaded via POST /images/payment-qr).
+  receiptNote: null as string | null,
+  gcashQrUrl: null as string | null,
+  gcashQrKey: null as string | null,
+  mayaQrUrl: null as string | null,
+  mayaQrKey: null as string | null,
 };
 
 @Injectable()

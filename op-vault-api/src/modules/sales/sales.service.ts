@@ -466,6 +466,7 @@ export class SalesService {
   async findAll(query: QuerySaleDto) {
     const where: Prisma.SaleWhereInput = { ...this.rangeFilter(query.range) };
     if (query.status) where.status = query.status;
+    else if (query.outstanding) where.status = { in: ['PARTIAL', 'UNPAID'] };
     if (query.customerId) where.customerId = query.customerId;
     if (query.search) {
       where.OR = [
@@ -486,7 +487,7 @@ export class SalesService {
         },
       }),
       this.prisma.sale.count({ where }),
-      this.prisma.sale.aggregate({ where: realWhere, _sum: { grandTotal: true, totalProfit: true } }),
+      this.prisma.sale.aggregate({ where: realWhere, _sum: { grandTotal: true, totalProfit: true, amountPaid: true } }),
       this.prisma.saleItem.aggregate({ where: { sale: realWhere }, _sum: { quantity: true } }),
     ]);
 
@@ -497,6 +498,8 @@ export class SalesService {
         totalRevenue: Number(agg._sum.grandTotal ?? 0),
         totalProfit: Number(agg._sum.totalProfit ?? 0),
         totalCardsSold: Number(cardsAgg._sum.quantity ?? 0),
+        // Money still owed across the filtered sales (the Payments page total).
+        totalOutstanding: Number(agg._sum.grandTotal ?? 0) - Number(agg._sum.amountPaid ?? 0),
       },
     };
   }

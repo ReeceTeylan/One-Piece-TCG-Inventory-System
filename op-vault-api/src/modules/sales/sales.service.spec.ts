@@ -100,3 +100,32 @@ describe('SalesService.completeSale', () => {
     expect(t.sale.create).not.toHaveBeenCalled();
   });
 });
+
+describe('SalesService.findAll (Payments page)', () => {
+  it('outstanding=true lists PARTIAL and UNPAID together and totals what is owed', async () => {
+    const prisma: any = {
+      sale: {
+        findMany: jest.fn().mockReturnValue('findMany'),
+        count: jest.fn().mockReturnValue('count'),
+        aggregate: jest.fn().mockReturnValue('aggregate'),
+      },
+      saleItem: { aggregate: jest.fn().mockReturnValue('items') },
+      $transaction: jest.fn().mockResolvedValue([
+        [{ id: 's1' }, { id: 's2' }], 2,
+        { _sum: { grandTotal: 5000, totalProfit: 1200, amountPaid: 1500 } },
+        { _sum: { quantity: 4 } },
+      ]),
+    };
+    const moduleRef = await Test.createTestingModule({
+      providers: [
+        SalesService,
+        { provide: PrismaService, useValue: prisma },
+        { provide: ActivityLogsService, useValue: { log: jest.fn() } },
+      ],
+    }).compile();
+    const res = await moduleRef.get(SalesService).findAll({ page: 1, limit: 20, skip: 0, sortOrder: 'desc', outstanding: true } as any);
+    expect(prisma.sale.findMany.mock.calls[0][0].where.status).toEqual({ in: ['PARTIAL', 'UNPAID'] });
+    expect(res.summary.totalOutstanding).toBe(3500);
+    expect(res.meta.total).toBe(2);
+  });
+});

@@ -7,6 +7,7 @@ import { MarketPricesService } from './market-prices.service';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 import { LinkListingDto } from './dto/link-listing.dto';
 import { LinkUrlDto } from './dto/link-url.dto';
+import { SuggestPriceDto } from './dto/suggest-price.dto';
 
 @ApiTags('market-prices')
 @ApiBearerAuth()
@@ -18,6 +19,26 @@ export class MarketPricesController {
   @ApiOperation({ summary: 'In-stock raw cards with their Yuyu-tei price and underpriced flag' })
   list(@Query() query: QueryMarketPricesDto) {
     return this.service.list(query);
+  }
+
+  @Get('movers')
+  @ApiOperation({ summary: 'Biggest price moves since the last sync (dashboard card)' })
+  movers(@Query('limit') limit?: string) {
+    const n = Math.min(Math.max(Number(limit) || 5, 1), 20);
+    return this.service.movers(n);
+  }
+
+  @Get('cards')
+  @ApiOperation({ summary: 'Market price for specific raw card ids (comma-separated, max 200)' })
+  cards(@Query('ids') ids?: string) {
+    const list = (ids ?? '').split(',').map((s) => s.trim()).filter(Boolean).slice(0, 200);
+    return list.length ? this.service.forCards(list) : {};
+  }
+
+  @Get('suggest')
+  @ApiOperation({ summary: 'Suggested posted price for a card number + rarity (Add Card form)' })
+  suggest(@Query() q: SuggestPriceDto) {
+    return this.service.suggest(q.cardNumber, q.rarity, q.notes);
   }
 
   @Get('sync/status')
