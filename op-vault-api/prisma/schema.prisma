@@ -143,6 +143,7 @@ model RawCard {
   isPinned     Boolean     @default(false)
   totalSold    Int         @default(0)
   lastSoldAt   DateTime?
+  marketListingKey String? // manual Yuyu-tei match (MarketPrice.listingKey); null = automatic
   images       CardImage[]
   saleItems    SaleItem[]
   restockLogs  RestockLog[]
@@ -453,4 +454,24 @@ model ShipmentEvent {
 
   @@index([shipmentId])
   @@map("shipment_events")
+}
+
+// ------------------ MARKET PRICES ------------------
+// One row per Yuyu-tei listing, refreshed by the nightly price sync.
+model MarketPrice {
+  id         String   @id @default(cuid())
+  source     String   @default("YUYUTEI")
+  listingKey String   @unique // Yuyu-tei "<ver>/<cid>", e.g. "op01/10151"
+  cardNumber String   // "OP01-120"
+  rarity     String   // Yuyu-tei label, e.g. "P-SEC"
+  name       String
+  priceJpy   Int
+  inStock    Boolean
+  stockCount Int?
+  imageUrl   String?
+  url        String
+  fetchedAt  DateTime @default(now())
+
+  @@index([cardNumber])
+  @@map("market_prices")
 }

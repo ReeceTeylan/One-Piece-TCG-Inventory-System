@@ -11,6 +11,10 @@ const DEFAULTS = {
   defaultShippingFee: 80,
   lowStockThreshold: 3,
   postedPriceFormula: 'cost * 2.4',
+  // Yuyu-tei price sync: pesos per 1 yen (null until the owner sets it), and the
+  // % of the converted market price below which a card is flagged underpriced.
+  jpyToPhpRate: null as number | null,
+  underpricedPct: 90,
 };
 
 @Injectable()
