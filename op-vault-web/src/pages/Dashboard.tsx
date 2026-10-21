@@ -43,12 +43,13 @@
   );
 }
 
-  function Stat({ label, value, onClick, highlight }: { label: string; value: string; onClick?: () => void; highlight?: boolean }) {
+  function Stat({ label, value, onClick, highlight, lines, title }: { label: string; value: string; onClick?: () => void; highlight?: boolean; lines?: string[]; title?: string }) {
     return (
-      <Card onClick={onClick} className={cn(onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
+      <Card onClick={onClick} title={title} className={cn(onClick && 'cursor-pointer transition-colors hover:border-primary/40')}>
         <CardContent className="p-3.5">
           <div className="text-[11px] font-semibold text-muted-foreground">{label}</div>
           <div className={cn('mt-1.5 text-[19px] font-bold tracking-tight tnum', highlight && 'text-primary')}>{value}</div>
+          {lines?.map((l) => <div key={l} className="text-[10.5px] leading-snug text-muted-foreground tnum">{l}</div>)}
         </CardContent>
       </Card>
     );
@@ -102,7 +103,16 @@
             {/* Supporting numbers. "Waiting to ship" leads because it's the only one that asks you to do something. */}
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
               <Stat label="Waiting to ship" value={String(d.counts.waitingToShip)} highlight={d.counts.waitingToShip > 0} onClick={() => navigate('/shipments')} />
-              <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} onClick={() => navigate('/market-prices')} />
+              <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} onClick={() => navigate('/market-prices')}
+                lines={d.inventory.inventoryBreakdown && [
+                  `Raw ${peso(d.inventory.inventoryBreakdown.rawMarket + d.inventory.inventoryBreakdown.rawFallback)}`,
+                  `Slabs & sealed ${peso(d.inventory.inventoryBreakdown.slabsAndSealed)}`,
+                ]}
+                title={d.inventory.inventoryBreakdown && [
+                  `Raw at market price: ${peso(d.inventory.inventoryBreakdown.rawMarket)} (${d.inventory.inventoryBreakdown.rawMatchedCards} cards)`,
+                  `Raw at 80% of posted (no market price): ${peso(d.inventory.inventoryBreakdown.rawFallback)} (${d.inventory.inventoryBreakdown.rawFallbackCards} cards)`,
+                  `Slabs & sealed at 80% of posted: ${peso(d.inventory.inventoryBreakdown.slabsAndSealed)}`,
+                ].join('\n')} />
               <Stat label="Profit margin" value={`${d.inventory.profitMargin}%`} />
               <Stat label="Raw cards" value={String(d.counts.totalRawCards)} onClick={() => navigate('/raw-cards')} />
               <Stat label="Slabs & sealed" value={String(d.counts.totalSlabs)} onClick={() => navigate('/slabs')} />
