@@ -36,10 +36,12 @@ export const stockCountService = {
 // Market prices: Yuyu-tei (yen) for Japanese cards, TCGplayer via TCGCSV (USD) for
 // English ones. Peso conversion and Match prices are worked out server-side.
 export type MarketSource = 'YUYUTEI' | 'TCGPLAYER';
+export type MarketSort = 'change' | 'price_desc' | 'price_asc' | 'recent' | 'margin_desc' | 'underpriced';
 export interface MarketListing {
   source: MarketSource; listingKey: string; name: string; rarity: string | null;
   price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null;
   url: string; fetchedAt: string; manual: boolean; viaLink: boolean;
+  prevPrice: number | null; priceChangedAt: string | null;
 }
 export interface MarketCandidate {
   source: MarketSource; listingKey: string; cardNumber: string; name: string; rarity: string | null;
@@ -52,7 +54,8 @@ export interface MarketSync {
 }
 export interface MarketRow {
   id: string; name: string; cardNumber: string; rarity: string; setName: string; quantity: number;
-  postedPrice: number; imageUrl: string | null; notes: string | null;
+  postedPrice: number; buyCost: number; createdAt: string; imageUrl: string | null; notes: string | null;
+  condition: 'clean' | 'issues'; changePhp: number | null; marginPct: number | null;
   language: 'JP' | 'EN'; damage: string | null; rateUsed: number | null; damagedRateMissing: boolean;
   listing: MarketListing | null; candidateCount: number;
   marketPhp: number | null; diffPct: number | null; underpriced: boolean; matchPrice: number | null;
@@ -60,6 +63,7 @@ export interface MarketRow {
 export interface MarketSummary {
   rate: number | null; usdRate: number | null; jpyDamagedRate: number | null; usdDamagedRate: number | null;
   pct: number; cards: number; matched: number; underpriced: number; matchableUnderpriced: number;
+  changed: number; view: 'changes' | 'all';
   lastRun: MarketSync | null; sync: MarketSync;
 }
 export const marketPricesService = {

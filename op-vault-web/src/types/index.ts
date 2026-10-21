@@ -57,7 +57,9 @@ export interface DashboardData {
   cardsSold: Record<'today' | 'week' | 'month' | 'year', number>;
   orders: Record<'today' | 'week' | 'month' | 'year', number>;
   growth: { revenueWeek: number; revenueMonth: number; profitMonth: number };
-  inventory: { inventoryValue: number; averageBuyingCost: number; averageSellingPrice: number; profitMargin: number; totalPostedPrice: number; totalSpent: number; };
+  inventory: { inventoryValue: number; averageBuyingCost: number; averageSellingPrice: number; profitMargin: number; totalPostedPrice: number; totalSpent: number;
+    // Raw cards at market price (80% of posted if none) + slabs & sealed at 80% of posted.
+    inventoryBreakdown?: { rawMarket: number; rawFallback: number; rawMatchedCards: number; rawFallbackCards: number; slabsAndSealed: number }; };
   counts: { totalRawCards: number; totalSlabs: number; waitingToShip: number };
   generatedAt: string;
 }

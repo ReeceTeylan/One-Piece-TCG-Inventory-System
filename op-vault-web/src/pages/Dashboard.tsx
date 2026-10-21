@@ -101,7 +101,7 @@
             {/* Supporting numbers. "Waiting to ship" leads because it's the only one that asks you to do something. */}
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
               <Stat label="Waiting to ship" value={String(d.counts.waitingToShip)} highlight={d.counts.waitingToShip > 0} onClick={() => navigate('/shipments')} />
-              <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} />
+              <Stat label="Inventory value" value={peso(d.inventory.inventoryValue)} onClick={() => navigate('/market-prices')} />
               <Stat label="Profit margin" value={`${d.inventory.profitMargin}%`} />
               <Stat label="Raw cards" value={String(d.counts.totalRawCards)} onClick={() => navigate('/raw-cards')} />
               <Stat label="Slabs & sealed" value={String(d.counts.totalSlabs)} onClick={() => navigate('/slabs')} />

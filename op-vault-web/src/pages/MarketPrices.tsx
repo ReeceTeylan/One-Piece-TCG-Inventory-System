@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Select } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { CardThumb } from '@/components/common/CardImage';
@@ -18,7 +19,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useDebounce } from '@/hooks/use-debounce';
 import { apiError } from '@/lib/api';
 import { cn, peso } from '@/lib/utils';
-import { marketPricesService, type MarketRow, type MarketSummary } from '@/services';
+import { marketPricesService, type MarketRow, type MarketSort, type MarketSummary } from '@/services';
 
 const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`;
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -36,8 +37,16 @@ export function MarketPricesPage() {
   const [page, setPage] = useState(1);
   const [linking, setLinking] = useState<MarketRow | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [view, setView] = useState<'changes' | 'all'>('changes');
+  const [sort, setSort] = useState<MarketSort | ''>(''); // '' = default for the view
+  const [language, setLanguage] = useState<'' | 'JP' | 'EN'>('');
+  const [condition, setCondition] = useState<'' | 'clean' | 'issues'>('');
+  const reset = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
 
-  const params = { page, limit: 25, search: debounced || undefined, underpricedOnly: underpricedOnly || undefined };
+  const params = {
+    page, limit: 25, search: debounced || undefined, underpricedOnly: underpricedOnly || undefined,
+    view, sort: sort || undefined, language: language || undefined, condition: condition || undefined,
+  };
   const query = useQuery({ queryKey: ['market-prices', params], queryFn: () => marketPricesService.list(params) });
   const summary = query.data?.summary;
 
@@ -127,6 +136,29 @@ export function MarketPricesPage() {
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search name or card #…" className="pl-9" aria-label="Search" />
         </div>
+        <Select value={view} onChange={(e) => { reset(setView)(e.target.value as 'changes' | 'all'); setSort(''); }} aria-label="Show">
+          <option value="changes">Price changes (last day){summary ? ` · ${summary.changed}` : ''}</option>
+          <option value="all">All in-stock cards</option>
+        </Select>
+        <Select value={sort} onChange={(e) => reset(setSort)(e.target.value as MarketSort | '')} aria-label="Sort">
+          <option value="">{view === 'changes' ? 'Biggest change' : 'Most underpriced'}</option>
+          {view !== 'changes' && <option value="change">Biggest change</option>}
+          <option value="price_desc">Most expensive</option>
+          <option value="price_asc">Least expensive</option>
+          <option value="recent">Recently added</option>
+          <option value="margin_desc">Biggest margin</option>
+          {view === 'changes' && <option value="underpriced">Most underpriced</option>}
+        </Select>
+        <Select value={language} onChange={(e) => reset(setLanguage)(e.target.value as '' | 'JP' | 'EN')} aria-label="Language">
+          <option value="">All languages</option>
+          <option value="JP">Japanese</option>
+          <option value="EN">English</option>
+        </Select>
+        <Select value={condition} onChange={(e) => reset(setCondition)(e.target.value as '' | 'clean' | 'issues')} aria-label="Condition">
+          <option value="">All conditions</option>
+          <option value="clean">Clean</option>
+          <option value="issues">With issues</option>
+        </Select>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <Switch checked={underpricedOnly} onCheckedChange={(v) => { setUnderpricedOnly(v); setPage(1); }} />
           Underpriced only
@@ -137,7 +169,12 @@ export function MarketPricesPage() {
         {query.isLoading ? <TableSkeleton />
         : query.isError ? <ErrorState />
         : !query.data?.data.length
-          ? <EmptyState message={underpricedOnly ? 'Nothing is underpriced right now.' : summary?.matched ? 'No cards match your search.' : 'No prices yet. Run a sync to fetch market prices.'} />
+          ? (view === 'changes' && !underpricedOnly && !search && !language && !condition
+              ? <div className="flex flex-col items-center">
+                  <EmptyState message={summary?.lastRun ? 'No market prices moved since the last sync.' : 'No prices yet. Run a sync to fetch market prices.'} />
+                  <Button size="sm" variant="outline" className="-mt-6 mb-8" onClick={() => { setView('all'); setSort(''); setPage(1); }}>Show all cards</Button>
+                </div>
+              : <EmptyState message={underpricedOnly ? 'Nothing is underpriced right now.' : 'No cards match these filters.'} />)
         : (
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="min-h-0 flex-1 overflow-y-auto">
@@ -222,6 +259,13 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
             {l ? (row.marketPhp !== null ? peso(row.marketPhp) : foreign(l.price, l.currency)) : '—'}
           </div>
           {l && row.marketPhp !== null && <div className="text-[11px] tabular-nums text-muted-foreground">{foreign(l.price, l.currency)}</div>}
+          {row.changePhp !== null && l?.prevPrice != null && (
+            <div className={cn('text-[11px] font-semibold tabular-nums', row.changePhp > 0 ? 'text-success' : 'text-destructive')}
+              title={`Was ${foreign(l.prevPrice, l.currency)} before the last sync`}>
+              {row.changePhp > 0 ? '▲' : '▼'} {peso(Math.abs(row.changePhp))}
+            </div>
+          )}
+          {row.marginPct !== null && <div className="text-[11px] tabular-nums text-muted-foreground">Margin {row.marginPct}%</div>}
         </div>
         <div className="w-[92px]">
           {row.diffPct !== null && (
