@@ -32,14 +32,21 @@ const TCG = [
 
 describe('MarketPricesService', () => {
   let service: MarketPricesService;
+  let prisma: any;
+  let stamp: Record<string, unknown>;
   const rawUpdate = jest.fn().mockResolvedValue({});
 
   beforeEach(async () => {
     rawUpdate.mockClear();
-    const prisma = {
+    stamp = { rc_at: '2026-10-21T07:00:00Z', rc_n: BigInt(3) };
+    prisma = {
+      $queryRaw: jest.fn(() => Promise.resolve([stamp])), // the cache fingerprint
+      $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
+      priceHistory: { createMany: jest.fn((a: any) => Promise.resolve({ count: a.data.length })) },
       rawCard: {
         findMany: jest.fn().mockResolvedValue(CARDS),
         findUnique: jest.fn(({ where }: any) => Promise.resolve(CARDS.find((c) => c.id === where.id) ?? null)),
+        update: jest.fn((a: any) => Promise.resolve(a)),
       },
       marketPrice: { findMany: jest.fn().mockResolvedValue(YUYUTEI) },
       tcgplayerPrice: { findMany: jest.fn().mockResolvedValue(TCG) },
@@ -84,10 +91,32 @@ describe('MarketPricesService', () => {
     expect(rawUpdate).toHaveBeenCalledWith('jp', { postedPrice: 120 });
   });
 
-  it('Match all underpriced only raises underpriced cards', async () => {
+  it('Match all underpriced raises only underpriced cards, in one batched transaction', async () => {
     const r = await service.matchAllUnderpriced('user1');
     expect(r.updated).toBe(2);
-    expect(rawUpdate.mock.calls.map((c) => c[0]).sort()).toEqual(['en', 'jp']);
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.rawCard.update.mock.calls.map((c: any) => [c[0].where.id, Number(c[0].data.postedPrice)]).sort())
+      .toEqual([['en', 38300], ['jp', 120]]);
+    expect(prisma.priceHistory.createMany.mock.calls[0][0].data.map((h: any) => [h.itemId, Number(h.oldValue), Number(h.newValue)]).sort())
+      .toEqual([['en', 30000, 38300], ['jp', 100, 120]]);
+  });
+
+  it('reuses the priced list until the fingerprint changes', async () => {
+    await service.list({ page: 1, limit: 50, skip: 0, view: 'all' } as any);
+    await service.list({ page: 1, limit: 50, skip: 0, view: 'all', sort: 'price_asc' } as any);
+    await service.rawInventoryValue();
+    expect(prisma.rawCard.findMany).toHaveBeenCalledTimes(1);
+    stamp = { ...stamp, rc_at: '2026-10-21T08:00:00Z' }; // e.g. a sale changed a card
+    await service.list({ page: 1, limit: 50, skip: 0, view: 'all' } as any);
+    expect(prisma.rawCard.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('search matches names and card numbers typed with spaces or dashes', async () => {
+    const byNumber = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', search: 'op01 120' } as any);
+    expect(byNumber.data.map((r) => r.id).sort()).toEqual(['jp', 'jpDamaged']);
+    const byName = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', search: 'zoro' } as any);
+    expect(byName.data.map((r) => r.id)).toEqual(['en']);
+    expect(byName.summary.cards).toBe(1);
   });
 
   it('default view shows only cards whose price moved, with the peso change', async () => {

@@ -69,6 +69,7 @@ const CARD_SELECT = {
   images: { take: 1, select: { url: true } },
 } satisfies Prisma.RawCardSelect;
 type CardForPricing = Prisma.RawCardGetPayload<{ select: typeof CARD_SELECT }>;
+type PricedRow = Awaited<ReturnType<MarketPricesService['priceCards']>>[number];
 
 @Injectable()
 export class MarketPricesService {
@@ -77,6 +78,10 @@ export class MarketPricesService {
     running: false, trigger: null, phase: null, total: 0, done: 0, failed: 0, empty: 0,
     startedAt: null, finishedAt: null, lastError: null,
   };
+
+  /** Last fully priced in-stock list, reused while nothing it depends on has changed. */
+  private priced: { key: string; rows: PricedRow[]; rates: Rates; all: Record<string, any> } | null = null;
+  private pricing: Promise<NonNullable<MarketPricesService['priced']>> | null = null;
 
   constructor(
     private prisma: PrismaService,
@@ -283,15 +288,18 @@ export class MarketPricesService {
 
     const jpNumbers = [...new Set(jpCards.map((c) => norm(c.cardNumber)))];
     const jpManual = jpCards.map((c) => c.marketListingKey).filter((k): k is string => !!k && !k.startsWith(TCG_PREFIX));
-    const yuyutei = jpCards.length
-      ? await this.prisma.marketPrice.findMany({
-          where: { OR: [{ cardNumber: { in: jpNumbers } }, { listingKey: { in: jpManual } }] },
-        })
-      : [];
     const enNumbers = [...new Set(enCards.map((c) => norm(c.cardNumber)))];
-    const tcg = enCards.length
-      ? await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: { in: enNumbers } } })
-      : [];
+    // Both price tables are read at the same time (one round trip instead of two).
+    const [yuyutei, tcg] = await Promise.all([
+      jpCards.length
+        ? this.prisma.marketPrice.findMany({
+            where: { OR: [{ cardNumber: { in: jpNumbers } }, { listingKey: { in: jpManual } }] },
+          })
+        : Promise.resolve([] as MarketPrice[]),
+      enCards.length
+        ? this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: { in: enNumbers } } })
+        : Promise.resolve([] as TcgplayerPrice[]),
+    ]);
 
     const yByKey = new Map(yuyutei.map((l) => [l.listingKey, l]));
     const yByNum = groupBy(yuyutei, (l) => l.cardNumber);
@@ -371,24 +379,64 @@ export class MarketPricesService {
     });
   }
 
-  async list(q: QueryMarketPricesDto) {
-    const { rates, all } = await this.rates();
-    const where: Prisma.RawCardWhereInput = { quantity: { gt: 0 } };
-    const term = q.search?.trim();
-    if (term) {
-      where.OR = [
-        { name: { contains: term, mode: 'insensitive' } },
-        { cardNumber: { contains: term, mode: 'insensitive' } },
-      ];
+  /**
+   * Every in-stock raw card, priced. Cached in memory and reused until any
+   * input changes: one tiny "fingerprint" query per request checks the newest
+   * edit time and row count of cards, photos, settings and both price tables.
+   * A sale, edit, new photo, settings save or sync all change the fingerprint,
+   * so the cache can never serve stale prices.
+   */
+  private async loadPriced() {
+    const key = await this.fingerprint();
+    if (this.priced?.key === key) return this.priced;
+    if (!this.pricing) {
+      this.pricing = (async () => {
+        const [{ rates, all }, cards] = await Promise.all([
+          this.rates(),
+          this.prisma.rawCard.findMany({ where: { quantity: { gt: 0 } }, select: CARD_SELECT }),
+        ]);
+        const rows = await this.priceCards(cards, rates);
+        this.priced = { key, rows, rates, all };
+        return this.priced;
+      })().finally(() => { this.pricing = null; });
     }
-    const cards = await this.prisma.rawCard.findMany({ where, select: CARD_SELECT });
-    let rows = await this.priceCards(cards, rates);
+    return this.pricing;
+  }
 
+  private async fingerprint(): Promise<string> {
+    const [f] = await this.prisma.$queryRaw<Record<string, unknown>[]>(Prisma.sql`SELECT
+      (SELECT max("updatedAt") FROM raw_cards)        AS rc_at,
+      (SELECT count(*)         FROM raw_cards)        AS rc_n,
+      (SELECT max("createdAt") FROM card_images)      AS img_at,
+      (SELECT count(*)         FROM card_images)      AS img_n,
+      (SELECT max("updatedAt") FROM settings)         AS set_at,
+      (SELECT max("fetchedAt") FROM market_prices)    AS mp_at,
+      (SELECT count(*)         FROM market_prices)    AS mp_n,
+      (SELECT max("fetchedAt") FROM tcgplayer_prices) AS tp_at,
+      (SELECT count(*)         FROM tcgplayer_prices) AS tp_n`);
+    // The "changed in the last day" flag depends on the clock, so refresh hourly too.
+    const hour = Math.floor(Date.now() / 3_600_000);
+    return JSON.stringify({ ...f, hour }, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+  }
+
+  async list(q: QueryMarketPricesDto) {
+    const { rows: allRows, rates, all } = await this.loadPriced();
+    let rows = allRows;
+    const term = q.search?.trim().toLowerCase();
+    if (term) {
+      // "op01 120", "OP01-120" and "op01120" all find OP01-120.
+      const squash = (v: string) => v.toLowerCase().replace(/[\s-]/g, '');
+      const t = squash(term);
+      rows = rows.filter((r) => r.name.toLowerCase().includes(term) || squash(r.cardNumber).includes(t));
+    }
+
+    const searched = rows.length;
     const matched = rows.filter((r) => r.listing).length;
     const underpriced = rows.filter((r) => r.underpriced).length;
     const matchableUnderpriced = rows.filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice).length;
     const changed = rows.filter((r) => r.changePhp !== null).length;
 
+    rows = [...rows]; // never sort the cached array in place
     if (q.language) rows = rows.filter((r) => r.language === q.language);
     if (q.condition) rows = rows.filter((r) => r.condition === q.condition);
     if (q.underpricedOnly) rows = rows.filter((r) => r.underpriced);
@@ -403,7 +451,7 @@ export class MarketPricesService {
       meta: { total, page: q.page, limit: q.limit, totalPages: Math.ceil(total / q.limit) || 1 },
       summary: {
         rate: rates.jpy, usdRate: rates.usd, jpyDamagedRate: rates.jpyDamaged, usdDamagedRate: rates.usdDamaged,
-        pct: rates.pct, cards: cards.length, matched, underpriced, matchableUnderpriced, changed, view,
+        pct: rates.pct, cards: searched, matched, underpriced, matchableUnderpriced, changed, view,
         lastRun: all[LAST_RUN_KEY] ?? null, sync: this.status(),
       },
     };
@@ -415,9 +463,7 @@ export class MarketPricesService {
    * every request, so it follows each sync automatically.
    */
   async rawInventoryValue() {
-    const { rates } = await this.rates();
-    const cards = await this.prisma.rawCard.findMany({ where: { quantity: { gt: 0 } }, select: CARD_SELECT });
-    const rows = await this.priceCards(cards, rates);
+    const { rows } = await this.loadPriced();
     let market = 0, fallback = 0, matchedCards = 0;
     for (const r of rows) {
       if (r.marketPhp !== null) { market += r.marketPhp * r.quantity; matchedCards++; }
@@ -448,14 +494,24 @@ export class MarketPricesService {
 
   /** Raise every underpriced in-stock card to its rounded market price. */
   async matchAllUnderpriced(userId: string) {
-    const { rates } = await this.rates();
-    const cards = await this.prisma.rawCard.findMany({ where: { quantity: { gt: 0 } }, select: CARD_SELECT });
-    const rows = (await this.priceCards(cards, rates))
-      .filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice);
-    const changes: { id: string; name: string; from: number; to: number }[] = [];
-    for (const r of rows) {
-      await this.rawCards.update(r.id, { postedPrice: r.matchPrice! });
-      changes.push({ id: r.id, name: r.name, from: r.postedPrice, to: r.matchPrice! });
+    const { rows: priced } = await this.loadPriced();
+    const changes = priced
+      .filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice)
+      .map((r) => ({ id: r.id, name: r.name, from: r.postedPrice, to: r.matchPrice! }));
+    // One batched transaction: every price update plus its price-history row,
+    // the same records RawCardsService.update writes for a posted-price change.
+    if (changes.length) {
+      await this.prisma.$transaction([
+        ...changes.map((c) => this.prisma.rawCard.update({
+          where: { id: c.id }, data: { postedPrice: new Prisma.Decimal(c.to) },
+        })),
+        this.prisma.priceHistory.createMany({
+          data: changes.map((c) => ({
+            itemType: 'RAW' as const, itemId: c.id, field: 'postedPrice',
+            oldValue: new Prisma.Decimal(c.from), newValue: new Prisma.Decimal(c.to),
+          })),
+        }),
+      ]);
     }
     if (changes.length) {
       await this.audit.log({

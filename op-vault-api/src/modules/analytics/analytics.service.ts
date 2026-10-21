@@ -114,26 +114,28 @@ export class AnalyticsService {
   /** Inventory value & averages & stock health. */
   /** Inventory value & averages & stock health. */
   async inventory() {
-    const [rawValue] = await this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any; avgcost: any; avgprice: any }[]>(
-      Prisma.sql`SELECT
-        COALESCE(SUM(quantity * "buyCost"),0)      AS "totalSpent",
-        COALESCE(SUM(quantity * "postedPrice"),0)  AS "totalPosted",
-        COALESCE(AVG("buyCost"),0)                 AS avgcost,
-        COALESCE(AVG("postedPrice"),0)             AS avgprice
-      FROM raw_cards`,
-    );
-
-    const [slabValue] = await this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any }[]>(
-      Prisma.sql`SELECT 
-        COALESCE(SUM(quantity * "buyCost"),0) AS "totalSpent",
-        COALESCE(SUM(quantity * "sellPrice"),0) AS "totalPosted"
-      FROM slab_cards WHERE status <> 'SOLD'`,
-    );
-
-    const margin = await this.prisma.sale.aggregate({
-      where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } }, 
-      _sum: { grandTotal: true, totalProfit: true },
-    });
+    // All four reads run at the same time instead of one after another.
+    const [[rawValue], [slabValue], margin, raw] = await Promise.all([
+      this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any; avgcost: any; avgprice: any }[]>(
+        Prisma.sql`SELECT
+          COALESCE(SUM(quantity * "buyCost"),0)      AS "totalSpent",
+          COALESCE(SUM(quantity * "postedPrice"),0)  AS "totalPosted",
+          COALESCE(AVG("buyCost"),0)                 AS avgcost,
+          COALESCE(AVG("postedPrice"),0)             AS avgprice
+        FROM raw_cards`,
+      ),
+      this.prisma.$queryRaw<{ totalSpent: any; totalPosted: any }[]>(
+        Prisma.sql`SELECT
+          COALESCE(SUM(quantity * "buyCost"),0) AS "totalSpent",
+          COALESCE(SUM(quantity * "sellPrice"),0) AS "totalPosted"
+        FROM slab_cards WHERE status <> 'SOLD'`,
+      ),
+      this.prisma.sale.aggregate({
+        where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } },
+        _sum: { grandTotal: true, totalProfit: true },
+      }),
+      this.marketPrices.rawInventoryValue(),
+    ]);
 
     const rev = num(margin._sum.grandTotal);
     const prof = num(margin._sum.totalProfit);
@@ -144,7 +146,6 @@ export class AnalyticsService {
     // Inventory value: raw cards at today's market price (Yuyu-tei / TCGplayer at
     // the rates in Settings; 80% of posted when there's no market price yet),
     // slabs & sealed at 80% of posted. Follows each price sync automatically.
-    const raw = await this.marketPrices.rawInventoryValue();
     const slabsValue = num(slabValue.totalPosted) * 0.8;
     const inventoryValue = Math.round(raw.total + slabsValue);
 
