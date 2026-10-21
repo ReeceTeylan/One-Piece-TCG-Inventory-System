@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { AnalyticsService } from './analytics.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { MarketPricesService } from '../market-prices/market-prices.service';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
@@ -11,7 +12,7 @@ describe('AnalyticsService', () => {
       sale: { aggregate: jest.fn().mockResolvedValue({ _sum: { grandTotal: 0, totalProfit: 0 }, _count: { _all: 0 } }) },
       saleItem: { aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }) },
       rawCard: { aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }), count: jest.fn().mockResolvedValue(0) },
-      slabCard: { count: jest.fn().mockResolvedValue(0) },
+      slabCard: { count: jest.fn().mockResolvedValue(0), aggregate: jest.fn().mockResolvedValue({ _sum: { quantity: 0 } }) },
       shipment: { count: jest.fn().mockResolvedValue(0) },
       $queryRaw: jest.fn().mockResolvedValue([{ value: 0, avgcost: 0, avgprice: 0 }]),
       $transaction: jest.fn((arr: any) => Promise.all(arr)),
@@ -21,6 +22,7 @@ describe('AnalyticsService', () => {
         AnalyticsService,
         { provide: PrismaService, useValue: prisma },
         { provide: SettingsService, useValue: { get: jest.fn().mockResolvedValue(3) } },
+        { provide: MarketPricesService, useValue: { rawInventoryValue: jest.fn().mockResolvedValue({ total: 0, market: 0, fallback: 0, matchedCards: 0, fallbackCards: 0 }) } },
       ],
     }).compile();
     service = moduleRef.get(AnalyticsService);

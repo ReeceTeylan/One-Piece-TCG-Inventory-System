@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { MarketPricesService } from '../market-prices/market-prices.service';
 import { TopQueryDto, TrendQueryDto } from './dto/analytics-query.dto';
 
 const num = (v: any) => (v === null || v === undefined ? 0 : Number(v));
@@ -9,7 +10,11 @@ const ACTIVE = { notIn: ['CANCELLED', 'REFUNDED'] as any };
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService, private settings: SettingsService) {}
+  constructor(
+    private prisma: PrismaService,
+    private settings: SettingsService,
+    private marketPrices: MarketPricesService,
+  ) {}
 
   /**
    * Revenue + profit + order count for a period, with boundaries evaluated in
@@ -136,11 +141,22 @@ export class AnalyticsService {
     const totalSpent = num(rawValue.totalSpent) + num(slabValue.totalSpent);
     const totalPosted = num(rawValue.totalPosted) + num(slabValue.totalPosted);
     
-    // Inventory value is now 80% of the total posted price
-    const inventoryValue = totalPosted * 0.8;
+    // Inventory value: raw cards at today's market price (Yuyu-tei / TCGplayer at
+    // the rates in Settings; 80% of posted when there's no market price yet),
+    // slabs & sealed at 80% of posted. Follows each price sync automatically.
+    const raw = await this.marketPrices.rawInventoryValue();
+    const slabsValue = num(slabValue.totalPosted) * 0.8;
+    const inventoryValue = Math.round(raw.total + slabsValue);
 
     return {
       inventoryValue: inventoryValue,
+      inventoryBreakdown: {
+        rawMarket: Math.round(raw.market),
+        rawFallback: Math.round(raw.fallback),
+        rawMatchedCards: raw.matchedCards,
+        rawFallbackCards: raw.fallbackCards,
+        slabsAndSealed: Math.round(slabsValue),
+      },
       averageBuyingCost: Number(num(rawValue.avgcost).toFixed(2)),
       averageSellingPrice: Number(num(rawValue.avgprice).toFixed(2)),
       profitMargin: rev > 0 ? Number(((prof / rev) * 100).toFixed(1)) : 0,

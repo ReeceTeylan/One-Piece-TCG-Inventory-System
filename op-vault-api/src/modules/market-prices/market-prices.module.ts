@@ -9,5 +9,6 @@ import { RawCardsModule } from '../raw-cards/raw-cards.module';
   imports: [RawCardsModule],
   providers: [MarketPricesService],
   controllers: [MarketPricesController],
+  exports: [MarketPricesService], // dashboard inventory value
 })
 export class MarketPricesModule {}

@@ -22,6 +22,9 @@ const LAST_RUN_KEY = 'marketSyncLastRun';
 const SOURCE_SEARCH = 'YUYUTEI';
 const SOURCE_LINK = 'YUYUTEI_LINK';
 const TCG_PREFIX = 'tcgp:';
+// "Changed today" window: a little over a day so the 3 AM sync's changes stay
+// visible until the next one lands.
+const CHANGE_WINDOW_MS = 26 * 60 * 60 * 1000;
 
 export interface SyncState {
   running: boolean;
@@ -50,6 +53,8 @@ export interface RowListing {
   fetchedAt: Date;
   manual: boolean;
   viaLink: boolean;
+  prevPrice: number | null;      // foreign price before the last change
+  priceChangedAt: Date | null;
 }
 
 interface Rates { jpy: number | null; jpyDamaged: number | null; usd: number | null; usdDamaged: number | null; pct: number }
@@ -60,7 +65,7 @@ const positive = (v: unknown) => (Number(v) > 0 ? Number(v) : null);
 
 const CARD_SELECT = {
   id: true, name: true, cardNumber: true, rarity: true, setName: true, quantity: true,
-  postedPrice: true, marketListingKey: true, notes: true,
+  postedPrice: true, buyCost: true, createdAt: true, marketListingKey: true, notes: true,
   images: { take: 1, select: { url: true } },
 } satisfies Prisma.RawCardSelect;
 type CardForPricing = Prisma.RawCardGetPayload<{ select: typeof CARD_SELECT }>;
@@ -196,10 +201,14 @@ export class MarketPricesService {
     }
 
     const fetchedAt = new Date();
+    const old = new Map((await this.prisma.tcgplayerPrice.findMany({
+      where: { listingKey: { in: rows.map((r) => r.listingKey) } }, select: { listingKey: true, priceUsd: true },
+    })).map((o) => [o.listingKey, Number(o.priceUsd)]));
     await this.prisma.$transaction([
       ...rows.map((r) => {
         const data = { ...r, priceUsd: new Prisma.Decimal(r.priceUsd.toFixed(2)), fetchedAt };
-        return this.prisma.tcgplayerPrice.upsert({ where: { listingKey: r.listingKey }, update: data, create: data });
+        const change = changeFields(old.get(r.listingKey), r.priceUsd, 'prevPriceUsd', fetchedAt);
+        return this.prisma.tcgplayerPrice.upsert({ where: { listingKey: r.listingKey }, update: { ...data, ...change }, create: data });
       }),
       // Only prune when every set was read, so a TCGCSV hiccup never wipes prices.
       ...(groupFailures === 0 ? [this.prisma.tcgplayerPrice.deleteMany({
@@ -223,11 +232,12 @@ export class MarketPricesService {
     this.logger.warn(`Price sync ${what} failed: ${e?.message ?? e}`);
   }
 
-  private saveLinked(l: YuyuteiListing) {
+  private async saveLinked(l: YuyuteiListing) {
     const fetchedAt = new Date();
+    const old = await this.prisma.marketPrice.findUnique({ where: { listingKey: l.listingKey }, select: { priceJpy: true } });
     return this.prisma.marketPrice.upsert({
       where: { listingKey: l.listingKey },
-      update: { ...l, source: SOURCE_LINK, fetchedAt },
+      update: { ...l, source: SOURCE_LINK, fetchedAt, ...changeFields(old?.priceJpy, l.priceJpy, 'prevPriceJpy', fetchedAt) },
       create: { ...l, source: SOURCE_LINK, fetchedAt },
     });
   }
@@ -235,10 +245,13 @@ export class MarketPricesService {
   /** Upsert this card number's listings and drop ones Yuyu-tei no longer shows. */
   private async saveListings(num: string, listings: YuyuteiListing[]) {
     const fetchedAt = new Date();
+    const old = new Map((await this.prisma.marketPrice.findMany({
+      where: { listingKey: { in: listings.map((l) => l.listingKey) } }, select: { listingKey: true, priceJpy: true },
+    })).map((o) => [o.listingKey, o.priceJpy]));
     await this.prisma.$transaction([
       ...listings.map((l) => this.prisma.marketPrice.upsert({
         where: { listingKey: l.listingKey },
-        update: { ...l, fetchedAt },
+        update: { ...l, fetchedAt, ...changeFields(old.get(l.listingKey), l.priceJpy, 'prevPriceJpy', fetchedAt) },
         create: { ...l, fetchedAt },
       })),
       this.prisma.marketPrice.deleteMany({
@@ -304,6 +317,7 @@ export class MarketPricesService {
             source: 'TCGPLAYER', listingKey: t.listingKey, name: `${t.name} · ${t.subTypeName}`, rarity: t.rarity,
             price: t.priceUsd, currency: 'USD', inStock: null, stockCount: null,
             url: t.url, fetchedAt: t.fetchedAt, manual: !!manual, viaLink: false,
+            prevPrice: t.prevPriceUsd != null ? Number(t.prevPriceUsd) : null, priceChangedAt: t.priceChangedAt,
           };
         }
       } else {
@@ -317,6 +331,7 @@ export class MarketPricesService {
             source: 'YUYUTEI', listingKey: y.listingKey, name: y.name, rarity: y.rarity,
             price: y.priceJpy, currency: 'JPY', inStock: y.inStock, stockCount: y.stockCount,
             url: y.url, fetchedAt: y.fetchedAt, manual: !!manual, viaLink: y.source === SOURCE_LINK,
+            prevPrice: y.prevPriceJpy, priceChangedAt: y.priceChangedAt,
           };
         }
       }
@@ -329,9 +344,21 @@ export class MarketPricesService {
         : { marketPhp: null, diffPct: null, underpriced: false };
       const matchPrice = cmp.marketPhp !== null ? roundPrice(cmp.marketPhp) : null;
 
+      // Peso change from the last price move, valued at today's rate so it
+      // reflects the market moving, not the exchange rate.
+      const recent = !!listing?.priceChangedAt && Date.now() - listing.priceChangedAt.getTime() <= CHANGE_WINDOW_MS;
+      const changePhp = recent && listing!.prevPrice != null && rate && cmp.marketPhp !== null
+        ? cmp.marketPhp - Math.round(listing!.prevPrice * rate) : null;
+      const buyCost = Number(c.buyCost);
+      const marginPct = cmp.marketPhp ? Math.round(((cmp.marketPhp - buyCost) / cmp.marketPhp) * 1000) / 10 : null;
+
       return {
         id: c.id, name: c.name, cardNumber: c.cardNumber, rarity: c.rarity, setName: c.setName,
-        quantity: c.quantity, postedPrice: posted, imageUrl: c.images[0]?.url ?? null, notes: c.notes,
+        quantity: c.quantity, postedPrice: posted, buyCost, createdAt: c.createdAt,
+        imageUrl: c.images[0]?.url ?? null, notes: c.notes,
+        condition: damage ? 'issues' as const : 'clean' as const,
+        changePhp: changePhp || null,
+        marginPct,
         language: english ? 'EN' as const : 'JP' as const,
         damage,
         rateUsed: rate,
@@ -360,13 +387,15 @@ export class MarketPricesService {
     const matched = rows.filter((r) => r.listing).length;
     const underpriced = rows.filter((r) => r.underpriced).length;
     const matchableUnderpriced = rows.filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice).length;
-    if (q.underpricedOnly) rows = rows.filter((r) => r.underpriced);
+    const changed = rows.filter((r) => r.changePhp !== null).length;
 
-    // Most underpriced first; unmatched cards last.
-    rows.sort((a, b) =>
-      (a.diffPct === null ? 1 : 0) - (b.diffPct === null ? 1 : 0)
-      || (a.diffPct ?? 0) - (b.diffPct ?? 0)
-      || a.name.localeCompare(b.name));
+    if (q.language) rows = rows.filter((r) => r.language === q.language);
+    if (q.condition) rows = rows.filter((r) => r.condition === q.condition);
+    if (q.underpricedOnly) rows = rows.filter((r) => r.underpriced);
+    const view = q.view ?? 'changes';
+    if (view === 'changes') rows = rows.filter((r) => r.changePhp !== null);
+
+    sortRows(rows, q.sort ?? (view === 'changes' ? 'change' : 'underpriced'));
 
     const total = rows.length;
     return {
@@ -374,10 +403,27 @@ export class MarketPricesService {
       meta: { total, page: q.page, limit: q.limit, totalPages: Math.ceil(total / q.limit) || 1 },
       summary: {
         rate: rates.jpy, usdRate: rates.usd, jpyDamagedRate: rates.jpyDamaged, usdDamagedRate: rates.usdDamaged,
-        pct: rates.pct, cards: cards.length, matched, underpriced, matchableUnderpriced,
+        pct: rates.pct, cards: cards.length, matched, underpriced, matchableUnderpriced, changed, view,
         lastRun: all[LAST_RUN_KEY] ?? null, sync: this.status(),
       },
     };
+  }
+
+  /**
+   * Dashboard inventory value for raw cards: market price × quantity, or 80%
+   * of the posted price when a card has no market price yet. Recomputed on
+   * every request, so it follows each sync automatically.
+   */
+  async rawInventoryValue() {
+    const { rates } = await this.rates();
+    const cards = await this.prisma.rawCard.findMany({ where: { quantity: { gt: 0 } }, select: CARD_SELECT });
+    const rows = await this.priceCards(cards, rates);
+    let market = 0, fallback = 0, matchedCards = 0;
+    for (const r of rows) {
+      if (r.marketPhp !== null) { market += r.marketPhp * r.quantity; matchedCards++; }
+      else fallback += r.postedPrice * 0.8 * r.quantity;
+    }
+    return { total: market + fallback, market, fallback, matchedCards, fallbackCards: rows.length - matchedCards };
   }
 
   // ----------------------------- match -----------------------------
@@ -497,3 +543,33 @@ function groupBy<T>(items: T[], key: (t: T) => string): Map<string, T[]> {
   }
   return m;
 }
+
+/** Fields to set when a synced price differs from the stored one. */
+export function changeFields<K extends 'prevPriceJpy' | 'prevPriceUsd'>(
+  oldPrice: number | undefined, newPrice: number, key: K, at: Date,
+): Partial<Record<K, number> & { priceChangedAt: Date }> {
+  if (oldPrice === undefined || Math.abs(oldPrice - newPrice) < 0.005) return {};
+  return { [key]: oldPrice, priceChangedAt: at } as Record<K, number> & { priceChangedAt: Date };
+}
+
+export type MarketSort = 'change' | 'price_desc' | 'price_asc' | 'recent' | 'margin_desc' | 'underpriced';
+
+/** Sort in place. Rows missing the sort value always go last. */
+export function sortRows<T extends {
+  name: string; changePhp: number | null; marketPhp: number | null; createdAt: Date;
+  marginPct: number | null; diffPct: number | null;
+}>(rows: T[], sort: MarketSort) {
+  const last = (v: number | null) => (v === null ? 1 : 0);
+  const by = (pick: (r: T) => number | null, dir: 1 | -1) => (a: T, b: T) =>
+    last(pick(a)) - last(pick(b)) || dir * ((pick(a) ?? 0) - (pick(b) ?? 0)) || a.name.localeCompare(b.name);
+  const cmp: Record<MarketSort, (a: T, b: T) => number> = {
+    change: by((r) => (r.changePhp === null ? null : Math.abs(r.changePhp)), -1),
+    price_desc: by((r) => r.marketPhp, -1),
+    price_asc: by((r) => r.marketPhp, 1),
+    recent: (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.name.localeCompare(b.name),
+    margin_desc: by((r) => r.marginPct, -1),
+    underpriced: by((r) => r.diffPct, 1),
+  };
+  rows.sort(cmp[sort]);
+}
+

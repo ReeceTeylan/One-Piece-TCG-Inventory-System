@@ -466,6 +466,8 @@ model MarketPrice {
   rarity     String   // Yuyu-tei label, e.g. "P-SEC"
   name       String
   priceJpy   Int
+  prevPriceJpy   Int?      // price before the last change (null = never changed)
+  priceChangedAt DateTime? // when a sync last saw the price change
   inStock    Boolean
   stockCount Int?
   imageUrl   String?
@@ -490,6 +492,8 @@ model TcgplayerPrice {
   groupId     Int
   groupAbbr   String?
   priceUsd    Decimal  @db.Decimal(10, 2)
+  prevPriceUsd   Decimal?  @db.Decimal(10, 2) // price before the last change
+  priceChangedAt DateTime? // when a sync last saw the price change
   url         String
   imageUrl    String?
   fetchedAt   DateTime @default(now())
