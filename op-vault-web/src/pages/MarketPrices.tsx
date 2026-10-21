@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, RefreshCw, ExternalLink, Loader2, Check, Link2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -47,8 +47,20 @@ export function MarketPricesPage() {
     page, limit: 25, search: debounced || undefined, underpricedOnly: underpricedOnly || undefined,
     view, sort: sort || undefined, language: language || undefined, condition: condition || undefined,
   };
-  const query = useQuery({ queryKey: ['market-prices', params], queryFn: () => marketPricesService.list(params) });
+  // Keep showing the current list while the next filter/page loads (no blank flash).
+  const query = useQuery({
+    queryKey: ['market-prices', params],
+    queryFn: () => marketPricesService.list(params),
+    placeholderData: keepPreviousData,
+  });
   const summary = query.data?.summary;
+  // Preload the next page so "Next" opens instantly.
+  const totalPages = query.data?.meta.totalPages ?? 1;
+  useEffect(() => {
+    if (query.isPlaceholderData || page >= totalPages) return;
+    const next = { ...params, page: page + 1 };
+    qc.prefetchQuery({ queryKey: ['market-prices', next], queryFn: () => marketPricesService.list(next) });
+  }, [query.data, page, totalPages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll sync progress only while a sync is running.
   const status = useQuery({
@@ -165,7 +177,7 @@ export function MarketPricesPage() {
         </label>
       </div>
 
-      <Card className="flex min-h-0 flex-1 flex-col">
+      <Card className={cn('flex min-h-0 flex-1 flex-col transition-opacity', query.isPlaceholderData && 'opacity-60')}>
         {query.isLoading ? <TableSkeleton />
         : query.isError ? <ErrorState />
         : !query.data?.data.length
