@@ -55,7 +55,9 @@ export function StockCountPage() {
   // Raw: omit inStock to include qty 0. Slabs: the API defaults to in-stock,
   // so including qty 0 needs an explicit inStock=false.
   const params = {
-    page, limit: LIMIT, search: debounced || undefined, sortBy: 'name', sortOrder: 'asc',
+    // Most expensive first, so the high-value items get counted first.
+    page, limit: LIMIT, search: debounced || undefined,
+    sortBy: tab === 'RAW' ? 'postedPrice' : 'sellPrice', sortOrder: 'desc',
     inStock: includeZero ? (tab === 'SLAB' ? false : undefined) : true,
   };
 
