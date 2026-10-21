@@ -1,9 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MarketPricesController } from './market-prices.controller';
 import { MarketPricesService } from './market-prices.service';
+import { RawCardsModule } from '../raw-cards/raw-cards.module';
 
-// PrismaModule and SettingsModule are @Global, so no imports needed.
+// PrismaModule, SettingsModule and ActivityLogsModule are @Global; RawCardsModule
+// provides RawCardsService so Match goes through the normal price-history path.
 @Module({
+  imports: [RawCardsModule],
   providers: [MarketPricesService],
   controllers: [MarketPricesController],
 })

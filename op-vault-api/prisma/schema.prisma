@@ -475,3 +475,25 @@ model MarketPrice {
   @@index([cardNumber])
   @@map("market_prices")
 }
+
+// ---------------- TCGPLAYER PRICES (via TCGCSV) ----------------
+// English printings. One row per TCGplayer product + printing (Normal/Foil),
+// refreshed by the nightly price sync for card numbers we stock in English.
+model TcgplayerPrice {
+  id          String   @id @default(cuid())
+  listingKey  String   @unique // "tcgp:<productId>:<subTypeName>"
+  productId   Int
+  subTypeName String
+  cardNumber  String
+  rarity      String?
+  name        String
+  groupId     Int
+  groupAbbr   String?
+  priceUsd    Decimal  @db.Decimal(10, 2)
+  url         String
+  imageUrl    String?
+  fetchedAt   DateTime @default(now())
+
+  @@index([cardNumber])
+  @@map("tcgplayer_prices")
+}

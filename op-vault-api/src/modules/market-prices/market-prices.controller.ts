@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MarketPricesService } from './market-prices.service';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 import { LinkListingDto } from './dto/link-listing.dto';
@@ -32,8 +33,22 @@ export class MarketPricesController {
   }
 
   @Get('listings/:cardNumber')
-  listings(@Param('cardNumber') cardNumber: string) {
-    return this.service.listingsFor(cardNumber);
+  listings(@Param('cardNumber') cardNumber: string, @Query('source') source?: string) {
+    return this.service.listingsFor(cardNumber, source === 'TCGPLAYER' ? 'TCGPLAYER' : 'YUYUTEI');
+  }
+
+  @Post('raw-cards/:id/match')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: "Set a card's posted price to its rounded market price" })
+  match(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.service.matchOne(id, userId);
+  }
+
+  @Post('match-underpriced')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Raise every underpriced in-stock card to its rounded market price' })
+  matchAll(@CurrentUser('id') userId: string) {
+    return this.service.matchAllUnderpriced(userId);
   }
 
   @Patch('raw-cards/:id/link')

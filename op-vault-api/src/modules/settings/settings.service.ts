@@ -15,6 +15,11 @@ const DEFAULTS = {
   // % of the converted market price below which a card is flagged underpriced.
   jpyToPhpRate: null as number | null,
   underpricedPct: 90,
+  // English cards (TCGplayer, USD) and lower rates for cards whose notes
+  // mention whites / dents / scratches / issues. null = not set.
+  usdToPhpRate: null as number | null,
+  jpyToPhpRateDamaged: null as number | null,
+  usdToPhpRateDamaged: null as number | null,
 };
 
 @Injectable()

@@ -55,3 +55,60 @@ describe('comparePrice', () => {
     expect(comparePrice(1300, 3980, null, 90)).toEqual({ marketPhp: null, diffPct: null, underpriced: false });
   });
 });
+
+import { damageReason, isEnglish, isParallelRarity, pickTcgListing, roundPrice } from './market-match';
+
+describe('notes rules', () => {
+  it('detects English printings', () => {
+    expect(isEnglish('ENG')).toBe(true);
+    expect(isEnglish('english version, NM')).toBe(true);
+    expect(isEnglish('Eng.')).toBe(true);
+    expect(isEnglish('engraved sleeve')).toBe(false);
+    expect(isEnglish(null)).toBe(false);
+  });
+  it('detects damage words but not negations', () => {
+    expect(damageReason('minor whites on back')).toBe('whites');
+    expect(damageReason('small DENT top left')).toBe('dent');
+    expect(damageReason('light scratch')).toBe('scratch');
+    expect(damageReason('has issue on corner')).toBe('issue');
+    expect(damageReason('no whites, mint')).toBeNull();
+    expect(damageReason('pack fresh, no issues')).toBeNull();
+    expect(damageReason('whitewash art')).toBeNull();
+  });
+  it('rounds like the web app', () => {
+    expect(roundPrice(1512)).toBe(1510);
+    expect(roundPrice(1515)).toBe(1520);
+    expect(roundPrice(48640)).toBe(48600);
+    expect(roundPrice(4996)).toBe(5000);
+  });
+  it('knows parallel rarity codes', () => {
+    expect(isParallelRarity('PSEC')).toBe(true);
+    expect(isParallelRarity('PL')).toBe(true);
+    expect(isParallelRarity('Promo')).toBe(false);
+    expect(isParallelRarity('SP')).toBe(false);
+  });
+});
+
+// Zoro rows and the PRB-01 Shanks are real TCGCSV data (category 68, Oct 2026).
+// The two OP01 Shanks rows (4546xx) are illustrative stand-ins in the same format.
+const TCG = [
+  { listingKey: 'tcgp:454512:Normal', productId: 454512, subTypeName: 'Normal', cardNumber: 'OP01-001', rarity: 'L', name: 'Roronoa Zoro (001)', groupAbbr: 'OP01' },
+  { listingKey: 'tcgp:454513:Foil', productId: 454513, subTypeName: 'Foil', cardNumber: 'OP01-001', rarity: 'L', name: 'Roronoa Zoro (001) (Parallel)', groupAbbr: 'OP01' },
+  { listingKey: 'tcgp:586194:Foil', productId: 586194, subTypeName: 'Foil', cardNumber: 'OP01-120', rarity: 'SEC', name: 'Shanks (OP01-120) (Alternate Art)', groupAbbr: 'PRB-01' },
+  { listingKey: 'tcgp:454600:Foil', productId: 454600, subTypeName: 'Foil', cardNumber: 'OP01-120', rarity: 'SEC', name: 'Shanks (120)', groupAbbr: 'OP01' },
+  { listingKey: 'tcgp:454601:Foil', productId: 454601, subTypeName: 'Foil', cardNumber: 'OP01-120', rarity: 'SEC', name: 'Shanks (120) (Parallel)', groupAbbr: 'OP01' },
+];
+
+describe('pickTcgListing', () => {
+  it('Leader picks the base card, PL picks the parallel', () => {
+    expect(pickTcgListing({ cardNumber: 'OP01-001', rarity: 'Leader' }, TCG)?.productId).toBe(454512);
+    expect(pickTcgListing({ cardNumber: 'OP01-001', rarity: 'PL' }, TCG)?.productId).toBe(454513);
+  });
+  it('PSEC prefers the original set over the PRB alternate art', () => {
+    expect(pickTcgListing({ cardNumber: 'OP01-120', rarity: 'PSEC' }, TCG)?.productId).toBe(454601);
+    expect(pickTcgListing({ cardNumber: 'OP01-120', rarity: 'SEC' }, TCG)?.productId).toBe(454600);
+  });
+  it('returns null when no product has the number', () => {
+    expect(pickTcgListing({ cardNumber: 'OP02-001', rarity: 'L' }, TCG)).toBeNull();
+  });
+});
