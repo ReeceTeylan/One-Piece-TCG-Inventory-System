@@ -139,23 +139,38 @@ function PromoCard() {
   );
 }
 
-/** Settings for the Yuyu-tei price sync (Market Prices page). */
+/** Settings for the market price sync (Market Prices page). */
+type RateKey = 'jpyToPhpRate' | 'usdToPhpRate' | 'jpyToPhpRateDamaged' | 'usdToPhpRateDamaged';
+const RATE_FIELDS: { key: RateKey; label: string; placeholder: string; max: number }[] = [
+  { key: 'jpyToPhpRate', label: '₱ per ¥1 (Japanese)', placeholder: 'e.g. 0.38', max: 10 },
+  { key: 'usdToPhpRate', label: '₱ per $1 (English)', placeholder: 'e.g. 58', max: 1000 },
+  { key: 'jpyToPhpRateDamaged', label: '₱ per ¥1, damaged', placeholder: 'e.g. 0.30', max: 10 },
+  { key: 'usdToPhpRateDamaged', label: '₱ per $1, damaged', placeholder: 'e.g. 45', max: 1000 },
+];
+
 function MarketPricesCard() {
   const settings = useSettings();
   const save = useSettingsMutation();
-  const [rate, setRate] = useState<string | null>(null);
-  const [pct, setPct] = useState<string | null>(null);
+  const [edits, setEdits] = useState<Partial<Record<RateKey | 'underpricedPct', string>>>({});
   // Show saved values until the owner starts typing.
-  const rateVal = rate ?? (settings.data?.jpyToPhpRate != null ? String(settings.data.jpyToPhpRate) : '');
-  const pctVal = pct ?? String(settings.data?.underpricedPct ?? 90);
+  const value = (key: RateKey | 'underpricedPct') =>
+    edits[key] ?? (settings.data?.[key] != null ? String(settings.data[key]) : key === 'underpricedPct' ? '90' : '');
 
   const submit = async () => {
-    const r = Number(rateVal), p = Number(pctVal);
-    if (!(r > 0 && r <= 10)) { toast.error('Enter the peso value of 1 yen, e.g. 0.38'); return; }
+    const dto: Record<string, number> = {};
+    for (const f of RATE_FIELDS) {
+      const raw = value(f.key).trim();
+      if (!raw) continue; // left blank = not set
+      const n = Number(raw);
+      if (!(n > 0 && n <= f.max)) { toast.error(`${f.label}: enter a number above 0, e.g. ${f.placeholder.replace('e.g. ', '')}`); return; }
+      dto[f.key] = n;
+    }
+    const p = Number(value('underpricedPct'));
     if (!(p >= 1 && p <= 100)) { toast.error('Underpriced threshold must be between 1 and 100%'); return; }
+    dto.underpricedPct = p;
     try {
-      await save.mutateAsync({ jpyToPhpRate: r, underpricedPct: p });
-      setRate(null); setPct(null);
+      await save.mutateAsync(dto);
+      setEdits({});
       toast.success('Market price settings saved');
     } catch (e) { toast.error(apiError(e).message); }
   };
@@ -163,10 +178,19 @@ function MarketPricesCard() {
   return (
     <Card className="p-5">
       <h3 className="mb-1 text-sm font-bold">Market prices</h3>
-      <p className="mb-3 text-xs text-muted-foreground">Used to convert Yuyu-tei prices and flag cards priced below the market.</p>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Japanese cards use Yuyu-tei (yen); cards with English or ENG in their notes use TCGplayer (dollars).
+        Cards whose notes mention whites, dents, scratches or issues use the damaged rates.
+      </p>
       <div className="mb-3 grid grid-cols-2 gap-3">
-        <div><Label>₱ per ¥1</Label><Input type="number" min={0.01} step={0.001} placeholder="e.g. 0.38" value={rateVal} onChange={(e) => setRate(e.target.value)} className="mt-1" /></div>
-        <div><Label>Flag below (% of market)</Label><Input type="number" min={1} max={100} value={pctVal} onChange={(e) => setPct(e.target.value)} className="mt-1" /></div>
+        {RATE_FIELDS.map((f) => (
+          <div key={f.key}>
+            <Label>{f.label}</Label>
+            <Input type="number" min={0.01} step="any" placeholder={f.placeholder} value={value(f.key)}
+              onChange={(e) => setEdits((d) => ({ ...d, [f.key]: e.target.value }))} className="mt-1" />
+          </div>
+        ))}
+        <div><Label>Flag below (% of market)</Label><Input type="number" min={1} max={100} value={value('underpricedPct')} onChange={(e) => setEdits((d) => ({ ...d, underpricedPct: e.target.value }))} className="mt-1" /></div>
       </div>
       <div className="flex justify-end">
         <Button onClick={submit} disabled={save.isPending || settings.isLoading}>{save.isPending ? 'Saving…' : 'Save'}</Button>

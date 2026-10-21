@@ -33,22 +33,33 @@ export const stockCountService = {
   adjust: (dto: { itemType: 'RAW' | 'SLAB'; id: string; expectedQty: number; countedQty: number }) =>
     api.post('/stock-count/adjust', dto).then(unwrap<{ changed: boolean; quantity: number; delta: number }>),
 };
-// Yuyu-tei price sync. Prices are yen; peso conversion happens server-side.
+// Market prices: Yuyu-tei (yen) for Japanese cards, TCGplayer via TCGCSV (USD) for
+// English ones. Peso conversion and Match prices are worked out server-side.
+export type MarketSource = 'YUYUTEI' | 'TCGPLAYER';
 export interface MarketListing {
-  listingKey: string; name: string; rarity: string; priceJpy: number; inStock: boolean;
-  stockCount: number | null; url: string; fetchedAt: string; manual?: boolean; viaLink?: boolean;
+  source: MarketSource; listingKey: string; name: string; rarity: string | null;
+  price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null;
+  url: string; fetchedAt: string; manual: boolean; viaLink: boolean;
+}
+export interface MarketCandidate {
+  source: MarketSource; listingKey: string; cardNumber: string; name: string; rarity: string | null;
+  setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string;
 }
 export interface MarketSync {
-  running: boolean; trigger: 'nightly' | 'manual' | null; total: number; done: number; failed: number;
-  empty: number; startedAt: string | null; finishedAt: string | null; lastError: string | null;
+  running: boolean; trigger: 'nightly' | 'manual' | null; phase: 'yuyutei' | 'tcgplayer' | null;
+  total: number; done: number; failed: number; empty: number;
+  startedAt: string | null; finishedAt: string | null; lastError: string | null;
 }
 export interface MarketRow {
   id: string; name: string; cardNumber: string; rarity: string; setName: string; quantity: number;
-  postedPrice: number; imageUrl: string | null; listing: MarketListing | null; candidateCount: number;
-  marketPhp: number | null; diffPct: number | null; underpriced: boolean;
+  postedPrice: number; imageUrl: string | null; notes: string | null;
+  language: 'JP' | 'EN'; damage: string | null; rateUsed: number | null; damagedRateMissing: boolean;
+  listing: MarketListing | null; candidateCount: number;
+  marketPhp: number | null; diffPct: number | null; underpriced: boolean; matchPrice: number | null;
 }
 export interface MarketSummary {
-  rate: number | null; pct: number; cards: number; matched: number; underpriced: number;
+  rate: number | null; usdRate: number | null; jpyDamagedRate: number | null; usdDamagedRate: number | null;
+  pct: number; cards: number; matched: number; underpriced: number; matchableUnderpriced: number;
   lastRun: MarketSync | null; sync: MarketSync;
 }
 export const marketPricesService = {
@@ -56,13 +67,18 @@ export const marketPricesService = {
     api.get('/market-prices', { params: p }).then((r) => unwrap<Omit<Paginated<MarketRow>, 'summary'> & { summary: MarketSummary }>(r)),
   status: () => one<MarketSync>('/market-prices/sync/status'),
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
-  listings: (cardNumber: string) =>
-    one<(MarketListing & { cardNumber: string })[]>(`/market-prices/listings/${encodeURIComponent(cardNumber)}`),
+  listings: (cardNumber: string, source: MarketSource) =>
+    api.get(`/market-prices/listings/${encodeURIComponent(cardNumber)}`, { params: { source } }).then(unwrap<MarketCandidate[]>),
   link: (id: string, listingKey: string | null) =>
     api.patch(`/market-prices/raw-cards/${id}/link`, { listingKey }).then(unwrap),
   // Match by pasting a Yuyu-tei card page link (for cards search can't find, e.g. DON!!).
   linkUrl: (id: string, url: string) =>
-    api.patch(`/market-prices/raw-cards/${id}/link-url`, { url }).then(unwrap<MarketListing>),
+    api.patch(`/market-prices/raw-cards/${id}/link-url`, { url }).then(unwrap<{ name: string }>),
+  // Set posted price to the rounded market price; bulk version only raises underpriced cards.
+  match: (id: string) =>
+    api.post(`/market-prices/raw-cards/${id}/match`).then(unwrap<{ id: string; from: number; to: number; changed: boolean }>),
+  matchAllUnderpriced: () =>
+    api.post('/market-prices/match-underpriced').then(unwrap<{ updated: number; changes: { id: string; name: string; from: number; to: number }[] }>),
 };
 export const customersService = {
   list: (p?: Record<string, any>) => list<Customer>('/customers', p),

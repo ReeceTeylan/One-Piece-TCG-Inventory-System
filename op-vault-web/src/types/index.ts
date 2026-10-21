@@ -63,4 +63,4 @@ export interface DashboardData {
 }
 export interface Promo { id: string; percentage: string; startsAt: string; endsAt: string; endedAt: string | null; note?: string | null; createdAt: string; }
 export interface TrendPoint { date: string; revenue: number; profit: number; orders: number; cardsSold: number; }
-export interface Settings { storeName: string; logoUrl: string | null; currency: string; defaultShippingFee: number; lowStockThreshold: number; postedPriceFormula: string; jpyToPhpRate: number | null; underpricedPct: number; }
+export interface Settings { storeName: string; logoUrl: string | null; currency: string; defaultShippingFee: number; lowStockThreshold: number; postedPriceFormula: string; jpyToPhpRate: number | null; underpricedPct: number; usdToPhpRate: number | null; jpyToPhpRateDamaged: number | null; usdToPhpRateDamaged: number | null; }
