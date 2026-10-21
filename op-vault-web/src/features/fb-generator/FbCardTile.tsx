@@ -1,6 +1,5 @@
 import { peso } from '@/lib/utils';
 import { resolveImageUrl } from '@/components/common/CardImage';
-import storeLogo from '@/assets/LOGO.png';
 import type { FbCard, OverlayConfig } from './types';
 
 // A single card tile with an overlay. `scale` lets an export clone render larger.

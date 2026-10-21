@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload, SlidersHorizontal, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, PackagePlus, Pencil, Trash2, Loader2, Upload, SlidersHorizontal, LayoutGrid, List, BadgeJapaneseYen } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -20,11 +21,12 @@ import { RestockDialog } from '@/features/raw-cards/RestockDialog';
 import { useRawCards, useRawCardMutations, RARITIES } from '@/features/raw-cards/use-raw-cards';
 import { useImageDrop } from '@/features/raw-cards/use-image-drop';
 import { useAuth } from '@/contexts/auth-context';
-import { peso } from '@/lib/utils';
+import { cn, peso } from '@/lib/utils';
 import { apiError } from '@/lib/api';
 import { useDebounce } from '@/hooks/use-debounce';
 import type { RawCard, StockStatus } from '@/types';
-import { rawCardsService } from '@/services';
+import { rawCardsService, marketPricesService } from '@/services';
+import { useCardMarket, useMatchPrice } from '@/features/market/use-card-market';
 import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
 
 const statusBadge = (s: StockStatus) =>
@@ -77,6 +79,16 @@ export function RawCardsPage() {
   });
 
   const rows = query.data?.data ?? [];
+  // Market price for the cards on this page (in-stock cards only; sold-out ones show —).
+  const market = useCardMarket(rows.map((c) => c.id));
+  const matchPrice = useMatchPrice();
+  const qc = useQueryClient();
+  const matchOne = async (c: RawCard) => {
+    try {
+      const r = await matchPrice.mutateAsync(c.id);
+      toast.success(r.changed ? `${c.name}: ₱${r.from.toLocaleString()} → ₱${r.to.toLocaleString()}` : 'Already at the market price');
+    } catch (e) { toast.error(apiError(e).message); }
+  };
   const allSelected = rows.length > 0 && rows.every((c) => selected.has(c.id));
   const someSelected = rows.some((c) => selected.has(c.id));
 
@@ -123,6 +135,13 @@ export function RawCardsPage() {
       { label: 'cards' },
     );
     setBulkVal('');
+  };
+
+  // Bulk: set every selected card that has a market price to its rounded market price.
+  const matchableSelected = selectedRows.filter((c) => market.data?.[c.id]?.matchPrice != null);
+  const applyBulkMatch = async () => {
+    await bulkRun(matchableSelected, (c) => marketPricesService.match(c.id), { label: 'cards' });
+    for (const k of ['card-market', 'market-prices', 'market-movers', 'dashboard']) qc.invalidateQueries({ queryKey: [k] });
   };
 
   const applyBulkDelete = async () => {
@@ -208,6 +227,12 @@ export function RawCardsPage() {
             {bulkProgress.running ? <><Loader2 className="size-4 animate-spin" /> {bulkProgress.done}/{bulkProgress.total}</> : 'Apply price'}
           </Button>
 
+          {isOwner && matchableSelected.length > 0 && (
+            <Button size="sm" variant="outline" onClick={applyBulkMatch} disabled={bulkProgress.running}>
+              <BadgeJapaneseYen className="size-4" /> Match {matchableSelected.length} to market
+            </Button>
+          )}
+
           <div className="mx-1 h-5 w-px bg-border" />
           {isOwner && (
             <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setBulkDeleteOpen(true)} disabled={bulkProgress.running}>
@@ -232,7 +257,7 @@ export function RawCardsPage() {
                   title: c.name,
                   subtitle: `${c.cardNumber} · ${c.setName}`,
                   price: peso(c.postedPrice),
-                  meta: `×${c.quantity}`,
+                  meta: market.data?.[c.id]?.marketPhp != null ? `×${c.quantity} · Mkt ${peso(market.data[c.id].marketPhp)}` : `×${c.quantity}`,
                   badge: statusBadge(c.status),
                 }))}
                 selected={selected}
@@ -259,7 +284,7 @@ export function RawCardsPage() {
                     onChange={toggleAll} className="size-4 cursor-pointer align-middle" />
                 </TH>
                 <TH>Card</TH><TH>Set</TH><TH>Rarity</TH><TH className="text-right">Qty</TH>
-                <TH className="text-right">Cost</TH><TH className="text-right">Price</TH><TH>Status</TH><TH></TH>
+                <TH className="text-right">Cost</TH><TH className="text-right">Price</TH><TH className="text-right">Market</TH><TH>Status</TH><TH></TH>
               </TR></THead>
               <TBody>
                 {query.data.data.map((c) => (
@@ -289,6 +314,8 @@ export function RawCardsPage() {
                     <TD className="text-right tnum">{c.quantity}</TD>
                     <TD className="text-right tnum">{peso(c.buyCost)}</TD>
                     <TD className="text-right font-semibold tnum">{peso(c.postedPrice)}</TD>
+                    <TD className="text-right"><MarketCell m={market.data?.[c.id]} loading={market.isLoading}
+                      canMatch={isOwner} busy={matchPrice.isPending && matchPrice.variables === c.id} onMatch={() => matchOne(c)} /></TD>
                     <TD>{statusBadge(c.status)}</TD>
                     <TD>
                       <div className="flex justify-end gap-1">
@@ -359,6 +386,26 @@ export function RawCardsPage() {
       <ConfirmDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}
         title={`Delete ${selected.size} cards?`} description="The selected cards on this page will be permanently removed. This cannot be undone."
         destructive confirmLabel="Delete all" loading={bulkProgress.running} onConfirm={applyBulkDelete} />
+    </div>
+  );
+}
+
+/** Market price with an underpriced tint, and a one-tap Match for the owner. */
+function MarketCell({ m, loading, canMatch, busy, onMatch }: {
+  m?: { marketPhp: number | null; matchPrice: number | null; underpriced: boolean; diffPct: number | null; listingName: string | null };
+  loading: boolean; canMatch: boolean; busy: boolean; onMatch: () => void;
+}) {
+  if (loading) return <span className="text-muted-foreground">…</span>;
+  if (!m || m.marketPhp === null) return <span className="text-muted-foreground">—</span>;
+  return (
+    <div className="flex flex-col items-end leading-tight" title={m.listingName ?? undefined}>
+      <span className={cn('tnum', m.underpriced && 'font-semibold text-warning')}>{peso(m.marketPhp)}</span>
+      {canMatch && m.matchPrice !== null && (
+        <button onClick={onMatch} disabled={busy}
+          className="mt-0.5 text-[11px] font-semibold text-primary hover:underline disabled:opacity-50">
+          {busy ? 'Matching…' : `Match ${peso(m.matchPrice)}`}
+        </button>
+      )}
     </div>
   );
 }

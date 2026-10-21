@@ -13,6 +13,9 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false, staleTime: 30_000 } },
 });
 
+// On phones, toasts drop from the top so they never cover the bottom tab bar.
+const toastPosition = window.matchMedia('(max-width: 767px)').matches ? 'top-center' : 'bottom-right';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
@@ -21,7 +24,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <ImageViewerProvider>
             <RouterProvider router={router} />
           </ImageViewerProvider>
-          <Toaster position="bottom-right" richColors closeButton />
+          <Toaster position={toastPosition} richColors closeButton />
         </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>

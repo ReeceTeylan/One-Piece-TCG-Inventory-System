@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Topbar } from '@/components/layout/Topbar';
+import { BottomTabs } from '@/components/layout/BottomTabs';
 import { SailingProgress } from '@/components/common/Nautical';
 
 export function AppLayout() {
@@ -19,8 +20,10 @@ export function AppLayout() {
         <div className="relative h-0"><SailingProgress /></div>
         {/* min-h-0 lets children shrink below their content height so the table,
             not the page, is what scrolls. */}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4"><Outlet /></main>
+        {/* Bottom padding on phones keeps the last row clear of the tab bar. */}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-4"><Outlet /></main>
       </div>
+      <BottomTabs onMore={() => setMobileOpen(true)} />
     </div>
   );
 }

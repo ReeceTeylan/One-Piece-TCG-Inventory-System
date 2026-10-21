@@ -6,7 +6,11 @@ export function useRawCards(params: Record<string, any>) {
 }
 export function useRawCardMutations() {
   const qc = useQueryClient();
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['raw-cards'] });
+  // Market column values depend on posted price and notes, so refresh them too.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['raw-cards'] });
+    qc.invalidateQueries({ queryKey: ['card-market'] });
+  };
   return {
     create: useMutation({ mutationFn: rawCardsService.create, onSuccess: invalidate }),
     update: useMutation({ mutationFn: (v: { id: string; dto: any }) => rawCardsService.update(v.id, v.dto), onSuccess: invalidate }),

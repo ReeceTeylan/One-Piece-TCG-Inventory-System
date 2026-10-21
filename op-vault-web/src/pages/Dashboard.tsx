@@ -14,6 +14,7 @@
   import { Gear5Number } from '@/components/ui/gear5-number';
   import { HeroAura } from '@/components/common/HeroAura';
   import { Input } from '@/components/ui/input';
+  import { MarketMovers } from '@/components/common/MarketMovers';
 
   function Delta({ value }: { value: number }) {
     const up = value >= 0;
@@ -110,6 +111,8 @@
             </div>
           </>
         )}
+
+        <MarketMovers />
 
         <Card className="mt-5">
           <CardContent className="p-4">

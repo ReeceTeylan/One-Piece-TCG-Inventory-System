@@ -18,6 +18,8 @@ import { apiError } from '@/lib/api';
 import type { Sale } from '@/types';
 import { useSales, useSaleMutations } from '@/features/sales/use-sales';
 import { EditOrderDialog } from '@/features/sales/EditOrderDialog';
+import { ReceiptDialog } from '@/features/sales/ReceiptDialog';
+import { Receipt } from 'lucide-react';
 
 const RANGES = ['today', 'week', 'month', 'year'] as const;
 
@@ -33,6 +35,7 @@ export function SalesHistoryPage() {
 
   const [action, setAction] = useState<{ type: 'cancel' | 'refund'; sale: Sale } | null>(null);
   const [editSale, setEditSale] = useState<Sale | null>(null);
+  const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
 
   const runAction = async () => {
     if (!action) return;
@@ -97,6 +100,9 @@ export function SalesHistoryPage() {
                   <TD className="text-muted-foreground">{s.shipment?.courier ?? '—'}</TD>
                   <TD>
                     <div className="flex justify-end gap-1">
+                      {s.status !== 'CANCELLED' && s.status !== 'REFUNDED' && (
+                        <Button variant="ghost" size="icon" onClick={() => setReceiptSale(s)} aria-label="Receipt" title="Receipt for the buyer"><Receipt className="size-4" /></Button>
+                      )}
                       {isOwner && s.status !== 'CANCELLED' && s.status !== 'REFUNDED' && (
                         <>
                           <Button variant="outline" size="sm" onClick={() => setEditSale(s)}>Edit</Button>
@@ -118,6 +124,8 @@ export function SalesHistoryPage() {
         title={action?.type === 'cancel' ? 'Cancel sale' : 'Refund sale'}
         description={`${action?.type === 'cancel' ? 'Cancel' : 'Refund'} ${action?.sale?.reference}? Inventory will be restored.`}
         confirmLabel={action?.type === 'cancel' ? 'Cancel sale' : 'Refund'} loading={cancel.isPending || refund.isPending} onConfirm={runAction} />
+
+      <ReceiptDialog sale={receiptSale} onOpenChange={(o) => !o && setReceiptSale(null)} />
 
       <EditOrderDialog 
         sale={editSale} 

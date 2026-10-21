@@ -66,7 +66,7 @@ export function unwrap<T>(res: { data: any }): T {
 export interface Paginated<T> {
   data: T[];
   meta: { total: number; page: number; limit: number; totalPages: number };
-  summary?: { totalRevenue: number; totalProfit: number; totalCardsSold: number };
+  summary?: { totalRevenue: number; totalProfit: number; totalCardsSold: number; totalOutstanding?: number };
 }
 export function apiError(e: unknown): { code?: string; message: string; status?: number; body?: any } {
   const err = e as AxiosError<any>;

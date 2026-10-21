@@ -66,6 +66,20 @@ export interface MarketSummary {
   changed: number; view: 'changes' | 'all';
   lastRun: MarketSync | null; sync: MarketSync;
 }
+export interface MarketMover {
+  id: string; name: string; cardNumber: string; rarity: string; imageUrl: string | null; language: 'JP' | 'EN';
+  postedPrice: number; marketPhp: number | null; changePhp: number | null; changePct: number | null; priceChangedAt: string | null;
+}
+export interface CardMarket {
+  marketPhp: number | null; matchPrice: number | null; diffPct: number | null; underpriced: boolean;
+  changePhp: number | null; language: 'JP' | 'EN'; source: MarketSource | null; listingName: string | null;
+}
+export interface PriceSuggestion {
+  cardNumber: string; rarity: string; language: 'JP' | 'EN'; damage: string | null;
+  found: boolean; reason: string | null; candidates: number;
+  source: MarketSource | null; listingName: string | null; price: number | null; currency: 'JPY' | 'USD' | null;
+  rate: number | null; marketPhp: number | null; suggested: number | null; url: string | null; fetchedAt: string | null;
+}
 export const marketPricesService = {
   list: (p?: Record<string, any>) =>
     api.get('/market-prices', { params: p }).then((r) => unwrap<Omit<Paginated<MarketRow>, 'summary'> & { summary: MarketSummary }>(r)),
@@ -81,6 +95,14 @@ export const marketPricesService = {
   // Set posted price to the rounded market price; bulk version only raises underpriced cards.
   match: (id: string) =>
     api.post(`/market-prices/raw-cards/${id}/match`).then(unwrap<{ id: string; from: number; to: number; changed: boolean }>),
+  // Dashboard "Market movers": biggest price changes since the last sync.
+  movers: (limit = 5) => api.get('/market-prices/movers', { params: { limit } }).then(unwrap<{ changed: number; data: MarketMover[] }>),
+  // Market price for specific raw cards (Raw Cards page, Sales wizard). Cards with no stock aren't priced.
+  forCards: (ids: string[]) =>
+    api.get('/market-prices/cards', { params: { ids: ids.join(',') } }).then(unwrap<Record<string, CardMarket>>),
+  // Add Card form: suggested posted price for a card number + rarity (notes decide English / damaged).
+  suggest: (p: { cardNumber: string; rarity: string; notes?: string }) =>
+    api.get('/market-prices/suggest', { params: p }).then(unwrap<PriceSuggestion>),
   matchAllUnderpriced: () =>
     api.post('/market-prices/match-underpriced').then(unwrap<{ updated: number; changes: { id: string; name: string; from: number; to: number }[] }>),
 };
@@ -132,6 +154,13 @@ export const notificationsService = {
 export const settingsService = {
   get: () => one<Settings>('/settings'),
   update: (dto: Partial<Settings>) => api.patch('/settings', dto).then(unwrap<Settings>),
+  // GCash / Maya QR printed on sale receipts.
+  uploadQr: (method: 'gcash' | 'maya', file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return api.post(`/images/payment-qr/${method}`, fd).then(unwrap<{ method: string; url: string }>);
+  },
+  removeQr: (method: 'gcash' | 'maya') => api.delete(`/images/payment-qr/${method}`).then(unwrap),
 };
 export const promosService = {
   active: () => one<Promo | null>('/promos/active'),

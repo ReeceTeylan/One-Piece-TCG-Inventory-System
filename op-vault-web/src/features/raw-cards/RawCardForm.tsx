@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ExternalLink, Loader2, Sparkles } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,6 +16,9 @@ import { ImageUploader } from '@/components/common/ImageUploader';
 import { useRawCardMutations, RARITIES, COLORS } from './use-raw-cards';
 import { useImageUpload } from '@/features/images/use-image-upload';
 import { apiError } from '@/lib/api';
+import { useDebounce } from '@/hooks/use-debounce';
+import { marketPricesService, type PriceSuggestion } from '@/services';
+import { peso } from '@/lib/utils';
 import type { RawCard } from '@/types';
 
 const schema = z.object({
@@ -39,7 +44,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
   const [removeExisting, setRemoveExisting] = useState(false);
   const existingImage = editing?.images?.[0] ?? null;
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<Form>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { errors, dirtyFields } } = useForm<Form>({
     resolver: zodResolver(schema), defaultValues: { rarity: 'SR', color: 'Red', quantity: 1 },
   });
 
@@ -56,6 +61,24 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
     }
     setFile(null); setRemoveExisting(false);
   }, [editing, open, reset]);
+
+  // Suggested posted price from the market (Yuyu-tei, or TCGplayer when notes say ENG).
+  const numberD = useDebounce((watch('cardNumber') ?? '').trim().toUpperCase(), 450);
+  const rarity = watch('rarity');
+  const notesD = useDebounce((watch('notes') ?? '').trim(), 600);
+  const suggestion = useQuery({
+    queryKey: ['price-suggest', numberD, rarity, notesD],
+    queryFn: () => marketPricesService.suggest({ cardNumber: numberD, rarity, notes: notesD || undefined }),
+    enabled: open && /^[A-Z0-9]+-\d{2,3}$/.test(numberD) && !!rarity,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const suggested = suggestion.data?.suggested ?? null;
+  const posted = Number(watch('postedPrice') ?? 0);
+  // New cards: fill the price in automatically until you type your own.
+  useEffect(() => {
+    if (!editing && suggested !== null && !dirtyFields.postedPrice) setValue('postedPrice', suggested);
+  }, [editing, suggested, dirtyFields.postedPrice, setValue]);
 
   const finishClose = () => { reset(); setFile(null); setRemoveExisting(false); onOpenChange(false); };
 
@@ -122,6 +145,8 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
             <div><Label>Rarity</Label><Select {...register('rarity')} className="mt-1 w-full">{RARITIES.map((r) => <option key={r}>{r}</option>)}</Select></div>
             {field('Buying cost (₱)', 'buyCost', 'number')}
             {field('Posted price (₱)', 'postedPrice', 'number')}
+            <PriceHint className="col-span-2" loading={suggestion.isFetching && !suggestion.data} s={suggestion.data}
+              current={posted} onUse={(v) => setValue('postedPrice', v, { shouldDirty: true })} />
             {field('Quantity', 'quantity', 'number')}
             <div className="col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
             <div className="col-span-2">
@@ -153,5 +178,37 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
         onConfirm={confirmAddQty}
       />
     </>
+  );
+}
+
+const foreign = (s: PriceSuggestion) =>
+  s.currency === 'USD' ? `$${s.price!.toFixed(2)}` : `¥${s.price!.toLocaleString('ja-JP')}`;
+
+/** One line under the price: where the suggestion came from and a button to use it. */
+function PriceHint({ s, loading, current, onUse, className }: {
+  s?: PriceSuggestion; loading: boolean; current: number; onUse: (v: number) => void; className?: string;
+}) {
+  if (loading) {
+    return <p className={`flex items-center gap-1.5 text-xs text-muted-foreground ${className}`}><Loader2 className="size-3.5 animate-spin" /> Checking the market price…</p>;
+  }
+  if (!s) return null;
+  const where = s.source === 'TCGPLAYER' ? 'TCGplayer' : 'Yuyu-tei';
+  if (!s.found || s.suggested === null) {
+    return <p className={`text-xs text-muted-foreground ${className}`}>{s.reason}</p>;
+  }
+  return (
+    <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-xs ${className}`}>
+      <Sparkles className="size-3.5 shrink-0 text-primary" />
+      <span className="min-w-0">
+        {where} {foreign(s)} × {s.rate} = {peso(s.marketPhp)} → <b>{peso(s.suggested)}</b>
+        {s.damage && <span className="text-muted-foreground"> · damaged rate ({s.damage})</span>}
+      </span>
+      {s.url && <a href={s.url} target="_blank" rel="noreferrer" className="text-muted-foreground hover:text-foreground" aria-label={`Open on ${where}`}><ExternalLink className="size-3.5" /></a>}
+      {current !== s.suggested && (
+        <Button type="button" size="sm" variant="outline" className="ml-auto h-6 px-2 text-xs" onClick={() => onUse(s.suggested!)}>
+          Use {peso(s.suggested)}
+        </Button>
+      )}
+    </div>
   );
 }

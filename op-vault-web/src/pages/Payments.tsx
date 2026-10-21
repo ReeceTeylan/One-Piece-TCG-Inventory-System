@@ -20,21 +20,25 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsService } from '@/services';
 import { useSales } from '@/features/sales/use-sales';
 import type { Sale } from '@/types';
+import { ReceiptDialog } from '@/features/sales/ReceiptDialog';
+import { Receipt } from 'lucide-react';
 
 export function PaymentsPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const debounced = useDebounce(search);
-  // Outstanding balances = partial + unpaid sales
-  const { data, isLoading, isError } = useSales({ page, limit: 20, search: debounced || undefined, status: 'PARTIAL' });
-  const { data: unpaid } = useSales({ page: 1, limit: 50, status: 'UNPAID' });
+  // Outstanding balances = partial + unpaid sales, in one paged, searchable list.
+  const { data, isLoading, isError } = useSales({ page, limit: 20, search: debounced || undefined, outstanding: true });
   const [target, setTarget] = useState<Sale | null>(null);
+  const [receiptSale, setReceiptSale] = useState<Sale | null>(null);
 
-  const rows = [...(data?.data ?? []), ...(page === 1 ? unpaid?.data ?? [] : [])];
+  const rows = data?.data ?? [];
+  const owed = data?.summary?.totalOutstanding;
 
   return (
     <>
-      <PageHeader title="Payments" subtitle="Outstanding balances & payment history" />
+      <PageHeader title="Payments"
+        subtitle={data ? `${data.meta.total} with a balance${owed != null ? ` · ${peso(owed)} owed` : ''}` : 'Outstanding balances & payment history'} />
       <div className="mb-3.5 flex items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search reference, customer…" />
       </div>
@@ -54,7 +58,13 @@ export function PaymentsPage() {
                     <TD className="text-right font-semibold tabular-nums text-warning">{peso(balance)}</TD>
                     <TD><Badge variant={saleVariant(s.status)}>{s.status}</Badge></TD>
                     <TD>{fmtDate(s.createdAt)}</TD>
-                    <TD className="text-right"><Button size="sm" onClick={() => setTarget(s)}>Add payment</Button></TD>
+                    <TD className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {/* Receipt with the balance and your QR doubles as a payment reminder. */}
+                        <Button variant="ghost" size="icon" onClick={() => setReceiptSale(s)} aria-label="Receipt" title="Send a receipt / reminder"><Receipt className="size-4" /></Button>
+                        <Button size="sm" onClick={() => setTarget(s)}>Add payment</Button>
+                      </div>
+                    </TD>
                   </TR>
                 );
               })}
@@ -64,6 +74,7 @@ export function PaymentsPage() {
         {data && data.meta.totalPages > 1 && <div className="flex border-t"><Pagination page={data.meta.page} totalPages={data.meta.totalPages} total={data.meta.total} onPage={setPage} /></div>}
       </Card>
       <PaymentDialog sale={target} onOpenChange={(o) => !o && setTarget(null)} />
+      <ReceiptDialog sale={receiptSale} onOpenChange={(o) => !o && setReceiptSale(null)} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Trash2, Minus, ArrowRight, ArrowLeft, CheckCircle2, X } from 'lucide-react';
+import { Plus, Search, Trash2, Minus, ArrowRight, ArrowLeft, CheckCircle2, X, AlertTriangle, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -24,6 +24,10 @@ import { CartLine, cartSubtotal, cartProfit, lineTotal } from '@/features/sales/
 import type { Customer } from '@/types';
 import { usePromo } from '@/features/fb-generator/use-promo';
 import { promoPrice } from '@/lib/promo';
+import { useCardMarket } from '@/features/market/use-card-market';
+import { useSettings } from '@/features/settings/use-settings';
+import { ReceiptDialog } from '@/features/sales/ReceiptDialog';
+import type { CardMarket } from '@/services';
 
 export function SalesWizardPage() {
   const { data: promo } = usePromo();
@@ -54,6 +58,21 @@ export function SalesWizardPage() {
   const [paymentStatus, setPaymentStatus] = useState<'PAID' | 'PARTIAL' | 'UNPAID'>('PAID');
   const [amountPaid, setAmountPaid] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState('CASH');
+
+  // Market price next to raw cards, and a warning when a line sells well below it
+  // (below the "flag below" % from Settings, 90% by default).
+  const market = useCardMarket([
+    ...(raw.data?.data.map((c) => c.id) ?? []),
+    ...cart.flatMap((l) => (l.rawCardId ? [l.rawCardId] : [])),
+  ]);
+  const flagPct = useSettings().data?.underpricedPct ?? 90;
+  const marketOf = (id?: string): CardMarket | undefined => (id ? market.data?.[id] : undefined);
+  const belowPct = (l: CartLine) => {
+    const m = marketOf(l.rawCardId)?.marketPhp;
+    return m && l.unitPrice < m * (flagPct / 100) ? Math.round((1 - l.unitPrice / m) * 100) : null;
+  };
+  const lowLines = cart.filter((l) => belowPct(l) !== null).length;
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const subtotal = useMemo(() => cartSubtotal(cart), [cart]);
   const profit = useMemo(() => cartProfit(cart) - discount, [cart, discount]);
@@ -181,7 +200,8 @@ export function SalesWizardPage() {
             </div>
             <div className="max-h-[50vh] space-y-1.5 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
               {raw.data?.data.map((c) => (
-                <ProductRow key={c.id} img={c.images?.[0]?.url} name={c.name} sub={`${c.cardNumber} · ${c.quantity} in stock`} price={c.postedPrice} onAdd={() => addRaw(c)} />
+                <ProductRow key={c.id} img={c.images?.[0]?.url} name={c.name} sub={`${c.cardNumber} · ${c.quantity} in stock`} price={c.postedPrice}
+                  market={marketOf(c.id)?.marketPhp} onAdd={() => addRaw(c)} />
               ))}
               {slabs.data?.data.map((s) => (
                 <ProductRow key={s.id} img={s.images?.[0]?.url} name={s.name}
@@ -224,7 +244,17 @@ export function SalesWizardPage() {
               {cart.map((l) => (
                 <div key={l.key} className="flex flex-wrap items-center gap-2.5 border-b py-2.5 last:border-0">
                   <CardThumb url={l.imageUrl} alt={l.name} className="h-12 w-9" />
-                  <div className="min-w-0 flex-1 basis-40"><b className="block truncate text-[13px]">{l.name}</b><span className="block truncate text-[11px] text-muted-foreground">{l.sub}</span></div>
+                  <div className="min-w-0 flex-1 basis-40">
+                    <b className="block truncate text-[13px]">{l.name}</b>
+                    <span className="block truncate text-[11px] text-muted-foreground">
+                      {l.sub}{marketOf(l.rawCardId)?.marketPhp ? ` · Market ${peso(marketOf(l.rawCardId)!.marketPhp)}` : ''}
+                    </span>
+                    {belowPct(l) !== null && (
+                      <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
+                        <AlertTriangle className="size-3" /> {belowPct(l)}% below market
+                      </span>
+                    )}
+                  </div>
                   <div className="flex shrink-0 items-center overflow-hidden rounded-md border">
                     <button className="grid size-7 place-items-center hover:bg-muted disabled:opacity-40" disabled={l.max <= 1} onClick={() => setQty(l.key, -1)}><Minus className="size-3.5" /></button>
                     <span className="w-7 text-center text-[13px] font-semibold tabular-nums">{l.quantity}</span>
@@ -246,6 +276,12 @@ export function SalesWizardPage() {
             <Row label="Shipping fee" value={peso(Number(shippingFee || 0))} />
             <Row label="Est. profit" value={peso(profit)} valueClass="text-success" />
             <div className="mt-2 flex items-center justify-between gap-2 border-t pt-3 text-base font-bold"><span>Grand total</span><span className="shrink-0 tabular-nums">{pesoF(grandTotal)}</span></div>
+            {lowLines > 0 && (
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/5 p-2.5 text-[12.5px]">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                <span>{lowLines} item{lowLines === 1 ? ' is' : 's are'} priced more than {100 - flagPct}% below market. Check before you continue.</span>
+              </div>
+            )}
             <div className="mt-4 flex gap-2">
               <Button variant="ghost" onClick={() => setStep(2)}><ArrowLeft /> Back</Button>
               <Button className="flex-1" onClick={() => setStep(4)}>Proceed to payment <ArrowRight /></Button>
@@ -288,17 +324,19 @@ export function SalesWizardPage() {
             <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Grand total</div><Gear5Number value={Number(result.grandTotal)} format={peso} className="block text-lg font-bold tabular-nums" /></div>
             <div className="rounded-lg border p-3"><div className="text-[11px] text-muted-foreground">Profit</div><Gear5Number value={Number(result.totalProfit)} format={peso} className="block text-lg font-bold tabular-nums text-success" /></div>
           </div>
+          <Button className="mb-2 w-full" onClick={() => setShowReceipt(true)}><Receipt /> Receipt for the buyer</Button>
           <div className="flex justify-center gap-2">
             <Button variant="outline" onClick={reset}>New sale</Button>
-            <Button onClick={() => navigate('/sales-history')}>View sales</Button>
+            <Button variant="outline" onClick={() => navigate('/sales-history')}>View sales</Button>
           </div>
+          <ReceiptDialog sale={showReceipt ? result : null} paymentMethod={paymentMethod} onOpenChange={setShowReceipt} />
         </Card>
       )}
     </div>
   );
 }
 
-function ProductRow({ img, name, sub, price, badge, onAdd }: { img?: string; name: string; sub: string; price: string | number; badge?: string; onAdd: () => void }) {
+function ProductRow({ img, name, sub, price, badge, market, onAdd }: { img?: string; name: string; sub: string; price: string | number; badge?: string; market?: number | null; onAdd: () => void }) {
   return (
     <div className="flex items-center gap-2.5 rounded-lg border p-2">
       <CardThumb url={img} alt={name} className="h-12 w-9" />
@@ -307,7 +345,7 @@ function ProductRow({ img, name, sub, price, badge, onAdd }: { img?: string; nam
           <b className="truncate text-[13px]">{name}</b>
           {badge && <Badge variant="info" className="shrink-0">{badge}</Badge>}
         </div>
-        <span className="block truncate text-[11px] text-muted-foreground">{sub}</span>
+        <span className="block truncate text-[11px] text-muted-foreground">{sub}{market ? ` · Market ${peso(market)}` : ''}</span>
         {/* Price sits under the name on narrow screens so the Add button always fits. */}
         <b className="block text-[13px] tabular-nums sm:hidden">{peso(price)}</b>
       </div>

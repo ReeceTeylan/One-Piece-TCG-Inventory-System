@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { toPng } from 'html-to-image';
-import { Download, Layers, X } from 'lucide-react';
+import { Download, Layers, Share2, X } from 'lucide-react';
+import { canShareFiles, dataUrlToFile, useShareImages } from '@/lib/share';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -110,6 +111,17 @@ export function GeneratorWorkspace({
     }
   };
 
+  // Share straight to Messenger (phone share sheet). A prepared image is dropped
+  // as soon as the layout changes so a stale picture is never sent.
+  const shareImg = useShareImages();
+  useEffect(() => { shareImg.clear(); }, [cards, config, resolution]); // eslint-disable-line react-hooks/exhaustive-deps
+  const renderPng = async () => {
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    const node = exportRef.current!;
+    const dataUrl = await toPng(node, { pixelRatio: resolution / node.offsetWidth, cacheBust: true, backgroundColor: config.theme === 'dark' ? '#0b0b0d' : '#ffffff' });
+    return [await dataUrlToFile(dataUrl, `op-vault-${mode.type.toLowerCase()}-${Date.now()}.png`)];
+  };
+
   const exportPng = async () => {
     if (!cards.length) { toast.error('Add items first'); return; }
     setExporting(true);
@@ -138,6 +150,11 @@ export function GeneratorWorkspace({
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
           </Select>
           <Button variant="outline" size="sm" onClick={clearAll} disabled={!cards.length}>Clear</Button>
+          {canShareFiles() && (
+            <Button size="sm" variant="outline" onClick={() => shareImg.share(renderPng)} disabled={shareImg.busy || exporting || !cards.length}>
+              <Share2 className="size-4" /> {shareImg.busy ? 'Preparing…' : shareImg.ready ? 'Tap to share' : 'Share'}
+            </Button>
+          )}
           <Button size="sm" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
         </div>
       </div>

@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import { authService, promosService } from '@/services';
+import { authService, promosService, settingsService } from '@/services';
+import { Textarea } from '@/components/ui/textarea';
+import { resolveImageUrl } from '@/components/common/CardImage';
+
+import { Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -11,6 +15,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isPromoActive, promoTimeLeft, formatTimeLeft } from '@/lib/promo';
 import { useSettings, useSettingsMutation } from '@/features/settings/use-settings';
 
+// Stored QR links are full Supabase URLs; only relative (local-disk) ones need resolving.
+const qrSrc = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : resolveImageUrl(u));
+
 export function SettingsPage() {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
@@ -19,6 +26,7 @@ export function SettingsPage() {
         <ChangePasswordCard />
         <PromoCard />
         <MarketPricesCard />
+        <ReceiptSettingsCard />
       </div>
     </div>
   );
@@ -151,10 +159,10 @@ const RATE_FIELDS: { key: RateKey; label: string; placeholder: string; max: numb
 function MarketPricesCard() {
   const settings = useSettings();
   const save = useSettingsMutation();
-  const [edits, setEdits] = useState<Partial<Record<RateKey | 'underpricedPct', string>>>({});
+  const [edits, setEdits] = useState<Partial<Record<RateKey | 'underpricedPct' | 'priceAlertPct', string>>>({});
   // Show saved values until the owner starts typing.
-  const value = (key: RateKey | 'underpricedPct') =>
-    edits[key] ?? (settings.data?.[key] != null ? String(settings.data[key]) : key === 'underpricedPct' ? '90' : '');
+  const value = (key: RateKey | 'underpricedPct' | 'priceAlertPct') =>
+    edits[key] ?? (settings.data?.[key] != null ? String(settings.data[key]) : key === 'underpricedPct' ? '90' : key === 'priceAlertPct' ? '20' : '');
 
   const submit = async () => {
     const dto: Record<string, number> = {};
@@ -168,6 +176,9 @@ function MarketPricesCard() {
     const p = Number(value('underpricedPct'));
     if (!(p >= 1 && p <= 100)) { toast.error('Underpriced threshold must be between 1 and 100%'); return; }
     dto.underpricedPct = p;
+    const a = Number(value('priceAlertPct'));
+    if (!(a >= 1 && a <= 100)) { toast.error('Price alert must be between 1 and 100%'); return; }
+    dto.priceAlertPct = a;
     try {
       await save.mutateAsync(dto);
       setEdits({});
@@ -191,9 +202,85 @@ function MarketPricesCard() {
           </div>
         ))}
         <div><Label>Flag below (% of market)</Label><Input type="number" min={1} max={100} value={value('underpricedPct')} onChange={(e) => setEdits((d) => ({ ...d, underpricedPct: e.target.value }))} className="mt-1" /></div>
+        <div><Label>Alert when a card moves (%)</Label><Input type="number" min={1} max={100} value={value('priceAlertPct')} onChange={(e) => setEdits((d) => ({ ...d, priceAlertPct: e.target.value }))} className="mt-1" /></div>
       </div>
       <div className="flex justify-end">
         <Button onClick={submit} disabled={save.isPending || settings.isLoading}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Sale receipt image: GCash / Maya QR and a short note under the totals. */
+function ReceiptSettingsCard() {
+  const qc = useQueryClient();
+  const settings = useSettings();
+  const save = useSettingsMutation();
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'gcash' | 'maya' | null>(null);
+  const noteValue = note ?? settings.data?.receiptNote ?? '';
+
+  const upload = async (method: 'gcash' | 'maya', file?: File | null) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be 5 MB or smaller'); return; }
+    setBusy(method);
+    try {
+      await settingsService.uploadQr(method, file);
+      await qc.invalidateQueries({ queryKey: ['settings'] });
+      toast.success(`${method === 'gcash' ? 'GCash' : 'Maya'} QR saved`);
+    } catch (e) { toast.error(apiError(e).message); }
+    finally { setBusy(null); }
+  };
+  const remove = async (method: 'gcash' | 'maya') => {
+    setBusy(method);
+    try {
+      await settingsService.removeQr(method);
+      await qc.invalidateQueries({ queryKey: ['settings'] });
+    } catch (e) { toast.error(apiError(e).message); }
+    finally { setBusy(null); }
+  };
+  const saveNote = async () => {
+    try {
+      await save.mutateAsync({ receiptNote: noteValue.trim() });
+      setNote(null);
+      toast.success('Receipt note saved');
+    } catch (e) { toast.error(apiError(e).message); }
+  };
+
+  const slot = (method: 'gcash' | 'maya', label: string) => {
+    const url = method === 'gcash' ? settings.data?.gcashQrUrl : settings.data?.mayaQrUrl;
+    return (
+      <div className="rounded-lg border p-2.5 text-center">
+        <div className="mb-1.5 text-xs font-semibold">{label} QR</div>
+        {url
+          ? <img src={qrSrc(url)} alt={`${label} QR`} className="mx-auto aspect-square w-full max-w-[140px] rounded object-contain" />
+          : <div className="mx-auto grid aspect-square w-full max-w-[140px] place-items-center rounded border border-dashed text-[11px] text-muted-foreground">Not set</div>}
+        <div className="mt-2 flex justify-center gap-1">
+          <label className={`inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-muted ${busy ? 'pointer-events-none opacity-50' : ''}`}>
+            <Upload className="size-3.5" /> {busy === method ? 'Saving…' : url ? 'Replace' : 'Upload'}
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden"
+              onChange={(e) => { upload(method, e.target.files?.[0]); e.target.value = ''; }} />
+          </label>
+          {url && <Button variant="ghost" size="sm" className="h-7 px-2 text-destructive" onClick={() => remove(method)} disabled={!!busy} aria-label={`Remove ${label} QR`}><Trash2 className="size-3.5" /></Button>}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Card className="p-5">
+      <h3 className="mb-1 text-sm font-bold">Sale receipts</h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Shown on the receipt image you send buyers after a sale. Use the screenshot of your QR from the GCash or Maya app.
+      </p>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        {slot('gcash', 'GCash')}
+        {slot('maya', 'Maya')}
+      </div>
+      <Label>Note on the receipt</Label>
+      <Textarea value={noteValue} maxLength={200} placeholder="e.g. GCash 0917 123 4567 · R. B." onChange={(e) => setNote(e.target.value)} className="mt-1" />
+      <div className="mt-3 flex justify-end">
+        <Button onClick={saveNote} disabled={save.isPending || note === null}>{save.isPending ? 'Saving…' : 'Save note'}</Button>
       </div>
     </Card>
   );

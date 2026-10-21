@@ -1,9 +1,10 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { GeneratorWorkspace } from './GeneratorWorkspace';
 import { usePagedGenerator } from './usePagedGenerator';
 import { useBatchFill } from './use-batch-fill';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Download, Plus, Trash2, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Plus, Share2, Trash2, Zap } from 'lucide-react';
+import { canShareFiles, dataUrlToFile, useShareImages } from '@/lib/share';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
@@ -20,6 +21,28 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   const handleAutoFill = async () => {
     const allCards = await fetchAllRawSortedByValue();
     if (allCards) autoFill(allCards);
+  };
+
+  // Every page as an image, straight to the phone's share sheet (Messenger etc.).
+  const shareAll = useShareImages();
+  useEffect(() => { shareAll.clear(); }, [pages]); // eslint-disable-line react-hooks/exhaustive-deps
+  const renderAll = async () => {
+    setIsExporting(true);
+    const originalId = currentPageId;
+    const files: File[] = [];
+    try {
+      for (let i = 0; i < pages.length; i++) {
+        if (!pages[i].cards.length) continue;
+        setCurrent(pages[i].id);
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const node = document.getElementById('fb-export-node');
+        if (node) files.push(await dataUrlToFile(await toPng(node, { quality: 1, pixelRatio: 2 }), `Page_${i + 1}.png`));
+      }
+      return files;
+    } finally {
+      setCurrent(originalId);
+      setIsExporting(false);
+    }
   };
 
   const exportAll = async () => {
@@ -79,6 +102,11 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
           <Button variant="outline" size="sm" onClick={handleAutoFill} disabled={loading || isExporting}>
             <Zap className="mr-1 size-4" /> {loading ? 'Loading…' : 'Auto-fill'}
           </Button>
+          {canShareFiles() && (
+            <Button variant="outline" size="sm" onClick={() => shareAll.share(renderAll)} disabled={isExporting || shareAll.busy || totalCards === 0}>
+              <Share2 className="mr-1 size-4" /> {shareAll.busy ? 'Preparing…' : shareAll.ready ? 'Tap to share' : 'Share all'}
+            </Button>
+          )}
           <Button size="sm" onClick={exportAll} disabled={isExporting || totalCards === 0}>
             <Download className="mr-1 size-4" /> {isExporting ? 'Exporting…' : 'Export ZIP'}
           </Button>

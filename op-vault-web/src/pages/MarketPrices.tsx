@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, RefreshCw, ExternalLink, Loader2, Check, Link2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,7 +31,9 @@ const when = (iso?: string | null) =>
 export function MarketPricesPage() {
   const { isOwner } = useAuth();
   const qc = useQueryClient();
-  const [search, setSearch] = useState('');
+  const [sp] = useSearchParams();
+  // ?search= lets the dashboard's Market movers open straight to a card.
+  const [search, setSearch] = useState(() => sp.get('search') ?? '');
   const debounced = useDebounce(search);
   const [underpricedOnly, setUnderpricedOnly] = useState(false);
   const [page, setPage] = useState(1);
