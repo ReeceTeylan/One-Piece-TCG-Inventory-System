@@ -27,6 +27,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { HealthModule } from './modules/health/health.module';
 import { PromosModule } from './modules/promos/promos.module';
+import { StockCountModule } from './modules/stock-count/stock-count.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { PromosModule } from './modules/promos/promos.module';
     FavoritesModule,
     ImagesModule,
     FacebookGeneratorModule,
+    StockCountModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },  // rate limiting
