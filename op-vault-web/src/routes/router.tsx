@@ -22,6 +22,7 @@ const SettingsPage = lazy(() => import('@/pages/Settings').then((m) => ({ defaul
 const ActivityLogsPage = lazy(() => import('@/pages/ActivityLogs').then((m) => ({ default: m.ActivityLogsPage })));
 const FacebookGeneratorPage = lazy(() => import('@/pages/FacebookGenerator').then((m) => ({ default: m.FacebookGeneratorPage })));
 const StockCountPage = lazy(() => import('@/pages/StockCount').then((m) => ({ default: m.StockCountPage })));
+const MarketPricesPage = lazy(() => import('@/pages/MarketPrices').then((m) => ({ default: m.MarketPricesPage })));
 
 const s = (el: ReactNode): ReactNode => (
   <Suspense fallback={<div className="grid place-items-center py-24"><Spinner /></div>}>{el}</Suspense>
@@ -46,6 +47,7 @@ export const router = createBrowserRouter([
           { path: '/shipments', element: s(<ShipmentsPage />) },
           { path: '/analytics', element: s(<AnalyticsPage />) },
           { path: '/reports', element: s(<ReportsPage />) },
+          { path: '/market-prices', element: s(<MarketPricesPage />) },
           { path: '/facebook', element: s(<FacebookGeneratorPage />) },
           { path: '/favorites', element: s(<FavoritesPage />) },
           { path: '/notifications', element: s(<NotificationsPage />) },

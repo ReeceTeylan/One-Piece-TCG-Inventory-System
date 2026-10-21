@@ -5,7 +5,7 @@ const LABELS: Record<string, string> = {
   'raw-cards': 'Raw Cards', slabs: 'Slab Inventory', customers: 'Customers', sales: 'Sales',
   payments: 'Payments', shipments: 'Shipments', analytics: 'Analytics', reports: 'Reports',
   settings: 'Settings', favorites: 'Favorites', notifications: 'Notifications',
-  'activity-logs': 'Activity Logs', facebook: 'Facebook Generator', 'stock-count': 'Stock Count',
+  'activity-logs': 'Activity Logs', facebook: 'Facebook Generator', 'stock-count': 'Stock Count', 'market-prices': 'Market Prices',
 };
 
 export function Breadcrumbs() {

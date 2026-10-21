@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { apiError } from '@/lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { isPromoActive, promoTimeLeft, formatTimeLeft } from '@/lib/promo';
+import { useSettings, useSettingsMutation } from '@/features/settings/use-settings';
 
 export function SettingsPage() {
   return (
@@ -17,6 +18,7 @@ export function SettingsPage() {
       <div className="grid max-w-4xl gap-4 md:grid-cols-2">
         <ChangePasswordCard />
         <PromoCard />
+        <MarketPricesCard />
       </div>
     </div>
   );
@@ -133,6 +135,42 @@ function PromoCard() {
           </div>
         </>
       )}
+    </Card>
+  );
+}
+
+/** Settings for the Yuyu-tei price sync (Market Prices page). */
+function MarketPricesCard() {
+  const settings = useSettings();
+  const save = useSettingsMutation();
+  const [rate, setRate] = useState<string | null>(null);
+  const [pct, setPct] = useState<string | null>(null);
+  // Show saved values until the owner starts typing.
+  const rateVal = rate ?? (settings.data?.jpyToPhpRate != null ? String(settings.data.jpyToPhpRate) : '');
+  const pctVal = pct ?? String(settings.data?.underpricedPct ?? 90);
+
+  const submit = async () => {
+    const r = Number(rateVal), p = Number(pctVal);
+    if (!(r > 0 && r <= 10)) { toast.error('Enter the peso value of 1 yen, e.g. 0.38'); return; }
+    if (!(p >= 1 && p <= 100)) { toast.error('Underpriced threshold must be between 1 and 100%'); return; }
+    try {
+      await save.mutateAsync({ jpyToPhpRate: r, underpricedPct: p });
+      setRate(null); setPct(null);
+      toast.success('Market price settings saved');
+    } catch (e) { toast.error(apiError(e).message); }
+  };
+
+  return (
+    <Card className="p-5">
+      <h3 className="mb-1 text-sm font-bold">Market prices</h3>
+      <p className="mb-3 text-xs text-muted-foreground">Used to convert Yuyu-tei prices and flag cards priced below the market.</p>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <div><Label>₱ per ¥1</Label><Input type="number" min={0.01} step={0.001} placeholder="e.g. 0.38" value={rateVal} onChange={(e) => setRate(e.target.value)} className="mt-1" /></div>
+        <div><Label>Flag below (% of market)</Label><Input type="number" min={1} max={100} value={pctVal} onChange={(e) => setPct(e.target.value)} className="mt-1" /></div>
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={submit} disabled={save.isPending || settings.isLoading}>{save.isPending ? 'Saving…' : 'Save'}</Button>
+      </div>
     </Card>
   );
 }

@@ -33,6 +33,37 @@ export const stockCountService = {
   adjust: (dto: { itemType: 'RAW' | 'SLAB'; id: string; expectedQty: number; countedQty: number }) =>
     api.post('/stock-count/adjust', dto).then(unwrap<{ changed: boolean; quantity: number; delta: number }>),
 };
+// Yuyu-tei price sync. Prices are yen; peso conversion happens server-side.
+export interface MarketListing {
+  listingKey: string; name: string; rarity: string; priceJpy: number; inStock: boolean;
+  stockCount: number | null; url: string; fetchedAt: string; manual?: boolean; viaLink?: boolean;
+}
+export interface MarketSync {
+  running: boolean; trigger: 'nightly' | 'manual' | null; total: number; done: number; failed: number;
+  empty: number; startedAt: string | null; finishedAt: string | null; lastError: string | null;
+}
+export interface MarketRow {
+  id: string; name: string; cardNumber: string; rarity: string; setName: string; quantity: number;
+  postedPrice: number; imageUrl: string | null; listing: MarketListing | null; candidateCount: number;
+  marketPhp: number | null; diffPct: number | null; underpriced: boolean;
+}
+export interface MarketSummary {
+  rate: number | null; pct: number; cards: number; matched: number; underpriced: number;
+  lastRun: MarketSync | null; sync: MarketSync;
+}
+export const marketPricesService = {
+  list: (p?: Record<string, any>) =>
+    api.get('/market-prices', { params: p }).then((r) => unwrap<Omit<Paginated<MarketRow>, 'summary'> & { summary: MarketSummary }>(r)),
+  status: () => one<MarketSync>('/market-prices/sync/status'),
+  sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
+  listings: (cardNumber: string) =>
+    one<(MarketListing & { cardNumber: string })[]>(`/market-prices/listings/${encodeURIComponent(cardNumber)}`),
+  link: (id: string, listingKey: string | null) =>
+    api.patch(`/market-prices/raw-cards/${id}/link`, { listingKey }).then(unwrap),
+  // Match by pasting a Yuyu-tei card page link (for cards search can't find, e.g. DON!!).
+  linkUrl: (id: string, url: string) =>
+    api.patch(`/market-prices/raw-cards/${id}/link-url`, { url }).then(unwrap<MarketListing>),
+};
 export const customersService = {
   list: (p?: Record<string, any>) => list<Customer>('/customers', p),
   get: (id: string) => one<Customer>(`/customers/${id}`),
