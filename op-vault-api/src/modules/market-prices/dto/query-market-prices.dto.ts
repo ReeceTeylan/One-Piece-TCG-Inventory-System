@@ -8,9 +8,10 @@ export class QueryMarketPricesDto extends PaginationDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean() @IsOptional() underpricedOnly?: boolean;
 
-  /** "changes" (default): only cards whose market price moved in the last day. */
-  @ApiPropertyOptional({ enum: ['changes', 'all'], default: 'changes' })
-  @IsIn(['changes', 'all']) @IsOptional() view?: 'changes' | 'all';
+  /** "changes" (default): only cards whose market price moved in the last day.
+   *  "unlinked": cards with no market price (never linked, match removed, or listing gone). */
+  @ApiPropertyOptional({ enum: ['changes', 'all', 'unlinked'], default: 'changes' })
+  @IsIn(['changes', 'all', 'unlinked']) @IsOptional() view?: 'changes' | 'all' | 'unlinked';
 
   @ApiPropertyOptional({ enum: ['change', 'price_desc', 'price_asc', 'recent', 'margin_desc', 'underpriced'] })
   @IsIn(['change', 'price_desc', 'price_asc', 'recent', 'margin_desc', 'underpriced']) @IsOptional()

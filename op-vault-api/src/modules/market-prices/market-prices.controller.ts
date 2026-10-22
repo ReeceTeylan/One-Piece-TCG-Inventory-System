@@ -48,9 +48,16 @@ export class MarketPricesController {
 
   @Post('sync')
   @Roles(Role.OWNER)
-  @ApiOperation({ summary: 'Start a Yuyu-tei price sync now (runs in the background)' })
+  @ApiOperation({ summary: 'Refresh prices of linked cards now (runs in the background; never changes links)' })
   sync() {
     return this.service.startManual();
+  }
+
+  @Post('link-new')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Find listings for in-stock cards that were never linked (runs in the background)' })
+  linkNew() {
+    return this.service.startLink();
   }
 
   @Get('listings/:cardNumber')
@@ -74,7 +81,7 @@ export class MarketPricesController {
 
   @Patch('raw-cards/:id/link')
   @Roles(Role.OWNER)
-  @ApiOperation({ summary: 'Match a raw card to a specific listing (null = automatic, "none" = no market price)' })
+  @ApiOperation({ summary: 'Link a raw card to a listing ("none" = no market price, null = find one automatically now)' })
   link(@Param('id') id: string, @Body() dto: LinkListingDto) {
     return this.service.link(id, dto.listingKey ?? null);
   }

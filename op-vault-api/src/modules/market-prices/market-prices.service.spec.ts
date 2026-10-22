@@ -17,12 +17,13 @@ const card = (over: Partial<any>) => ({
   marketListingKey: null, notes: null, images: [], ...over,
 });
 
+// Every priced card has a saved link (marketListingKey); prices never come from anywhere else.
 const CARDS = [
-  card({ id: 'jp', name: 'Shanks JP', postedPrice: new Prisma.Decimal(100) }),
-  card({ id: 'jpDamaged', name: 'Shanks JP whites', postedPrice: new Prisma.Decimal(100), notes: 'light whites' }),
-  card({ id: 'en', name: 'Zoro EN', cardNumber: 'OP01-001', rarity: 'PL', postedPrice: new Prisma.Decimal(30000), notes: 'ENG' }),
-  // Not on Yuyu-tei: priced from Dorasuta. And a card whose match the owner removed.
-  card({ id: 'dora', name: 'Jack', cardNumber: 'OP08-084', rarity: 'PSR', postedPrice: new Prisma.Decimal(300) }),
+  card({ id: 'jp', name: 'Shanks JP', postedPrice: new Prisma.Decimal(100), marketListingKey: 'op01/10150' }),
+  card({ id: 'jpDamaged', name: 'Shanks JP whites', postedPrice: new Prisma.Decimal(100), notes: 'light whites', marketListingKey: 'op01/10150' }),
+  card({ id: 'en', name: 'Zoro EN', cardNumber: 'OP01-001', rarity: 'PL', postedPrice: new Prisma.Decimal(30000), notes: 'ENG', marketListingKey: 'tcgp:454513:Foil' }),
+  // Linked to Dorasuta (Yuyu-tei doesn't list it). And a card whose match the owner removed.
+  card({ id: 'dora', name: 'Jack', cardNumber: 'OP08-084', rarity: 'PSR', postedPrice: new Prisma.Decimal(300), marketListingKey: 'dorasuta:541696' }),
   card({ id: 'removed', name: 'Shanks no match', cardNumber: 'OP01-120', rarity: 'SEC', postedPrice: new Prisma.Decimal(500), marketListingKey: 'none' }),
 ];
 const YUYUTEI = [
@@ -54,6 +55,7 @@ describe('MarketPricesService', () => {
     prisma = {
       $queryRaw: jest.fn(() => Promise.resolve([stamp])), // the cache fingerprint
       $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
+      setting: { upsert: jest.fn().mockResolvedValue({}) },
       priceHistory: { createMany: jest.fn((a: any) => Promise.resolve({ count: a.data.length })) },
       rawCard: {
         findMany: jest.fn().mockResolvedValue(CARDS),
@@ -105,7 +107,8 @@ describe('MarketPricesService', () => {
     expect(by.dora).toMatchObject({ marketPhp: 304, underpriced: false, matchPrice: null });
     expect(by.dora.listing).toMatchObject({ source: 'DORASUTA', listingKey: 'dorasuta:541696', price: 800 });
     // Owner removed the match: no market price even though Yuyu-tei lists OP01-120 SEC.
-    expect(by.removed).toMatchObject({ unlinked: true, listing: null, marketPhp: null });
+    expect(by.removed).toMatchObject({ linkState: 'none', listing: null, marketPhp: null });
+    expect(by.jp.linkState).toBe('linked');
     expect(res.summary.matchableUnderpriced).toBe(2);
   });
 
@@ -217,23 +220,69 @@ describe('MarketPricesService', () => {
     y.mockRestore(); d.mockRestore();
   });
 
-  it('sync searches Dorasuta only for cards Yuyu-tei has no listing for (or pinned to Dorasuta)', async () => {
-    const { readFileSync } = jest.requireActual('fs');
-    const html = readFileSync(require('path').join(__dirname, '__fixtures__', 'dorasuta-op08-084.html'), 'utf8');
-    const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockResolvedValue(html);
-    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void) => { fn(); return 0 as any; }) as any);
-    await (service as any).syncDorasuta([
-      { cardNumber: 'OP01-120', rarity: 'SEC', marketListingKey: null },  // on Yuyu-tei: skipped
-      { cardNumber: 'OP08-084', rarity: 'PSR', marketListingKey: null },  // not on Yuyu-tei: searched
-    ]);
-    (global.setTimeout as any).mockRestore?.();
-    expect(d.mock.calls.map((c) => c[0])).toEqual(['OP08-084']);
-    const saved = prisma.marketPrice.upsert.mock.calls.map((c: any) => [c[0].where.listingKey, c[0].create.source]);
-    expect(saved).toContainEqual(['dorasuta:541696', 'DORASUTA']);
-    expect(prisma.marketPrice.deleteMany).toHaveBeenCalledWith({
-      where: { cardNumber: 'OP08-084', source: 'DORASUTA', listingKey: { notIn: expect.arrayContaining(['dorasuta:541696']) } },
+  it('a card that was never linked has no market price until Link runs', async () => {
+    prisma.rawCard.findMany.mockResolvedValueOnce([card({ id: 'new', cardNumber: 'OP01-120', rarity: 'SEC', marketListingKey: null })]);
+    const res = await service.list({ page: 1, limit: 50, skip: 0, view: 'all' } as any);
+    expect(res.data[0]).toMatchObject({ linkState: 'new', listing: null, marketPhp: null });
+    expect(res.summary.notLinked).toBe(1);
+  });
+
+  it('"Not linked" view lists cards with no market price', async () => {
+    const res = await service.list({ page: 1, limit: 50, skip: 0, view: 'unlinked' } as any);
+    expect(res.data.map((r) => [r.id, r.linkState])).toEqual([['removed', 'none']]);
+  });
+
+  describe('Sync and Link', () => {
+    beforeEach(() => {
+      jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void) => { fn(); return 0 as any; }) as any);
     });
-    d.mockRestore();
+    afterEach(() => jest.restoreAllMocks());
+
+    it('Sync refreshes only linked cards, each from its own shop, and never changes links', async () => {
+      const y = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch').mockResolvedValue('<html></html>');
+      const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockResolvedValue('<html></html>');
+      const tcg = jest.fn().mockResolvedValue(undefined);
+      (service as any).syncTcgplayer = tcg;
+      prisma.rawCard.findMany.mockResolvedValueOnce(CARDS.map((c) => ({ cardNumber: c.cardNumber, marketListingKey: c.marketListingKey })));
+      await (service as any).refreshLinked();
+      expect(y.mock.calls.map((c) => c[0])).toEqual(['OP01-120']);  // Shanks (Yuyu-tei); the removed card is skipped
+      expect(d.mock.calls.map((c) => c[0])).toEqual(['OP08-084']);  // Jack (Dorasuta)
+      expect([...tcg.mock.calls[0][0]]).toEqual(['OP01-001']);       // Zoro (TCGplayer)
+      expect(prisma.rawCard.update).not.toHaveBeenCalled();
+    });
+
+    it('Link new stock links only unlinked cards: Yuyu-tei first, then Dorasuta', async () => {
+      const y = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch').mockResolvedValue('<html></html>');
+      const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockResolvedValue('<html></html>');
+      prisma.rawCard.findMany.mockResolvedValueOnce([
+        { id: 'n1', cardNumber: 'OP01-120', rarity: 'SEC', notes: null },   // fresh Yuyu-tei listing: no request
+        { id: 'n2', cardNumber: 'OP08-084', rarity: 'PSR', notes: null },   // not on Yuyu-tei: Dorasuta
+        { id: 'n3', cardNumber: 'OP09-999', rarity: 'SR', notes: null },    // nowhere
+      ]);
+      await (service as any).runJob('link', 'marketLinkLastRun', () => (service as any).linkNewStock());
+      expect(prisma.rawCard.findMany.mock.calls[0][0].where).toEqual({ quantity: { gt: 0 }, marketListingKey: null });
+      expect(y.mock.calls.map((c) => c[0])).toEqual(['OP08-084', 'OP09-999']);
+      expect(d.mock.calls.map((c) => c[0])).toEqual(['OP09-999']);  // OP08-084 already has fresh Dorasuta listings
+      expect(prisma.rawCard.update.mock.calls.map((c: any) => [c[0].where.id, c[0].data.marketListingKey]))
+        .toEqual([['n1', 'op01/10150'], ['n2', 'dorasuta:541696']]);
+      expect(service.status()).toMatchObject({ trigger: 'link', running: false, linked: 2, unmatched: 1 });
+    });
+
+    it('after Dorasuta refuses (403) it stops asking and says so instead of "no listings"', async () => {
+      const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockRejectedValue(new Error('Dorasuta responded 403'));
+      (service as any).state.running = true;
+      await (service as any).searchDorasuta(['OP09-001', 'OP09-002', 'OP09-003'], true);
+      expect(d).toHaveBeenCalledTimes(1);
+      expect(service.status()).toMatchObject({ failed: 1, done: 3 });
+      await expect(service.listingsFor('EB04-058', 'DORASUTA')).rejects.toThrow(/refusing requests from this server \(403\)/);
+      expect(d).toHaveBeenCalledTimes(1);
+    });
+
+    it('"Link automatically" on one card finds its listing now', async () => {
+      prisma.rawCard.findUnique = jest.fn().mockResolvedValue({ id: 'jp', cardNumber: 'OP01-120', rarity: 'SEC', notes: null });
+      await expect(service.link('jp', null)).resolves.toEqual({ id: 'jp', marketListingKey: 'op01/10150' });
+      expect(prisma.rawCard.update.mock.calls.map((c: any) => c[0].data.marketListingKey)).toEqual([null, 'op01/10150']);
+    });
   });
 
   it('link accepts "none" to remove a match', async () => {
