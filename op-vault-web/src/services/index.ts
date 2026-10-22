@@ -48,8 +48,9 @@ export interface MarketCandidate {
   setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string;
 }
 export interface MarketSync {
-  running: boolean; trigger: 'nightly' | 'manual' | null; phase: 'yuyutei' | 'dorasuta' | 'tcgplayer' | null;
+  running: boolean; trigger: 'nightly' | 'manual' | 'link' | null; phase: 'yuyutei' | 'dorasuta' | 'tcgplayer' | null;
   total: number; done: number; failed: number; empty: number;
+  linked?: number; unmatched?: number; // Link new stock results
   startedAt: string | null; finishedAt: string | null; lastError: string | null;
 }
 export interface MarketRow {
@@ -58,15 +59,18 @@ export interface MarketRow {
   condition: 'clean' | 'issues'; changePhp: number | null; marginPct: number | null;
   language: 'JP' | 'EN'; damage: string | null;
   rateUsed: number | null; damagedRateMissing: boolean;
-  unlinked: boolean; // owner removed the match: no market price, counted at 80% of posted
+  // linked = has a market listing · new = never linked (Link new stock) · none = match removed by you
+  // · missing = the linked listing is no longer on the shop. All but linked count at 80% of posted.
+  linkState: 'linked' | 'new' | 'none' | 'missing';
   listing: MarketListing | null; candidateCount: number;
   marketPhp: number | null; diffPct: number | null; underpriced: boolean; matchPrice: number | null;
 }
 export interface MarketSummary {
   rate: number | null; usdRate: number | null; jpyDamagedRate: number | null; usdDamagedRate: number | null;
   pct: number; cards: number; matched: number; underpriced: number; matchableUnderpriced: number;
-  changed: number; view: 'changes' | 'all';
-  lastRun: MarketSync | null; sync: MarketSync;
+  changed: number; view: 'changes' | 'all' | 'unlinked';
+  notLinked: number; linkMissing: number;
+  lastRun: MarketSync | null; lastLink: MarketSync | null; sync: MarketSync;
 }
 export interface MarketMover {
   id: string; name: string; cardNumber: string; rarity: string; imageUrl: string | null; language: 'JP' | 'EN';
@@ -86,12 +90,14 @@ export const marketPricesService = {
   list: (p?: Record<string, any>) =>
     api.get('/market-prices', { params: p }).then((r) => unwrap<Omit<Paginated<MarketRow>, 'summary'> & { summary: MarketSummary }>(r)),
   status: () => one<MarketSync>('/market-prices/sync/status'),
+  // Sync refreshes prices of linked cards; Link new stock finds listings for never-linked cards.
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
+  linkNew: () => api.post('/market-prices/link-new').then(unwrap<MarketSync>),
   listings: (cardNumber: string, source: MarketSource) =>
     api.get(`/market-prices/listings/${encodeURIComponent(cardNumber)}`, { params: { source } }).then(unwrap<MarketCandidate[]>),
-  // listingKey: a listing, 'none' = no market price, null = automatic.
+  // listingKey: a listing, 'none' = no market price, null = find one automatically now.
   link: (id: string, listingKey: string | null) =>
-    api.patch(`/market-prices/raw-cards/${id}/link`, { listingKey }).then(unwrap),
+    api.patch(`/market-prices/raw-cards/${id}/link`, { listingKey }).then(unwrap<{ id: string; marketListingKey: string | null }>),
   // Match by pasting a Yuyu-tei card page link (for cards search can't find, e.g. DON!!).
   linkUrl: (id: string, url: string) =>
     api.patch(`/market-prices/raw-cards/${id}/link-url`, { url }).then(unwrap<{ name: string }>),
