@@ -153,3 +153,42 @@ export function pickTcgListing<T extends TcgLike>(card: { cardNumber: string; ra
   )[0];
 }
 
+
+// ------------------------------------------------------------------
+// Dorasuta (backup for Japanese cards Yuyu-tei doesn't list)
+// ------------------------------------------------------------------
+
+/** OP-Vault rarity → Dorasuta label. Seen on real pages: SEC, SEC/パラレル,
+ *  SR, SR/パラレル (super parallels are "SEC/スーパーパラレル", never auto-picked).
+ *  The rest follow the same "<base>/パラレル" pattern; a wrong guess just means
+ *  "no match", fixable from the Dorasuta tab or a pasted link. */
+const DORASUTA_MAP: Record<string, string> = {
+  C: 'C', UC: 'UC', R: 'R', SR: 'SR', SEC: 'SEC', L: 'L', LEADER: 'L',
+  PC: 'C/パラレル', PUC: 'UC/パラレル', PR: 'R/パラレル', PSR: 'SR/パラレル', PSEC: 'SEC/パラレル', PL: 'L/パラレル',
+};
+
+export function toDorasutaRarity(rarity: string): string | null {
+  return DORASUTA_MAP[normRarity(rarity)] ?? null;
+}
+
+/** "[illust.x]", "[漫画コマ]", "【For Asia】", "[NOT FOR SALE]" mark special versions. */
+const specialTags = (name: string) => (name.match(/\[[^\]]*\]|【[^】]*】/g) ?? []).length;
+
+/**
+ * Default Dorasuta listing: same number and mapped rarity, the plainest name
+ * (no alternate-art / promo tags), then the oldest product id.
+ */
+export function pickDorasutaListing<T extends ListingLike>(
+  card: { cardNumber: string; rarity: string },
+  listings: T[],
+): T | null {
+  const want = toDorasutaRarity(card.rarity);
+  if (!want) return null;
+  const num = card.cardNumber.trim().toUpperCase();
+  const pid = (k: string) => Number(k.replace(/\D/g, '')) || 0;
+  const candidates = listings.filter((l) => l.cardNumber === num && l.rarity === want);
+  if (!candidates.length) return null;
+  return [...candidates].sort((a, b) =>
+    specialTags(a.name) - specialTags(b.name) || pid(a.listingKey) - pid(b.listingKey),
+  )[0];
+}

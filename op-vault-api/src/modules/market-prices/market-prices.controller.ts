@@ -55,7 +55,7 @@ export class MarketPricesController {
 
   @Get('listings/:cardNumber')
   listings(@Param('cardNumber') cardNumber: string, @Query('source') source?: string) {
-    return this.service.listingsFor(cardNumber, source === 'TCGPLAYER' ? 'TCGPLAYER' : 'YUYUTEI');
+    return this.service.listingsFor(cardNumber, source === 'TCGPLAYER' || source === 'DORASUTA' ? source : 'YUYUTEI');
   }
 
   @Post('raw-cards/:id/match')
@@ -74,14 +74,14 @@ export class MarketPricesController {
 
   @Patch('raw-cards/:id/link')
   @Roles(Role.OWNER)
-  @ApiOperation({ summary: 'Match a raw card to a specific Yuyu-tei listing (null = automatic)' })
+  @ApiOperation({ summary: 'Match a raw card to a specific listing (null = automatic, "none" = no market price)' })
   link(@Param('id') id: string, @Body() dto: LinkListingDto) {
     return this.service.link(id, dto.listingKey ?? null);
   }
 
   @Patch('raw-cards/:id/link-url')
   @Roles(Role.OWNER)
-  @ApiOperation({ summary: 'Match a raw card by pasting its Yuyu-tei card page link' })
+  @ApiOperation({ summary: 'Match a raw card by pasting its Yuyu-tei or Dorasuta card link' })
   linkUrl(@Param('id') id: string, @Body() dto: LinkUrlDto) {
     return this.service.linkByUrl(id, dto.url);
   }

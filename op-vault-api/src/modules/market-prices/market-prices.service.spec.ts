@@ -7,6 +7,7 @@ import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { RawCardsService } from '../raw-cards/raw-cards.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as yuyuteiClient from './yuyutei.client';
+import * as dorasutaClient from './dorasuta.client';
 import { MarketPricesModule } from './market-prices.module';
 import { MarketPricesService } from './market-prices.service';
 
@@ -20,11 +21,18 @@ const CARDS = [
   card({ id: 'jp', name: 'Shanks JP', postedPrice: new Prisma.Decimal(100) }),
   card({ id: 'jpDamaged', name: 'Shanks JP whites', postedPrice: new Prisma.Decimal(100), notes: 'light whites' }),
   card({ id: 'en', name: 'Zoro EN', cardNumber: 'OP01-001', rarity: 'PL', postedPrice: new Prisma.Decimal(30000), notes: 'ENG' }),
+  // Not on Yuyu-tei: priced from Dorasuta. And a card whose match the owner removed.
+  card({ id: 'dora', name: 'Jack', cardNumber: 'OP08-084', rarity: 'PSR', postedPrice: new Prisma.Decimal(300) }),
+  card({ id: 'removed', name: 'Shanks no match', cardNumber: 'OP01-120', rarity: 'SEC', postedPrice: new Prisma.Decimal(500), marketListingKey: 'none' }),
 ];
 const YUYUTEI = [
   { listingKey: 'op01/10150', source: 'YUYUTEI', cardNumber: 'OP01-120', rarity: 'SEC', name: 'シャンクス(刻印なし)',
     priceJpy: 320, prevPriceJpy: 300, priceChangedAt: new Date(), // moved ¥300 → ¥320 at the last sync
     inStock: true, stockCount: 6, url: 'u', fetchedAt: new Date() },
+  { listingKey: 'dorasuta:541696', source: 'DORASUTA', cardNumber: 'OP08-084', rarity: 'SR/パラレル', name: 'ジャック(★SR/パラレル)(OP08-084)',
+    priceJpy: 800, prevPriceJpy: null, priceChangedAt: null, inStock: true, stockCount: 11, url: 'u', fetchedAt: new Date() },
+  { listingKey: 'dorasuta:541700', source: 'DORASUTA', cardNumber: 'OP01-120', rarity: 'SEC', name: 'シャンクス(OP01-120)',
+    priceJpy: 150, prevPriceJpy: null, priceChangedAt: null, inStock: true, stockCount: 3, url: 'u', fetchedAt: new Date() },
 ];
 const TCG = [
   { listingKey: 'tcgp:454513:Foil', productId: 454513, subTypeName: 'Foil', cardNumber: 'OP01-001', rarity: 'L',
@@ -54,8 +62,8 @@ describe('MarketPricesService', () => {
       },
       marketPrice: {
         findMany: jest.fn(({ where }: any = {}) => Promise.resolve(
-          where?.cardNumber && typeof where.cardNumber === 'string'
-            ? YUYUTEI.filter((l) => l.cardNumber === where.cardNumber) : YUYUTEI)),
+          YUYUTEI.filter((l) => (typeof where?.cardNumber !== 'string' || l.cardNumber === where.cardNumber)
+            && (where?.source === undefined || (typeof where.source === 'string' ? l.source === where.source : l.source !== where.source.not))))),
         upsert: jest.fn((a: any) => Promise.resolve(a)),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -93,6 +101,11 @@ describe('MarketPricesService', () => {
     // English parallel: $660.39 × 58 = ₱38,303 → match ₱38,300
     expect(by.en).toMatchObject({ language: 'EN', marketPhp: 38303, matchPrice: 38300, underpriced: true });
     expect(by.en.listing).toMatchObject({ source: 'TCGPLAYER', currency: 'USD', price: 660.39 });
+    // Jack isn't on Yuyu-tei: Dorasuta ¥800 × 0.38 = ₱304, so posted ₱300 isn't flagged at 90%.
+    expect(by.dora).toMatchObject({ marketPhp: 304, underpriced: false, matchPrice: null });
+    expect(by.dora.listing).toMatchObject({ source: 'DORASUTA', listingKey: 'dorasuta:541696', price: 800 });
+    // Owner removed the match: no market price even though Yuyu-tei lists OP01-120 SEC.
+    expect(by.removed).toMatchObject({ unlinked: true, listing: null, marketPhp: null });
     expect(res.summary.matchableUnderpriced).toBe(2);
   });
 
@@ -124,7 +137,7 @@ describe('MarketPricesService', () => {
 
   it('search matches names and card numbers typed with spaces or dashes', async () => {
     const byNumber = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', search: 'op01 120' } as any);
-    expect(byNumber.data.map((r) => r.id).sort()).toEqual(['jp', 'jpDamaged']);
+    expect(byNumber.data.map((r) => r.id).sort()).toEqual(['jp', 'jpDamaged', 'removed']);
     const byName = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', search: 'zoro' } as any);
     expect(byName.data.map((r) => r.id)).toEqual(['en']);
     expect(byName.summary.cards).toBe(1);
@@ -146,17 +159,18 @@ describe('MarketPricesService', () => {
 
   it('sorts by market price and by margin', async () => {
     const hi = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', sort: 'price_desc' } as any);
-    expect(hi.data.map((r) => r.id)).toEqual(['en', 'jp', 'jpDamaged']);
+    expect(hi.data.map((r) => r.id)).toEqual(['en', 'dora', 'jp', 'jpDamaged', 'removed']); // no price goes last
     const lo = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', sort: 'price_asc' } as any);
-    expect(lo.data.map((r) => r.id)).toEqual(['jpDamaged', 'jp', 'en']);
+    expect(lo.data.map((r) => r.id)).toEqual(['jpDamaged', 'jp', 'dora', 'en', 'removed']);
     // margins vs ₱50 cost: en (38303−50)/38303 ≈ 99.9%, jp (122−50)/122 = 59%, damaged (96−50)/96 = 47.9%
     const margin = await service.list({ page: 1, limit: 50, skip: 0, view: 'all', sort: 'margin_desc' } as any);
-    expect(margin.data.map((r) => [r.id, r.marginPct])).toEqual([['en', 99.9], ['jp', 59], ['jpDamaged', 47.9]]);
+    expect(margin.data.map((r) => [r.id, r.marginPct])).toEqual([['en', 99.9], ['dora', 83.6], ['jp', 59], ['jpDamaged', 47.9], ['removed', null]]);
   });
 
   it('raw inventory value = market × qty, 80% of posted when no market price', async () => {
     const v = await service.rawInventoryValue();
-    expect(v).toEqual({ total: 122 + 96 + 38303, market: 122 + 96 + 38303, fallback: 0, matchedCards: 3, fallbackCards: 0 });
+    // The removed-match card counts at 80% of its ₱500 posted price.
+    expect(v).toEqual({ total: 122 + 96 + 38303 + 304 + 400, market: 122 + 96 + 38303 + 304, fallback: 400, matchedCards: 4, fallbackCards: 1 });
   });
 
   it('movers: biggest change first, one row per listing', async () => {
@@ -184,12 +198,53 @@ describe('MarketPricesService', () => {
 
   it('suggest fetches Yuyu-tei live once for a number it has never priced', async () => {
     const spy = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch').mockResolvedValue('<html></html>');
+    const dSpy = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockResolvedValue('<html></html>');
     const a = await service.suggest('OP05-119', 'SEC');
     const b = await service.suggest('OP05-119', 'SEC');
-    expect(a).toMatchObject({ found: false, reason: 'Yuyu-tei has no listing for OP05-119' });
+    expect(a).toMatchObject({ found: false, reason: 'Neither Yuyu-tei nor Dorasuta lists OP05-119' });
     expect(b.found).toBe(false);
     expect(spy).toHaveBeenCalledTimes(1); // cooldown: the second lookup doesn't hit Yuyu-tei again
-    spy.mockRestore();
+    expect(dSpy).toHaveBeenCalledTimes(1); // nor Dorasuta
+    spy.mockRestore(); dSpy.mockRestore();
+  });
+
+  it('suggest falls back to Dorasuta when Yuyu-tei has no listing', async () => {
+    const y = jest.spyOn(yuyuteiClient, 'fetchYuyuteiSearch').mockResolvedValue('<html></html>');
+    const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch');
+    const r = await service.suggest('OP08-084', 'PSR');
+    expect(r).toMatchObject({ found: true, source: 'DORASUTA', price: 800, marketPhp: 304, suggested: 300 });
+    expect(d).not.toHaveBeenCalled(); // the saved Dorasuta listing is fresh
+    y.mockRestore(); d.mockRestore();
+  });
+
+  it('sync searches Dorasuta only for cards Yuyu-tei has no listing for (or pinned to Dorasuta)', async () => {
+    const { readFileSync } = jest.requireActual('fs');
+    const html = readFileSync(require('path').join(__dirname, '__fixtures__', 'dorasuta-op08-084.html'), 'utf8');
+    const d = jest.spyOn(dorasutaClient, 'fetchDorasutaSearch').mockResolvedValue(html);
+    jest.spyOn(global, 'setTimeout').mockImplementation(((fn: () => void) => { fn(); return 0 as any; }) as any);
+    await (service as any).syncDorasuta([
+      { cardNumber: 'OP01-120', rarity: 'SEC', marketListingKey: null },  // on Yuyu-tei: skipped
+      { cardNumber: 'OP08-084', rarity: 'PSR', marketListingKey: null },  // not on Yuyu-tei: searched
+    ]);
+    (global.setTimeout as any).mockRestore?.();
+    expect(d.mock.calls.map((c) => c[0])).toEqual(['OP08-084']);
+    const saved = prisma.marketPrice.upsert.mock.calls.map((c: any) => [c[0].where.listingKey, c[0].create.source]);
+    expect(saved).toContainEqual(['dorasuta:541696', 'DORASUTA']);
+    expect(prisma.marketPrice.deleteMany).toHaveBeenCalledWith({
+      where: { cardNumber: 'OP08-084', source: 'DORASUTA', listingKey: { notIn: expect.arrayContaining(['dorasuta:541696']) } },
+    });
+    d.mockRestore();
+  });
+
+  it('link accepts "none" to remove a match', async () => {
+    prisma.rawCard.findUnique = jest.fn().mockResolvedValue({ cardNumber: 'OP01-120' });
+    await expect(service.link('jp', 'none')).resolves.toEqual({ id: 'jp', marketListingKey: 'none' });
+    expect(prisma.rawCard.update).toHaveBeenCalledWith({ where: { id: 'jp' }, data: { marketListingKey: 'none' } });
+  });
+
+  it('a pasted buy.dorasuta.jp link is refused with a clear message', async () => {
+    await expect(service.linkByUrl('jp', 'https://buy.dorasuta.jp/onepiece-cardgame/product?pid=559715'))
+      .rejects.toThrow(/buy-list/);
   });
 
   it('suggest explains rarities that cannot be matched automatically', async () => {
