@@ -35,7 +35,7 @@ export const stockCountService = {
 };
 // Market prices: Yuyu-tei (yen) for Japanese cards, TCGplayer via TCGCSV (USD) for
 // English ones. Peso conversion and Match prices are worked out server-side.
-export type MarketSource = 'YUYUTEI' | 'TCGPLAYER';
+export type MarketSource = 'YUYUTEI' | 'DORASUTA' | 'TCGPLAYER';
 export type MarketSort = 'change' | 'price_desc' | 'price_asc' | 'recent' | 'margin_desc' | 'underpriced';
 export interface MarketListing {
   source: MarketSource; listingKey: string; name: string; rarity: string | null;
@@ -48,7 +48,7 @@ export interface MarketCandidate {
   setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string;
 }
 export interface MarketSync {
-  running: boolean; trigger: 'nightly' | 'manual' | null; phase: 'yuyutei' | 'tcgplayer' | null;
+  running: boolean; trigger: 'nightly' | 'manual' | null; phase: 'yuyutei' | 'dorasuta' | 'tcgplayer' | null;
   total: number; done: number; failed: number; empty: number;
   startedAt: string | null; finishedAt: string | null; lastError: string | null;
 }
@@ -56,7 +56,9 @@ export interface MarketRow {
   id: string; name: string; cardNumber: string; rarity: string; setName: string; quantity: number;
   postedPrice: number; buyCost: number; createdAt: string; imageUrl: string | null; notes: string | null;
   condition: 'clean' | 'issues'; changePhp: number | null; marginPct: number | null;
-  language: 'JP' | 'EN'; damage: string | null; rateUsed: number | null; damagedRateMissing: boolean;
+  language: 'JP' | 'EN'; damage: string | null;
+  rateUsed: number | null; damagedRateMissing: boolean;
+  unlinked: boolean; // owner removed the match: no market price, counted at 80% of posted
   listing: MarketListing | null; candidateCount: number;
   marketPhp: number | null; diffPct: number | null; underpriced: boolean; matchPrice: number | null;
 }
@@ -87,6 +89,7 @@ export const marketPricesService = {
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
   listings: (cardNumber: string, source: MarketSource) =>
     api.get(`/market-prices/listings/${encodeURIComponent(cardNumber)}`, { params: { source } }).then(unwrap<MarketCandidate[]>),
+  // listingKey: a listing, 'none' = no market price, null = automatic.
   link: (id: string, listingKey: string | null) =>
     api.patch(`/market-prices/raw-cards/${id}/link`, { listingKey }).then(unwrap),
   // Match by pasting a Yuyu-tei card page link (for cards search can't find, e.g. DON!!).

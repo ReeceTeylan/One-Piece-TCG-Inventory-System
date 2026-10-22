@@ -19,12 +19,14 @@ import { useAuth } from '@/contexts/auth-context';
 import { useDebounce } from '@/hooks/use-debounce';
 import { apiError } from '@/lib/api';
 import { cn, peso } from '@/lib/utils';
-import { marketPricesService, type MarketRow, type MarketSort, type MarketSummary } from '@/services';
+import { marketPricesService, type MarketRow, type MarketSort, type MarketSource, type MarketSummary } from '@/services';
 
 const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`;
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const foreign = (price: number, currency: 'JPY' | 'USD') => (currency === 'USD' ? usd(price) : yen(price));
-const sourceName = (row: MarketRow) => (row.language === 'EN' ? 'TCGplayer' : 'Yuyu-tei');
+const SOURCE_NAME: Record<MarketSource, string> = { YUYUTEI: 'Yuyu-tei', DORASUTA: 'Dorasuta', TCGPLAYER: 'TCGplayer' };
+// Where this row's price comes from: its listing's shop, else the default for its language.
+const sourceName = (row: MarketRow) => (row.listing ? SOURCE_NAME[row.listing.source] : row.language === 'EN' ? 'TCGplayer' : 'Yuyu-tei');
 const when = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never';
 
@@ -125,7 +127,7 @@ export function MarketPricesPage() {
             </Button>
             <Button size="sm" variant="outline" onClick={() => startSync.mutate()} disabled={!!sync?.running || startSync.isPending}>
               {sync?.running
-                ? <><Loader2 className="size-4 animate-spin" /> {sync.phase === 'tcgplayer' ? 'TCGplayer' : 'Yuyu-tei'} {sync.done}/{sync.total}</>
+                ? <><Loader2 className="size-4 animate-spin" /> {sync.phase === 'tcgplayer' ? 'TCGplayer' : sync.phase === 'dorasuta' ? 'Dorasuta' : 'Yuyu-tei'} {sync.done}/{sync.total}</>
                 : <><RefreshCw className="size-4" /> Sync now</>}
             </Button>
           </div>
@@ -246,16 +248,18 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {l ? (
               <>
-                <span className="truncate" title={l.name}>{l.manual ? (l.viaLink ? 'Linked by you' : 'Matched by you') : 'Auto match'}: {l.name}</span>
+                <span className="truncate" title={l.name}>
+                  {l.manual ? (l.viaLink ? 'Linked by you' : 'Matched by you') : 'Auto match'}{l.source === 'DORASUTA' ? ' (Dorasuta)' : ''}: {l.name}
+                </span>
                 {l.inStock === false && <span className="shrink-0">· sold out there</span>}
                 <a href={l.url} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground" aria-label={`Open on ${sourceName(row)}`}>
                   <ExternalLink className="size-3.5" />
                 </a>
               </>
-            ) : <span>{row.candidateCount ? 'No automatic match' : `Not found on ${sourceName(row)} yet`}</span>}
-            {canEdit && (row.language === 'JP' || row.candidateCount > 0) && (
+            ) : <span>{row.unlinked ? 'No market price (match removed)' : row.candidateCount ? 'No automatic match' : `Not found on ${sourceName(row)} yet`}</span>}
+            {canEdit && (row.language === 'JP' || row.candidateCount > 0 || row.unlinked) && (
               <button type="button" onClick={onChange} className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline">
-                {l || row.candidateCount ? 'Change' : 'Paste link'}
+                {l || row.candidateCount || row.unlinked ? 'Change' : 'Paste link'}
               </button>
             )}
           </div>
@@ -304,17 +308,22 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
 function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => void }) {
   const qc = useQueryClient();
   const isEnglish = row?.language === 'EN';
-  const source = isEnglish ? 'TCGPLAYER' : 'YUYUTEI';
+  // Japanese cards: Yuyu-tei is the main shop, Dorasuta the backup. English: TCGplayer only.
+  const [tab, setTab] = useState<MarketSource>('YUYUTEI');
+  useEffect(() => {
+    if (row) setTab(row.language === 'EN' ? 'TCGPLAYER' : row.listing?.source === 'DORASUTA' ? 'DORASUTA' : 'YUYUTEI');
+  }, [row]);
   const listings = useQuery({
-    queryKey: ['market-listings', row?.cardNumber, source],
-    queryFn: () => marketPricesService.listings(row!.cardNumber, source),
-    enabled: !!row,
+    queryKey: ['market-listings', row?.cardNumber, tab],
+    queryFn: () => marketPricesService.listings(row!.cardNumber, tab),
+    enabled: !!row && (tab === 'TCGPLAYER') === isEnglish,
   });
   const link = useMutation({
     mutationFn: (key: string | null) => marketPricesService.link(row!.id, key),
     onSuccess: (_r, key) => {
-      toast.success(key ? 'Match updated' : 'Back to automatic match');
+      toast.success(key === 'none' ? 'Match removed. This card has no market price now.' : key ? 'Match updated' : 'Back to automatic match');
       qc.invalidateQueries({ queryKey: ['market-prices'] });
+      qc.invalidateQueries({ queryKey: ['card-market'] });
       onClose();
     },
     onError: (e) => toast.error(apiError(e).message),
@@ -327,12 +336,14 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
     onSuccess: (l) => {
       toast.success(`Linked: ${l.name}`);
       qc.invalidateQueries({ queryKey: ['market-prices'] });
+      qc.invalidateQueries({ queryKey: ['card-market'] });
       onClose();
     },
     onError: (e) => toast.error(apiError(e).message),
   });
   const busy = link.isPending || linkUrl.isPending;
   const rate = row?.rateUsed ?? null;
+  const isAuto = !!row && !row.unlinked && !current?.manual;
 
   return (
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
@@ -342,7 +353,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
           <DialogDescription>
             {isEnglish
               ? 'Pick the TCGplayer product that matches the printing you have.'
-              : 'Pick the Yuyu-tei listing that matches the printing you have, or paste its link.'}
+              : 'Pick the listing that matches the printing you have, or paste a Yuyu-tei or Dorasuta card link.'}
           </DialogDescription>
         </DialogHeader>
         {!isEnglish && (
@@ -350,22 +361,44 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
             <div className="relative min-w-0 flex-1">
               <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} inputMode="url"
-                placeholder="https://yuyu-tei.jp/sell/opc/card/…" className="pl-9" aria-label="Yuyu-tei card link" />
+                placeholder="Yuyu-tei or Dorasuta card link" className="pl-9" aria-label="Card link" />
             </div>
             <Button type="submit" disabled={busy || !url.trim()}>
               {linkUrl.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Use link'}
             </Button>
           </form>
         )}
-        {current?.viaLink && current.manual && (
-          <p className="mb-2 text-xs text-muted-foreground">Currently linked to <a href={current.url} target="_blank" rel="noreferrer" className="underline">{current.name}</a>.</p>
+        {current?.manual && (
+          <p className="mb-2 text-xs text-muted-foreground">Currently matched to <a href={current.url} target="_blank" rel="noreferrer" className="underline">{current.name}</a> on {SOURCE_NAME[current.source]}.</p>
         )}
-        <div className="max-h-[50vh] space-y-1.5 overflow-y-auto">
-          <OptionButton selected={!!current && !current.manual} disabled={busy} onClick={() => link.mutate(null)}>
+        <div className="mb-2 space-y-1.5">
+          <OptionButton selected={isAuto} disabled={busy} onClick={() => link.mutate(null)}>
             <div className="text-sm font-medium">Automatic</div>
-            <div className="text-xs text-muted-foreground">Original printing with the same rarity</div>
+            <div className="text-xs text-muted-foreground">
+              {isEnglish ? 'Original printing with the same rarity' : 'Yuyu-tei first; Dorasuta when Yuyu-tei doesn\'t list this card'}
+            </div>
           </OptionButton>
+          <OptionButton selected={!!row?.unlinked} disabled={busy} onClick={() => link.mutate('none')}>
+            <div className="text-sm font-medium">No market price</div>
+            <div className="text-xs text-muted-foreground">Remove the match if it&apos;s wrong and the shop doesn&apos;t sell this card. Counted at 80% of your price.</div>
+          </OptionButton>
+        </div>
+        {!isEnglish && (
+          <div className="mb-2 flex gap-1 rounded-md border bg-muted p-0.5" role="tablist">
+            {(['YUYUTEI', 'DORASUTA'] as const).map((t) => (
+              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+                className={cn('flex-1 rounded px-3 py-1 text-xs font-semibold', tab === t ? 'bg-card shadow-sm' : 'text-muted-foreground')}>
+                {SOURCE_NAME[t]}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="max-h-[42vh] space-y-1.5 overflow-y-auto">
           {listings.isLoading && <TableSkeleton rows={3} />}
+          {listings.data && !listings.data.length && (
+            <p className="py-4 text-center text-sm text-muted-foreground">{SOURCE_NAME[tab]} has no listings for {row?.cardNumber}.</p>
+          )}
+          {listings.isError && <p className="py-4 text-center text-sm text-muted-foreground">Couldn&apos;t load {SOURCE_NAME[tab]} right now. Try again in a moment.</p>}
           {listings.data?.map((l) => (
             <OptionButton key={l.listingKey} selected={!!current?.manual && current.listingKey === l.listingKey}
               disabled={busy} onClick={() => link.mutate(l.listingKey)}>
@@ -373,7 +406,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{l.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {[l.rarity, l.setLabel, l.inStock === null ? null : l.inStock ? `${l.stockCount ?? ''} in stock` : 'sold out'].filter(Boolean).join(' · ')}
+                    {[l.rarity, l.source === 'DORASUTA' ? null : l.setLabel, l.inStock === null ? null : l.inStock ? `${l.stockCount ?? ''} in stock` : 'sold out'].filter(Boolean).join(' · ')}
                   </div>
                 </div>
                 <div className="shrink-0 text-right text-sm font-semibold tabular-nums">

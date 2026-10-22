@@ -192,7 +192,7 @@ function PriceHint({ s, loading, current, onUse, className }: {
     return <p className={`flex items-center gap-1.5 text-xs text-muted-foreground ${className}`}><Loader2 className="size-3.5 animate-spin" /> Checking the market price…</p>;
   }
   if (!s) return null;
-  const where = s.source === 'TCGPLAYER' ? 'TCGplayer' : 'Yuyu-tei';
+  const where = s.source === 'TCGPLAYER' ? 'TCGplayer' : s.source === 'DORASUTA' ? 'Dorasuta' : 'Yuyu-tei';
   if (!s.found || s.suggested === null) {
     return <p className={`text-xs text-muted-foreground ${className}`}>{s.reason}</p>;
   }
