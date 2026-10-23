@@ -74,7 +74,7 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* Multi-Page Toolbar */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.max(0, currentIndex - 1)]?.id)} disabled={currentIndex === 0 || isExporting}>
             <ChevronLeft className="size-4" />
           </Button>
@@ -85,7 +85,7 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
             <ChevronRight className="size-4" />
           </Button>
 
-          <div className="mx-2 h-4 w-px bg-border" />
+          <div className="mx-2 hidden h-4 w-px bg-border sm:block" />
 
           <Button variant="ghost" size="sm" onClick={addPage} disabled={isExporting}>
             <Plus className="mr-1 size-4" /> Add
@@ -94,7 +94,7 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
             <Trash2 className="mr-1 size-4" /> Remove
           </Button>
 
-          {tabs && <><div className="mx-2 h-4 w-px bg-border" />{tabs}</>}
+          {tabs && <><div className="mx-2 hidden h-4 w-px bg-border sm:block" />{tabs}</>}
         </div>
 
         <div className="flex items-center gap-2">
