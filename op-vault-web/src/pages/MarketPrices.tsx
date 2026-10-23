@@ -50,6 +50,7 @@ export function MarketPricesPage() {
   const [linking, setLinking] = useState<MarketRow | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [view, setView] = useStickyState<'changes' | 'all' | 'unlinked'>('market:view', 'changes', { allowed: ['changes', 'all', 'unlinked'] });
   const [sort, setSort] = useStickyState<MarketSort | ''>('market:sort', '', { allowed: ['', 'change', 'price_desc', 'price_asc', 'recent', 'margin_desc', 'underpriced'] }); // '' = default for the view
   const [language, setLanguage] = useStickyState<'' | 'JP' | 'EN'>('market:language', '', { allowed: ['', 'JP', 'EN'] });
@@ -142,9 +143,9 @@ export function MarketPricesPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader title="Market Prices" subtitle={subtitle}
+      <PageHeader title="Market Prices" subtitle={<><span className="sm:hidden">{summary ? `${summary.underpriced} underpriced · ${summary.matched}/${summary.cards} linked` : ""}</span><span className="max-sm:hidden">{subtitle}</span></>}
         actions={isOwner && (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 max-sm:hidden">
             <Button size="sm" variant="outline" onClick={() => setConfirmAll(true)} disabled={!toRaise || matchAll.isPending}>
               <ArrowUpRight className="size-4" /> Match all underpriced{toRaise ? ` (${toRaise})` : ''}
             </Button>
@@ -163,6 +164,15 @@ export function MarketPricesPage() {
           </div>
         )} />
 
+      {isOwner && <div className="mb-3 sm:hidden">
+        <Button size="sm" variant="outline" className="w-full justify-between" aria-expanded={mobileActionsOpen} onClick={() => setMobileActionsOpen((v) => !v)}><span>Market actions</span><SlidersHorizontal className="size-4" /></Button>
+        {mobileActionsOpen && <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border bg-card p-2">
+          <Button size="sm" variant="outline" className="col-span-2" onClick={() => setConfirmAll(true)} disabled={!toRaise || matchAll.isPending}><ArrowUpRight className="size-4" /> Match underpriced ({toRaise})</Button>
+          <Button size="sm" variant="outline" onClick={() => startLink.mutate()} disabled={!!sync?.running || startLink.isPending}><Link2 className="size-4" /> Link ({notLinked})</Button>
+          <Button size="sm" variant="outline" onClick={() => startSync.mutate()} disabled={!!sync?.running || startSync.isPending}><RefreshCw className="size-4" /> Sync</Button>
+        </div>}
+      </div>}
+
       {missingRates.length > 0 && (
         <Card className="mb-3 flex flex-wrap items-center justify-between gap-2 border-warning/40 bg-warning/5 p-3 text-sm">
           <span>Not set yet: {missingRates.join(', ')}. Cards using a missing rate show the foreign price only.</span>
@@ -170,9 +180,9 @@ export function MarketPricesPage() {
         </Card>
       )}
       {notLinked > 0 && !sync?.running && (
-        <Card className="mb-3 flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
+        <Card className="mb-3 flex flex-wrap items-center justify-between gap-2 p-3 text-sm max-sm:p-2.5 max-sm:text-xs">
           <span>{notLinked} in-stock card{notLinked === 1 ? ' isn’t' : 's aren’t'} linked to a market listing yet. Until then {notLinked === 1 ? 'it counts' : 'they count'} at 80% of your price.</span>
-          {isOwner && <Button size="sm" variant="outline" onClick={() => startLink.mutate()} disabled={startLink.isPending}><Link2 className="size-4" /> Link new stock</Button>}
+          {isOwner && <Button size="sm" variant="outline" className="max-sm:hidden" onClick={() => startLink.mutate()} disabled={startLink.isPending}><Link2 className="size-4" /> Link new stock</Button>}
         </Card>
       )}
       {lastRun && lastRun.failed > 0 && !sync?.running && (
@@ -272,11 +282,11 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
   const lower = row.matchPrice !== null && row.matchPrice < row.postedPrice;
   return (
     <div className={cn('flex flex-col gap-2 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4', row.underpriced && 'bg-warning/5')}>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <CardThumb url={row.imageUrl} alt={row.name} className="aspect-[63/88] w-[38px]" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-medium">{row.name}</span>
+            <span className="truncate text-sm font-semibold sm:font-medium">{row.name}</span>
             {row.language === 'EN' && <Badge variant="info" className="shrink-0">English</Badge>}
             {row.damage && (
               <Badge variant="warning" className="shrink-0" title={row.damagedRateMissing ? 'Damaged rate not set — using the normal rate' : 'Priced at the damaged rate'}>
@@ -331,7 +341,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
           )}
           {row.underpriced && <div className="mt-1 text-[11px] font-semibold text-warning">Underpriced</div>}
           {canEdit && row.matchPrice !== null && (
-            <Button size="sm" variant={row.underpriced ? 'default' : 'outline'} className="mt-1.5 h-7 w-full px-2 text-[11px]"
+            <Button size="sm" variant={row.underpriced ? 'default' : 'outline'} className="mt-1.5 h-9 w-full px-2 text-xs sm:h-7 sm:text-[11px]"
               onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
               {matching ? <Loader2 className="size-3.5 animate-spin" />
                 : <>{lower ? <ArrowDownRight className="size-3.5" /> : <ArrowUpRight className="size-3.5" />} {peso(row.matchPrice)}</>}

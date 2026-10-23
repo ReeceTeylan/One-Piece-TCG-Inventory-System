@@ -11,13 +11,13 @@ export function Pagination({ page, totalPages, total, onPage, limit, onLimit }: 
 }) {
   return (
     <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-3 sm:px-4 text-sm text-muted-foreground">
-      <span className="min-w-0 truncate">{total} total · page {page} of {totalPages}</span>
+      <span className="min-w-0 truncate max-sm:text-xs"><span className="sm:hidden">{total} items · {page}/{totalPages}</span><span className="max-sm:hidden">{total} total · page {page} of {totalPages}</span></span>
       <div className="flex shrink-0 items-center gap-1.5">
         {limit !== undefined && onLimit && (
-          <div className="mr-1.5 hidden items-center gap-1.5 sm:flex">
-            <span className="text-xs">Show</span>
+          <div className="mr-1 flex items-center gap-1 sm:mr-1.5 sm:gap-1.5">
+            <span className="hidden text-xs sm:inline">Show</span>
             <Select value={String(limit)} onChange={(e) => onLimit(Number(e.target.value))}
-              className="h-8 w-auto pr-7 text-xs" aria-label="Items per page">
+              className="h-8 w-[54px] px-1 text-xs sm:w-auto sm:pr-7" aria-label="Items per page">
               {PAGE_SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
             </Select>
           </div>

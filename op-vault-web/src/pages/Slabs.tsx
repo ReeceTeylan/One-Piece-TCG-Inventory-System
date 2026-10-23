@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Plus, Upload, Pencil, Trash2, Loader2, PackagePlus, LayoutGrid, List } from 'lucide-react';
+import { Plus, SlidersHorizontal, Upload, Pencil, Trash2, Loader2, PackagePlus, LayoutGrid, List } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -31,6 +31,7 @@ export function SlabsPage() {
   const { isOwner } = useAuth();
   const { remove, upload } = useSlabMutations();
   const [search, setSearch] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   // Filters stay as you left them after a refresh.
   const [status, setStatus] = useStickyState('slabs:status', 'AVAILABLE', { allowed: ['', 'AVAILABLE', 'SOLD'] });
   const [grade, setGrade] = useStickyState('slabs:grade', '', { allowed: ['', ...GRADES] });
@@ -146,8 +147,10 @@ export function SlabsPage() {
       <PageHeader title="Slabs & Sealed" subtitle={`${data?.meta.total ?? 0} items`}
         actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus /> Add item</Button>} />
 
-      <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
+      <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-3.5 sm:gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search name, cert #, set…" />
+        <Button size="icon" variant="outline" className="shrink-0 sm:hidden" aria-label="Toggle filters" aria-expanded={mobileFiltersOpen} onClick={() => setMobileFiltersOpen((v) => !v)}><SlidersHorizontal className="size-4" /></Button>
+        <div className={`${mobileFiltersOpen ? "grid" : "hidden"} w-full grid-cols-2 gap-2 rounded-lg border bg-muted/20 p-2 sm:contents`}>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="">All status</option><option value="AVAILABLE">Available</option><option value="SOLD">Sold</option>
         </Select>
@@ -166,7 +169,8 @@ export function SlabsPage() {
           <option value="sellPrice:asc">Price low→high</option>
           <option value="grade:desc">Grade high→low</option>
         </Select>
-        <div className="ml-auto flex gap-0.5 rounded-md border bg-muted p-0.5">
+        </div>
+        <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border bg-muted p-0.5">
           {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:slabs:view', v); }}
               aria-label={`${v} view`} aria-pressed={view === v}

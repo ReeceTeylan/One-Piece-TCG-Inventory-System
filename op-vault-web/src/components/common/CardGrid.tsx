@@ -21,33 +21,34 @@ export function CardGrid({ items, selected, onToggle, onOpen, actions, aspect = 
 }) {
   return (
     // Scrolls internally so the page itself stays fixed, matching the Table.
-    <div className="min-h-0 flex-1 overflow-y-auto p-3">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
+    <div className="min-h-0 flex-1 overflow-y-auto p-2 sm:p-3">
+      <div className="grid grid-cols-3 gap-1.5 sm:grid-cols-4 sm:gap-2 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
         {items.map((it) => (
           <div key={it.id}
             data-selected={selected.has(it.id) || undefined}
             className="group relative flex flex-col overflow-hidden rounded-lg border bg-card transition-colors hover:border-primary/40 data-[selected]:border-primary">
             <input type="checkbox" aria-label={`Select ${it.title}`}
               checked={selected.has(it.id)} onChange={() => onToggle(it.id)}
-              className="absolute left-2 top-2 z-10 size-4 cursor-pointer rounded" />
-            {it.badge && <div className="absolute right-2 top-2 z-10">{it.badge}</div>}
+              className="absolute left-2 top-2 z-10 size-5 cursor-pointer rounded shadow-sm sm:size-4" />
+            {it.badge && <div className="absolute right-2 top-2 z-10 max-sm:hidden">{it.badge}</div>}
             <button type="button" onClick={() => onOpen?.(it.id)}
-              className={`block w-full overflow-hidden bg-muted ${aspect === '80/130' ? 'aspect-[80/130]' : 'aspect-[63/88]'}`}>
+              className={`block w-full overflow-hidden bg-muted max-sm:h-[112px] ${aspect === '80/130' ? 'sm:aspect-[80/130]' : 'sm:aspect-[63/88]'}`}>
               {it.imageUrl
                 ? <img src={it.imageUrl} alt={it.title} loading="lazy"
-                    className="size-full object-cover transition-transform duration-200 group-hover:scale-[1.04]" />
+                    className="size-full object-contain transition-transform duration-200 sm:object-cover sm:group-hover:scale-[1.04]" />
                 : <div className="grid size-full place-items-center text-[11px] text-muted-foreground">No image</div>}
             </button>
             <div className="flex min-w-0 flex-1 flex-col gap-0.5 p-1.5">
-              <div className="truncate text-[12px] font-medium leading-tight">{it.title}</div>
+              <div className="truncate text-[11px] font-semibold leading-tight sm:text-[12px] sm:font-medium">{it.title}</div>
+              {it.badge && <div className="max-sm:hidden">{it.badge}</div>}
               {it.subtitle && <div className="truncate text-[10px] text-muted-foreground">{it.subtitle}</div>}
-              <div className="mt-0.5 flex items-center justify-between gap-1">
-                <span className="truncate text-[12.5px] font-semibold tnum">{it.price}</span>
-                {it.meta && <span className="shrink-0 text-[10px] text-muted-foreground">{it.meta}</span>}
+              <div className="mt-auto flex min-w-0 flex-col gap-0.5 pt-1 sm:mt-0.5 sm:flex-row sm:items-center sm:justify-between sm:gap-1 sm:pt-0">
+                <span className="truncate text-[11px] font-semibold tnum sm:text-[12.5px]">{it.price}</span>
+                {it.meta && <span className="truncate text-[10px] text-muted-foreground sm:shrink-0">{it.meta}</span>}
               </div>
             </div>
             {actions && (
-              <div className="grid grid-cols-2 gap-1 border-t p-1 [&_button]:h-10 [&_button]:min-w-0 [&_button]:w-full [&_button]:px-1 [&_button]:text-xs [&_svg]:size-4 sm:flex sm:items-center sm:justify-evenly sm:gap-0 sm:p-0.5 sm:[&_button]:size-7 sm:[&_button]:shrink-0 sm:[&_button]:p-0 sm:[&_span]:hidden">{actions(it.id)}</div>
+              <div className="grid grid-cols-3 place-items-center gap-0.5 border-t p-0.5 [&_button]:size-8 [&_button]:min-w-0 [&_button]:shrink-0 [&_button]:p-0 [&_button]:text-[10px] [&_button]:gap-0 [&_svg]:size-3.5 sm:flex sm:items-center sm:justify-evenly sm:gap-0 sm:p-0.5 sm:[&_button]:size-7 sm:[&_button]:shrink-0 sm:[&_button]:p-0 sm:[&_span]:hidden">{actions(it.id)}</div>
             )}
           </div>
         ))}
