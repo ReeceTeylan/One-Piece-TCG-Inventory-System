@@ -171,7 +171,7 @@ export function MarketPricesPage() {
           <Button size="sm" variant="outline" onClick={() => startLink.mutate()} disabled={!!sync?.running || startLink.isPending}><Link2 className="size-4" /> Link ({notLinked})</Button>
           <Button size="sm" variant="outline" onClick={() => startSync.mutate()} disabled={!!sync?.running || startSync.isPending}><RefreshCw className="size-4" /> Sync</Button>
         </div>}
-      </div>
+      </div>}
 
       {missingRates.length > 0 && (
         <Card className="mb-3 flex flex-wrap items-center justify-between gap-2 border-warning/40 bg-warning/5 p-3 text-sm">
