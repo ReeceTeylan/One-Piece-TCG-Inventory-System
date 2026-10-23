@@ -35,7 +35,7 @@ export const stockCountService = {
 };
 // Market prices: Yuyu-tei (yen) for Japanese cards, TCGplayer via TCGCSV (USD) for
 // English ones. Peso conversion and Match prices are worked out server-side.
-export type MarketSource = 'YUYUTEI' | 'DORASUTA' | 'TCGPLAYER';
+export type MarketSource = 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER';
 export type MarketSort = 'change' | 'price_desc' | 'price_asc' | 'recent' | 'margin_desc' | 'underpriced';
 export interface MarketListing {
   source: MarketSource; listingKey: string; name: string; rarity: string | null;
@@ -48,7 +48,7 @@ export interface MarketCandidate {
   setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string;
 }
 export interface MarketSync {
-  running: boolean; trigger: 'nightly' | 'manual' | 'link' | null; phase: 'yuyutei' | 'dorasuta' | 'tcgplayer' | null;
+  running: boolean; trigger: 'nightly' | 'manual' | 'link' | null; phase: 'yuyutei' | 'cardrush' | 'tcgplayer' | null;
   total: number; done: number; failed: number; empty: number;
   linked?: number; unmatched?: number; // Link new stock results
   startedAt: string | null; finishedAt: string | null; lastError: string | null;

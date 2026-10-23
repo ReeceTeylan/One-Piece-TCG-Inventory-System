@@ -24,7 +24,7 @@ import { marketPricesService, type MarketRow, type MarketSort, type MarketSource
 const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`;
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const foreign = (price: number, currency: 'JPY' | 'USD') => (currency === 'USD' ? usd(price) : yen(price));
-const SOURCE_NAME: Record<MarketSource, string> = { YUYUTEI: 'Yuyu-tei', DORASUTA: 'Dorasuta', TCGPLAYER: 'TCGplayer' };
+const SOURCE_NAME: Record<MarketSource, string> = { YUYUTEI: 'Yuyu-tei', CARDRUSH: 'Cardrush', TCGPLAYER: 'TCGplayer' };
 // Where this row's price comes from: its listing's shop, else the default for its language.
 const sourceName = (row: MarketRow) => (row.listing ? SOURCE_NAME[row.listing.source] : row.language === 'EN' ? 'TCGplayer' : 'Yuyu-tei');
 const LINK_TEXT: Record<MarketRow['linkState'], string> = {
@@ -104,7 +104,7 @@ export function MarketPricesPage() {
     onError: (e) => toast.error(apiError(e).message),
   });
   const progress = sync?.running
-    ? `${sync.phase === 'tcgplayer' ? 'TCGplayer' : sync.phase === 'dorasuta' ? 'Dorasuta' : 'Yuyu-tei'} ${sync.done}/${sync.total}`
+    ? `${sync.phase === 'tcgplayer' ? 'TCGplayer' : sync.phase === 'cardrush' ? 'Cardrush' : 'Yuyu-tei'} ${sync.done}/${sync.total}`
     : null;
   const notLinked = summary?.notLinked ?? 0;
 
@@ -282,7 +282,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
           <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
             {l ? (
               <>
-                <span className="truncate" title={l.name}>Linked{l.source === 'DORASUTA' ? ' (Dorasuta)' : ''}: {l.name}</span>
+                <span className="truncate" title={l.name}>Linked{l.source === 'CARDRUSH' ? ' (Cardrush)' : ''}: {l.name}</span>
                 {l.inStock === false && <span className="shrink-0">· sold out there</span>}
                 <a href={l.url} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground" aria-label={`Open on ${sourceName(row)}`}>
                   <ExternalLink className="size-3.5" />
@@ -340,10 +340,10 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
 function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => void }) {
   const qc = useQueryClient();
   const isEnglish = row?.language === 'EN';
-  // Japanese cards: Yuyu-tei is the main shop, Dorasuta the backup. English: TCGplayer only.
+  // Japanese cards: Yuyu-tei is the main shop, Cardrush the backup. English: TCGplayer only.
   const [tab, setTab] = useState<MarketSource>('YUYUTEI');
   useEffect(() => {
-    if (row) setTab(row.language === 'EN' ? 'TCGPLAYER' : row.listing?.source === 'DORASUTA' ? 'DORASUTA' : 'YUYUTEI');
+    if (row) setTab(row.language === 'EN' ? 'TCGPLAYER' : row.listing?.source === 'CARDRUSH' ? 'CARDRUSH' : 'YUYUTEI');
   }, [row]);
   const listings = useQuery({
     queryKey: ['market-listings', row?.cardNumber, tab],
@@ -395,7 +395,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
           <DialogDescription>
             {isEnglish
               ? 'Pick the TCGplayer product that matches the printing you have.'
-              : 'Pick the listing that matches the printing you have, or paste a Yuyu-tei or Dorasuta card link.'}
+              : 'Pick the listing that matches the printing you have, or paste a Yuyu-tei or Cardrush card link.'}
           </DialogDescription>
         </DialogHeader>
         {!isEnglish && (
@@ -403,7 +403,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
             <div className="relative min-w-0 flex-1">
               <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} inputMode="url"
-                placeholder="Yuyu-tei or Dorasuta card link" className="pl-9" aria-label="Card link" />
+                placeholder="Yuyu-tei or Cardrush card link" className="pl-9" aria-label="Card link" />
             </div>
             <Button type="submit" disabled={busy || !url.trim()}>
               {linkUrl.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Use link'}
@@ -419,7 +419,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
               Link automatically {relink.isPending && <Loader2 className="size-3.5 animate-spin" />}
             </div>
             <div className="text-xs text-muted-foreground">
-              {isEnglish ? 'Search TCGplayer now for the same printing and rarity' : 'Search now: Yuyu-tei first, then Dorasuta'}
+              {isEnglish ? 'Search TCGplayer now for the same printing and rarity' : 'Search now: Yuyu-tei first, then Cardrush'}
             </div>
           </OptionButton>
           <OptionButton selected={row?.linkState === 'none'} disabled={busy} onClick={() => link.mutate('none')}>
@@ -429,7 +429,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
         </div>
         {!isEnglish && (
           <div className="mb-2 flex gap-1 rounded-md border bg-muted p-0.5" role="tablist">
-            {(['YUYUTEI', 'DORASUTA'] as const).map((t) => (
+            {(['YUYUTEI', 'CARDRUSH'] as const).map((t) => (
               <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
                 className={cn('flex-1 rounded px-3 py-1 text-xs font-semibold', tab === t ? 'bg-card shadow-sm' : 'text-muted-foreground')}>
                 {SOURCE_NAME[t]}
@@ -450,7 +450,7 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{l.name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {[l.rarity, l.source === 'DORASUTA' ? null : l.setLabel, l.inStock === null ? null : l.inStock ? `${l.stockCount ?? ''} in stock` : 'sold out'].filter(Boolean).join(' · ')}
+                    {[l.rarity, l.source === 'CARDRUSH' ? null : l.setLabel, l.inStock === null ? null : l.inStock ? `${l.stockCount ?? ''} in stock` : 'sold out'].filter(Boolean).join(' · ')}
                   </div>
                 </div>
                 <div className="shrink-0 text-right text-sm font-semibold tabular-nums">
