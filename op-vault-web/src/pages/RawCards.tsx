@@ -169,8 +169,8 @@ export function RawCardsPage() {
       <PageHeader title="Raw Cards" subtitle={query.data ? `${query.data.meta.total} titles` : undefined}
         actions={
           <div className="flex items-center gap-2 max-sm:gap-1.5">
-            <Button variant="outline" size="sm" onClick={() => setShowImport(true)}><Upload className="size-4" /> <span className="hidden sm:inline">Import CSV</span></Button>
-            <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Add raw card</span><span className="sm:hidden">Add</span></Button>
+            <Button variant="outline" size="sm" className="max-sm:h-8 max-sm:px-2" aria-label="Import CSV" onClick={() => setShowImport(true)}><Upload className="size-4" /> <span className="hidden sm:inline">Import CSV</span></Button>
+            <Button size="sm" className="max-sm:h-8 max-sm:px-2.5" onClick={() => setShowAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Add raw card</span><span className="sm:hidden">Add</span></Button>
           </div>
         } />
 

@@ -147,30 +147,41 @@ export function StockCountPage() {
       <PageHeader title="Stock Count"
         subtitle={`${sessionTotal} counted this session${query.data ? ` · ${countedHere}/${rows.length} on this page` : ''}`}
         actions={
-          <Button variant="outline" size="sm" onClick={() => setResetOpen(true)} disabled={!sessionTotal}>
-            <RotateCcw className="size-4" /> <span className="hidden sm:inline">New count</span>
+          <Button variant="outline" size="sm" className="max-sm:h-8 max-sm:gap-1 max-sm:px-2.5" onClick={() => setResetOpen(true)} disabled={!sessionTotal}>
+            <RotateCcw className="size-4" /> <span className="sm:hidden">Reset</span><span className="hidden sm:inline">New count</span>
           </Button>
         } />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border p-0.5">
-          <Button size="sm" variant={tab === 'RAW' ? 'default' : 'ghost'} onClick={() => switchTab('RAW')}>Raw</Button>
-          <Button size="sm" variant={tab === 'SLAB' ? 'default' : 'ghost'} onClick={() => switchTab('SLAB')}>Slabs & Sealed</Button>
+      <div className="mb-2.5 flex min-w-0 flex-wrap items-center gap-2 sm:mb-3">
+        <div className="grid w-full grid-cols-2 rounded-lg border bg-muted/40 p-0.5 sm:flex sm:w-auto sm:bg-transparent">
+          <Button size="sm" className="max-sm:h-9 max-sm:min-w-0" variant={tab === 'RAW' ? 'default' : 'ghost'} onClick={() => switchTab('RAW')}>Raw</Button>
+          <Button size="sm" className="max-sm:h-9 max-sm:min-w-0 max-sm:px-1" variant={tab === 'SLAB' ? 'default' : 'ghost'} onClick={() => switchTab('SLAB')}>Slabs & Sealed</Button>
         </div>
         <div className="relative w-full sm:w-72 sm:flex-none">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search name or card #…" className="pl-9" aria-label="Search" />
         </div>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Switch checked={hideCounted} onCheckedChange={setHideCounted} /> Hide counted
-        </label>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Switch checked={includeZero} onCheckedChange={(v) => { setIncludeZero(v); setPage(1); }} /> Include qty 0
-        </label>
+        <div className="grid w-full grid-cols-2 gap-2 sm:contents">
+          <label className="flex min-w-0 items-center gap-1.5 rounded-lg border bg-card px-2 py-2 text-[11px] text-muted-foreground sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:text-sm">
+            <Switch checked={hideCounted} onCheckedChange={setHideCounted} /> Hide counted
+          </label>
+          <label className="flex min-w-0 items-center gap-1.5 rounded-lg border bg-card px-2 py-2 text-[11px] text-muted-foreground sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:text-sm">
+            <Switch checked={includeZero} onCheckedChange={(v) => { setIncludeZero(v); setPage(1); }} /> Include qty 0
+          </label>
+        </div>
       </div>
 
-      <Card className="flex min-h-0 flex-1 flex-col">
+      {!!rows.length && (
+        <div className="mb-2 flex items-center gap-2 sm:hidden">
+          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Counted items on this page" aria-valuenow={countedHere} aria-valuemin={0} aria-valuemax={rows.length}>
+            <div className="h-full rounded-full bg-success transition-[width]" style={{ width: `${(countedHere / rows.length) * 100}%` }} />
+          </div>
+          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{countedHere}/{rows.length} counted</span>
+        </div>
+      )}
+
+      <Card className="flex min-h-0 min-w-0 flex-1 flex-col">
         {query.isLoading ? <TableSkeleton />
         : query.isError ? <ErrorState />
         : !rows.length ? <EmptyState message="No items match." />
@@ -186,8 +197,8 @@ export function StockCountPage() {
                 const setCount = (n: number) => setCounts((p) => ({ ...p, [row.key]: Math.max(0, n) }));
                 return (
                   <div key={row.key}
-                    className={cn('flex flex-col gap-2 border-b px-3 py-2.5 sm:flex-row sm:items-center sm:px-4', done && 'bg-success/5')}>
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                    className={cn('flex min-w-0 flex-col gap-2 border-b px-2.5 py-2 sm:flex-row sm:items-center sm:px-4 sm:py-2.5', done && 'bg-success/5')}>
+                    <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
                       <CardThumb url={row.image} alt={row.name} className="aspect-[63/88] w-[38px]" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{row.name}</div>
@@ -200,24 +211,29 @@ export function StockCountPage() {
                       </div>
                     </div>
                     {row.graded ? (
-                      <Button size="sm" variant={done ? 'subtle' : 'outline'} className="h-10 self-end sm:self-auto"
+                      <Button size="sm" variant={done ? 'subtle' : 'outline'} className="h-8 self-end px-3 text-xs sm:h-10 sm:self-auto"
                         onClick={() => markCounted(row.key)} disabled={done}>
                         <Check className="size-4" /> Found
                       </Button>
                     ) : (
-                      <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
-                        <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Decrease"
-                          onClick={() => setCount(counted - 1)} disabled={pending || counted <= 0}><Minus /></Button>
-                        <Input type="number" inputMode="numeric" min={0} value={counted} aria-label="Counted quantity"
-                          onChange={(e) => setCount(parseInt(e.target.value, 10) || 0)}
-                          className="h-10 w-14 text-center tabular-nums" disabled={pending} />
-                        <Button variant="outline" size="icon" className="h-10 w-10" aria-label="Increase"
-                          onClick={() => setCount(counted + 1)} disabled={pending}><Plus /></Button>
-                        <Button size="icon" className="h-10 w-10" variant={delta !== 0 ? 'default' : 'outline'}
-                          aria-label={delta !== 0 ? 'Save count' : 'Matches — mark counted'}
-                          onClick={() => save(row, counted)} disabled={pending}>
-                          {pending ? <Loader2 className="animate-spin" /> : <Check />}
-                        </Button>
+                      <div className="flex w-full min-w-0 items-center justify-between gap-2 self-end sm:w-auto sm:justify-end sm:self-auto">
+                        <span className="text-[11px] font-medium text-muted-foreground sm:hidden">Physical count</span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <div className="flex items-center overflow-hidden rounded-md border bg-card sm:gap-1.5 sm:overflow-visible sm:rounded-none sm:border-0">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none border-r sm:h-10 sm:w-10 sm:rounded-md sm:border sm:border-input" aria-label="Decrease count"
+                              onClick={() => setCount(counted - 1)} disabled={pending || counted <= 0}><Minus className="size-4" /></Button>
+                            <Input type="number" inputMode="numeric" min={0} value={counted} aria-label="Counted quantity"
+                              onChange={(e) => setCount(parseInt(e.target.value, 10) || 0)}
+                              className="h-9 w-11 rounded-none border-0 bg-transparent px-1 text-center text-sm tabular-nums focus-visible:ring-0 sm:h-10 sm:w-14 sm:rounded-md sm:border sm:border-input sm:bg-card" disabled={pending} />
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-none border-l sm:h-10 sm:w-10 sm:rounded-md sm:border sm:border-input" aria-label="Increase count"
+                              onClick={() => setCount(counted + 1)} disabled={pending}><Plus className="size-4" /></Button>
+                          </div>
+                          <Button size="icon" className="h-9 w-9 sm:h-10 sm:w-10" variant={delta !== 0 ? 'default' : 'outline'}
+                            aria-label={delta !== 0 ? 'Save count' : 'Matches — mark counted'}
+                            onClick={() => save(row, counted)} disabled={pending}>
+                            {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
