@@ -1,3 +1,5 @@
+import { CardrushName, parseCardrushName } from './cardrush.parser';
+
 /**
  * Pure matching + pricing rules for the Yuyu-tei price sync. No DB access,
  * so they can be unit-tested against parsed pages.
@@ -155,40 +157,42 @@ export function pickTcgListing<T extends TcgLike>(card: { cardNumber: string; ra
 
 
 // ------------------------------------------------------------------
-// Dorasuta (backup for Japanese cards Yuyu-tei doesn't list)
+// Cardrush (backup for Japanese cards Yuyu-tei doesn't list)
 // ------------------------------------------------------------------
 
-/** OP-Vault rarity → Dorasuta label. Seen on real pages: SEC, SEC/パラレル,
- *  SR, SR/パラレル (super parallels are "SEC/スーパーパラレル", never auto-picked).
- *  The rest follow the same "<base>/パラレル" pattern; a wrong guess just means
- *  "no match", fixable from the Dorasuta tab or a pasted link. */
-const DORASUTA_MAP: Record<string, string> = {
-  C: 'C', UC: 'UC', R: 'R', SR: 'SR', SEC: 'SEC', L: 'L', LEADER: 'L',
-  PC: 'C/パラレル', PUC: 'UC/パラレル', PR: 'R/パラレル', PSR: 'SR/パラレル', PSEC: 'SEC/パラレル', PL: 'L/パラレル',
+/** OP-Vault rarity → Cardrush label. Seen on real pages: L, L/P. The rest follow
+ *  the same "<base>/P" pattern for parallels; a wrong guess just means "no
+ *  match", fixable from the Cardrush tab or a pasted link. */
+const CARDRUSH_MAP: Record<string, string> = {
+  C: 'C', UC: 'UC', R: 'R', SR: 'SR', SEC: 'SEC', SP: 'SP', L: 'L', LEADER: 'L',
+  PC: 'C/P', PUC: 'UC/P', PR: 'R/P', PSR: 'SR/P', PSEC: 'SEC/P', PL: 'L/P',
 };
 
-export function toDorasutaRarity(rarity: string): string | null {
-  return DORASUTA_MAP[normRarity(rarity)] ?? null;
+export function toCardrushRarity(rarity: string): string | null {
+  return CARDRUSH_MAP[normRarity(rarity)] ?? null;
 }
 
-/** "[illust.x]", "[漫画コマ]", "【For Asia】", "[NOT FOR SALE]" mark special versions. */
-const specialTags = (name: string) => (name.match(/\[[^\]]*\]|【[^】]*】/g) ?? []).length;
-
 /**
- * Default Dorasuta listing: same number and mapped rarity, the plainest name
- * (no alternate-art / promo tags), then the oldest product id.
+ * Default Cardrush listing for a raw card: same number and mapped rarity, a
+ * standard copy (no 状態A-/B/C, not graded, not a sealed promo or deck), the
+ * plainest version (fewest tags besides "パラレル": manga art, gold letters…),
+ * then the oldest product id. Sold-out copies still count: their last price.
  */
-export function pickDorasutaListing<T extends ListingLike>(
+export function pickCardrushListing<T extends ListingLike>(
   card: { cardNumber: string; rarity: string },
   listings: T[],
 ): T | null {
-  const want = toDorasutaRarity(card.rarity);
+  const want = toCardrushRarity(card.rarity);
   if (!want) return null;
   const num = card.cardNumber.trim().toUpperCase();
   const pid = (k: string) => Number(k.replace(/\D/g, '')) || 0;
-  const candidates = listings.filter((l) => l.cardNumber === num && l.rarity === want);
+  const candidates = listings
+    .map((l) => ({ l, n: parseCardrushName(l.name) }))
+    .filter(({ l, n }) => l.cardNumber === num && n && n.rarity === want
+      && !n.condition && !n.grade && !n.extra && !n.tags.includes('未開封'));
   if (!candidates.length) return null;
+  const extraTags = (n: CardrushName) => n.tags.filter((t) => t !== 'パラレル').length;
   return [...candidates].sort((a, b) =>
-    specialTags(a.name) - specialTags(b.name) || pid(a.listingKey) - pid(b.listingKey),
-  )[0];
+    extraTags(a.n!) - extraTags(b.n!) || pid(a.l.listingKey) - pid(b.l.listingKey),
+  )[0].l;
 }

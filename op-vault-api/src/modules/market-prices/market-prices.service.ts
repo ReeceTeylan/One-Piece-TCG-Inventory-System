@@ -9,11 +9,11 @@ import { RawCardsService } from '../raw-cards/raw-cards.service';
 import { fetchYuyuteiCardPage, fetchYuyuteiSearch } from './yuyutei.client';
 import { parseYuyuteiCardPage, parseYuyuteiCardUrl, parseYuyuteiSearch, YuyuteiListing } from './yuyutei.parser';
 import { fetchGroups, fetchPrices, fetchProducts, TcgcsvGroup } from './tcgcsv.client';
-import { fetchDorasutaSearch } from './dorasuta.client';
-import { DORASUTA_PREFIX, isDorasutaBuyUrl, parseDorasutaProductUrl, parseDorasutaSearch } from './dorasuta.parser';
+import { fetchCardrushSearch } from './cardrush.client';
+import { CARDRUSH_PREFIX, parseCardrushProductUrl, parseCardrushSearch } from './cardrush.parser';
 import { groupHasWanted, joinGroup, TcgRow } from './tcgcsv.parser';
 import {
-  comparePrice, damageReason, isEnglish, pickAutoListing, pickDorasutaListing, pickTcgListing, roundPrice, toYuyuteiRarity,
+  comparePrice, damageReason, isEnglish, pickAutoListing, pickCardrushListing, pickTcgListing, roundPrice, toYuyuteiRarity,
 } from './market-match';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 
@@ -21,15 +21,18 @@ const DELAY_MS = 1500;          // gap between Yuyu-tei requests — be a polite
 const TCGCSV_DELAY_MS = 300;    // TCGCSV asks for a short pause between requests
 const LAST_RUN_KEY = 'marketSyncLastRun';
 const LAST_LINK_KEY = 'marketLinkLastRun';
-// Dorasuta refuses requests from the server (HTTP 403). After a refusal, stop
-// asking for a while instead of retrying every card.
-const DORASUTA_BACKOFF_MS = 6 * 60 * 60 * 1000;
+// If Cardrush ever refuses the server (HTTP 403), stop asking for a while
+// instead of retrying every card.
+const BLOCK_BACKOFF_MS = 6 * 60 * 60 * 1000;
 // Listings found by card-number search vs. pasted by the owner as a direct link.
 // Linked ones are refreshed from their own page and never pruned by a search.
 const SOURCE_SEARCH = 'YUYUTEI';
 const SOURCE_LINK = 'YUYUTEI_LINK';
-// Dorasuta: backup for Japanese cards Yuyu-tei doesn't list (searched by card number).
-const SOURCE_DORASUTA = 'DORASUTA';
+const YUYUTEI_SOURCES = [SOURCE_SEARCH, SOURCE_LINK];
+// Cardrush: backup for Japanese cards Yuyu-tei doesn't list (searched by card number).
+const SOURCE_CARDRUSH = 'CARDRUSH';
+// Dorasuta was removed (it blocks servers). Cards still linked to it count as not linked.
+const isRetiredKey = (k: string | null | undefined) => !!k && k.startsWith('dorasuta:');
 const TCG_PREFIX = 'tcgp:';
 // marketListingKey value meaning "this card has no market price" (match removed by the owner).
 export const NO_MATCH = 'none';
@@ -43,7 +46,7 @@ const DEFAULT_ALERT_PCT = 20;
 export interface SyncState {
   running: boolean;
   trigger: 'nightly' | 'manual' | 'link' | null;
-  phase: 'yuyutei' | 'dorasuta' | 'tcgplayer' | null;
+  phase: 'yuyutei' | 'cardrush' | 'tcgplayer' | null;
   linked: number;               // Link new stock: cards linked this run
   unmatched: number;            // Link new stock: cards with no listing found
   total: number;
@@ -57,7 +60,7 @@ export interface SyncState {
 
 /** One price source, normalised for the page (yen for Yuyu-tei, dollars for TCGplayer). */
 export interface RowListing {
-  source: 'YUYUTEI' | 'DORASUTA' | 'TCGPLAYER';
+  source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER';
   listingKey: string;
   name: string;
   rarity: string | null;
@@ -96,7 +99,7 @@ export class MarketPricesService {
     running: false, trigger: null, phase: null, total: 0, done: 0, failed: 0, empty: 0, linked: 0, unmatched: 0,
     startedAt: null, finishedAt: null, lastError: null,
   };
-  private dorasutaBlockedUntil = 0;
+  private cardrushBlockedUntil = 0;
 
   /** Last fully priced in-stock list, reused while nothing it depends on has changed. */
   private priced: { key: string; rows: PricedRow[]; rates: Rates; all: Record<string, any> } | null = null;
@@ -183,7 +186,7 @@ export class MarketPricesService {
       where: { quantity: { gt: 0 }, marketListingKey: { not: null } },
       select: { cardNumber: true, marketListingKey: true },
     });
-    const linkedCards = cards.filter((c) => c.marketListingKey !== NO_MATCH);
+    const linkedCards = cards.filter((c) => c.marketListingKey !== NO_MATCH && !isRetiredKey(c.marketListingKey));
     const shopKeys = linkedCards.map((c) => c.marketListingKey!).filter((k) => !k.startsWith(TCG_PREFIX));
     const stored = new Map((await this.prisma.marketPrice.findMany({
       where: { listingKey: { in: shopKeys } }, select: { listingKey: true, source: true, cardNumber: true },
@@ -191,19 +194,19 @@ export class MarketPricesService {
 
     const yuyuteiNums = new Set<string>();
     const pages = new Set<string>();
-    const dorasutaNums = new Set<string>();
+    const cardrushNums = new Set<string>();
     const tcgNums = new Set<string>();
     for (const c of linkedCards) {
       const key = c.marketListingKey!;
       const row = stored.get(key);
       const num = row?.cardNumber ?? norm(c.cardNumber);
       if (key.startsWith(TCG_PREFIX)) tcgNums.add(norm(c.cardNumber));
-      else if (key.startsWith(DORASUTA_PREFIX)) dorasutaNums.add(num);
+      else if (key.startsWith(CARDRUSH_PREFIX)) cardrushNums.add(num);
       else if (row?.source === SOURCE_LINK) pages.add(key);
       else yuyuteiNums.add(num); // a listing that vanished is looked for again under its number
     }
     this.state.total = yuyuteiNums.size + pages.size;
-    this.logger.log(`Price sync: ${yuyuteiNums.size} Yuyu-tei searches, ${pages.size} linked pages, ${dorasutaNums.size} Dorasuta searches, ${tcgNums.size} English card numbers`);
+    this.logger.log(`Price sync: ${yuyuteiNums.size} Yuyu-tei searches, ${pages.size} linked pages, ${cardrushNums.size} Cardrush searches, ${tcgNums.size} English card numbers`);
 
     await this.searchYuyutei([...yuyuteiNums].sort(), true);
     for (const key of [...pages].sort()) {
@@ -218,7 +221,7 @@ export class MarketPricesService {
       }
       this.state.done++;
     }
-    if (dorasutaNums.size) await this.searchDorasuta([...dorasutaNums].sort(), true);
+    if (cardrushNums.size) await this.searchCardrush([...cardrushNums].sort(), true);
     if (tcgNums.size) await this.syncTcgplayer(tcgNums);
     await this.notifyBigMoves(new Date(this.state.startedAt!));
   }
@@ -226,7 +229,7 @@ export class MarketPricesService {
   /** Link new stock: every in-stock card with no link yet (cards whose match was removed are left alone). */
   private async linkNewStock() {
     const cards = await this.prisma.rawCard.findMany({
-      where: { quantity: { gt: 0 }, marketListingKey: null },
+      where: { quantity: { gt: 0 }, OR: [{ marketListingKey: null }, { marketListingKey: { startsWith: 'dorasuta:' } }] },
       select: { id: true, cardNumber: true, rarity: true, notes: true },
     });
     this.logger.log(`Link new stock: ${cards.length} unlinked cards`);
@@ -236,7 +239,7 @@ export class MarketPricesService {
   }
 
   /**
-   * Find and save a listing for each card: Yuyu-tei first, Dorasuta for Japanese
+   * Find and save a listing for each card: Yuyu-tei first, Cardrush for Japanese
    * cards Yuyu-tei doesn't list, TCGplayer for English. Listings fetched in the
    * last day are reused. Returns card id → saved listing key.
    */
@@ -247,7 +250,7 @@ export class MarketPricesService {
 
     if (jp.length) {
       const nums = [...new Set(jp.map((c) => norm(c.cardNumber)).filter(Boolean))];
-      const yWhere = { cardNumber: { in: nums }, source: { not: SOURCE_DORASUTA } };
+      const yWhere = { cardNumber: { in: nums }, source: { in: YUYUTEI_SOURCES } };
       const stale = (rows: { cardNumber: string; fetchedAt: Date }[], list: string[]) => {
         const by = groupBy(rows, (r) => r.cardNumber);
         return list.filter((n) => !isFresh(by.get(n) ?? [])).sort();
@@ -264,12 +267,12 @@ export class MarketPricesService {
 
       if (missing.length) {
         const dNums = [...new Set(missing.map((c) => norm(c.cardNumber)))];
-        const dWhere = { cardNumber: { in: dNums }, source: SOURCE_DORASUTA };
+        const dWhere = { cardNumber: { in: dNums }, source: SOURCE_CARDRUSH };
         const dStale = stale(await this.prisma.marketPrice.findMany({ where: dWhere, select: { cardNumber: true, fetchedAt: true } }), dNums);
-        if (dStale.length) await this.searchDorasuta(dStale, track);
+        if (dStale.length) await this.searchCardrush(dStale, track);
         const dByNum = groupBy(await this.prisma.marketPrice.findMany({ where: dWhere }), (r) => r.cardNumber);
         for (const c of missing) {
-          const d = pickDorasutaListing(c, dByNum.get(norm(c.cardNumber)) ?? []);
+          const d = pickCardrushListing(c, dByNum.get(norm(c.cardNumber)) ?? []);
           if (d) found.set(c.id, d.listingKey);
         }
       }
@@ -315,43 +318,42 @@ export class MarketPricesService {
     }
   }
 
-  /** Search Dorasuta for each number and save what it lists. Stops early while Dorasuta refuses the server. */
-  private async searchDorasuta(nums: string[], track: boolean) {
-    if (track) { this.state.phase = 'dorasuta'; this.state.total += nums.length; }
+  /** Search Cardrush for each number and save what it lists. Stops early if Cardrush refuses the server. */
+  private async searchCardrush(nums: string[], track: boolean) {
+    if (track) { this.state.phase = 'cardrush'; this.state.total += nums.length; }
     for (const [i, num] of nums.entries()) {
       if (i > 0) await sleep(DELAY_MS);
       try {
-        const listings = await this.dorasutaSearch(num);
-        if (listings.length) await this.saveListings(num, listings, SOURCE_DORASUTA);
+        const listings = await this.cardrushSearch(num);
+        if (listings.length) await this.saveListings(num, listings, SOURCE_CARDRUSH);
         else if (track) this.state.empty++;
       } catch (e: any) {
-        if (this.dorasutaBlocked()) {
+        if (this.cardrushBlocked()) {
           // Every remaining number would be refused too: count them once and stop.
-          if (track) { this.recordFailure(`Dorasuta (${nums.length - i} numbers)`, e); this.state.done += nums.length - i; }
-          else this.logger.warn(`Dorasuta: ${e?.message ?? e}`);
+          if (track) { this.recordFailure(`Cardrush (${nums.length - i} numbers)`, e); this.state.done += nums.length - i; }
+          else this.logger.warn(`Cardrush: ${e?.message ?? e}`);
           return;
         }
-        if (track) this.recordFailure(`Dorasuta ${num}`, e); else this.logger.warn(`Dorasuta ${num}: ${e?.message ?? e}`);
+        if (track) this.recordFailure(`Cardrush ${num}`, e); else this.logger.warn(`Cardrush ${num}: ${e?.message ?? e}`);
       }
       if (track) this.state.done++;
     }
   }
 
-  private dorasutaBlocked() {
-    return Date.now() < this.dorasutaBlockedUntil;
+  private cardrushBlocked() {
+    return Date.now() < this.cardrushBlockedUntil;
   }
 
-  /** One Dorasuta search, refusing early while Dorasuta is blocking the server. */
-  private async dorasutaSearch(num: string) {
-    if (this.dorasutaBlocked()) {
-      throw new Error('Dorasuta is refusing requests from this server (403). Not asking again for a few hours.');
-    }
+  /** One Cardrush search, refusing early if Cardrush has been blocking the server. */
+  private async cardrushSearch(num: string) {
+    const blocked = 'Cardrush is refusing requests from this server (403). Not asking again for a few hours.';
+    if (this.cardrushBlocked()) throw new Error(blocked);
     try {
-      return parseDorasutaSearch(await fetchDorasutaSearch(num)).filter((l) => l.cardNumber === num);
+      return parseCardrushSearch(await this.withRetry(() => fetchCardrushSearch(num))).filter((l) => l.cardNumber === num);
     } catch (e: any) {
       if (/\b403\b/.test(e?.message ?? '')) {
-        this.dorasutaBlockedUntil = Date.now() + DORASUTA_BACKOFF_MS;
-        throw new Error('Dorasuta is refusing requests from this server (403). Not asking again for a few hours.');
+        this.cardrushBlockedUntil = Date.now() + BLOCK_BACKOFF_MS;
+        throw new Error(blocked);
       }
       throw e;
     }
@@ -498,7 +500,7 @@ export class MarketPricesService {
       let listing: RowListing | null = null;
       let candidateCount: number;
       // Prices come only from the card's saved link (see "sync & link" above).
-      const key = c.marketListingKey;
+      const key = isRetiredKey(c.marketListingKey) ? null : c.marketListingKey;
 
       if (english) {
         candidateCount = (tByNum.get(norm(c.cardNumber)) ?? []).length;
@@ -517,7 +519,7 @@ export class MarketPricesService {
         const y = key && key !== NO_MATCH && !key.startsWith(TCG_PREFIX) ? yByKey.get(key) : undefined;
         if (y) {
           listing = {
-            source: y.source === SOURCE_DORASUTA ? 'DORASUTA' : 'YUYUTEI', listingKey: y.listingKey, name: y.name, rarity: y.rarity,
+            source: y.source === SOURCE_CARDRUSH ? 'CARDRUSH' : 'YUYUTEI', listingKey: y.listingKey, name: y.name, rarity: y.rarity,
             price: y.priceJpy, currency: 'JPY', inStock: y.inStock, stockCount: y.stockCount,
             url: y.url, fetchedAt: y.fetchedAt, manual: true, viaLink: y.source === SOURCE_LINK,
             prevPrice: y.prevPriceJpy, priceChangedAt: y.priceChangedAt,
@@ -730,7 +732,7 @@ export class MarketPricesService {
       if (t) listing = { source: 'TCGPLAYER', name: `${t.name} · ${t.subTypeName}`, price: t.priceUsd, currency: 'USD', url: t.url, fetchedAt: t.fetchedAt };
     } else {
       if (!toYuyuteiRarity(rarity)) return empty(`${rarity} cards can't be matched automatically. Save the card, then paste its Yuyu-tei link on Market Prices.`);
-      const yWhere = { cardNumber: num, source: { not: SOURCE_DORASUTA } };
+      const yWhere = { cardNumber: num, source: { in: YUYUTEI_SOURCES } };
       let pool = await this.prisma.marketPrice.findMany({ where: yWhere });
       if (!isFresh(pool)) {
         await this.liveLookup(`y:${num}`, async () => {
@@ -743,16 +745,16 @@ export class MarketPricesService {
       const y = pickAutoListing({ cardNumber: num, rarity }, pool);
       if (y) listing = { source: 'YUYUTEI', name: y.name, price: y.priceJpy, currency: 'JPY', url: y.url, fetchedAt: y.fetchedAt };
       else {
-        // Not on Yuyu-tei: try Dorasuta, the same backup the sync uses.
-        const d = pickDorasutaListing({ cardNumber: num, rarity }, await this.dorasutaPool(num));
-        if (d) listing = { source: 'DORASUTA', name: d.name, price: d.priceJpy, currency: 'JPY', url: d.url, fetchedAt: d.fetchedAt };
+        // Not on Yuyu-tei: try Cardrush, the same backup Link uses.
+        const d = pickCardrushListing({ cardNumber: num, rarity }, await this.cardrushPool(num));
+        if (d) listing = { source: 'CARDRUSH', name: d.name, price: d.priceJpy, currency: 'JPY', url: d.url, fetchedAt: d.fetchedAt };
       }
     }
 
     if (!listing) {
       const reason = english
         ? (candidates ? `TCGplayer has ${num} but no ${rarity} version` : `TCGplayer has no listing for ${num}`)
-        : (candidates ? `Yuyu-tei has ${num} but no ${rarity} version, and Dorasuta doesn't either` : `Neither Yuyu-tei nor Dorasuta lists ${num}`);
+        : (candidates ? `Yuyu-tei has ${num} but no ${rarity} version, and Cardrush doesn't either` : `Neither Yuyu-tei nor Cardrush lists ${num}`);
       return empty(reason, candidates);
     }
     const marketPhp = rate ? Math.round(listing.price * rate) : null;
@@ -828,26 +830,26 @@ export class MarketPricesService {
   }
 
   /**
-   * Dorasuta listings for a number, searched live when none are saved from the
-   * last day. With throwOnError (the Dorasuta tab), a failed search is reported
+   * Cardrush listings for a number, searched live when none are saved from the
+   * last day. With throwOnError (the Cardrush tab), a failed search is reported
    * instead of looking like "no listings".
    */
-  private async dorasutaPool(num: string, throwOnError = false) {
-    const where = { cardNumber: num, source: SOURCE_DORASUTA };
+  private async cardrushPool(num: string, throwOnError = false) {
+    const where = { cardNumber: num, source: SOURCE_CARDRUSH };
     let pool = await this.prisma.marketPrice.findMany({ where });
     if (isFresh(pool)) return pool;
     if (throwOnError) {
       try {
-        const found = await this.dorasutaSearch(num);
-        if (found.length) await this.saveListings(num, found, SOURCE_DORASUTA);
+        const found = await this.cardrushSearch(num);
+        if (found.length) await this.saveListings(num, found, SOURCE_CARDRUSH);
       } catch (e: any) {
         if (pool.length) return pool; // keep showing what was saved before
-        throw new BadRequestException(`Couldn't load Dorasuta: ${e?.message ?? e}`);
+        throw new BadRequestException(`Couldn't load Cardrush: ${e?.message ?? e}`);
       }
     } else {
-      await this.liveLookup(`d:${num}`, async () => {
-        const found = await this.dorasutaSearch(num);
-        if (found.length) await this.saveListings(num, found, SOURCE_DORASUTA);
+      await this.liveLookup(`c:${num}`, async () => {
+        const found = await this.cardrushSearch(num);
+        if (found.length) await this.saveListings(num, found, SOURCE_CARDRUSH);
       });
     }
     pool = await this.prisma.marketPrice.findMany({ where });
@@ -855,25 +857,25 @@ export class MarketPricesService {
   }
 
   /**
-   * Match a card to a pasted Dorasuta product link. Dorasuta product pages
-   * aren't parsed; the product is looked up in the search for the card's own
-   * number, which is also how the nightly sync keeps its price fresh.
+   * Match a card to a pasted Cardrush product link. Product pages aren't
+   * parsed; the product is looked up in the search for the card's own number,
+   * which is also how the sync keeps its price fresh.
    */
-  private async linkDorasuta(rawCardId: string, listingKey: string) {
+  private async linkCardrush(rawCardId: string, listingKey: string) {
     const card = await this.prisma.rawCard.findUnique({ where: { id: rawCardId }, select: { cardNumber: true } });
     if (!card) throw new NotFoundException('Raw card not found');
     const num = norm(card.cardNumber);
     let listings;
     try {
-      listings = await this.dorasutaSearch(num);
+      listings = await this.cardrushSearch(num);
     } catch (e: any) {
-      throw new BadRequestException(`Couldn't check that Dorasuta link: ${e?.message ?? e}`);
+      throw new BadRequestException(`Couldn't check that Cardrush link: ${e?.message ?? e}`);
     }
     const listing = listings.find((l) => l.listingKey === listingKey);
     if (!listing) {
-      throw new BadRequestException(`That Dorasuta product isn't in Dorasuta's ${num} results (or only played copies are listed). Check the card number, or pick from the Dorasuta tab.`);
+      throw new BadRequestException(`That Cardrush product isn't in Cardrush's ${num} results. Check the card number, or pick from the Cardrush tab.`);
     }
-    await this.saveListings(num, listings, SOURCE_DORASUTA);
+    await this.saveListings(num, listings, SOURCE_CARDRUSH);
     await this.prisma.rawCard.update({ where: { id: rawCardId }, data: { marketListingKey: listingKey } });
     return listing;
   }
@@ -931,7 +933,7 @@ export class MarketPricesService {
   // ----------------------------- manual links -----------------------------
 
   /** Every listing for a card number, for the manual match picker. */
-  async listingsFor(cardNumber: string, source: 'YUYUTEI' | 'DORASUTA' | 'TCGPLAYER' = 'YUYUTEI') {
+  async listingsFor(cardNumber: string, source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER' = 'YUYUTEI') {
     const num = norm(cardNumber);
     if (source === 'TCGPLAYER') {
       const rows = await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: num }, orderBy: [{ priceUsd: 'asc' }] });
@@ -941,16 +943,16 @@ export class MarketPricesService {
         inStock: null, stockCount: null, url: t.url,
       }));
     }
-    if (source === 'DORASUTA') {
-      const rows = [...(await this.dorasutaPool(num, true))].sort((a, b) => a.rarity.localeCompare(b.rarity) || a.priceJpy - b.priceJpy);
+    if (source === 'CARDRUSH') {
+      const rows = [...(await this.cardrushPool(num, true))].sort((a, b) => a.rarity.localeCompare(b.rarity) || a.priceJpy - b.priceJpy);
       return rows.map((l) => ({
         source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
-        setLabel: 'Dorasuta', price: l.priceJpy, currency: 'JPY',
+        setLabel: 'Cardrush', price: l.priceJpy, currency: 'JPY',
         inStock: l.inStock, stockCount: l.stockCount, url: l.url,
       }));
     }
     const rows = await this.prisma.marketPrice.findMany({
-      where: { cardNumber: num, source: { not: SOURCE_DORASUTA } }, orderBy: [{ rarity: 'asc' }, { priceJpy: 'asc' }],
+      where: { cardNumber: num, source: { in: YUYUTEI_SOURCES } }, orderBy: [{ rarity: 'asc' }, { priceJpy: 'asc' }],
     });
     return rows.map((l) => ({
       source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
@@ -961,7 +963,7 @@ export class MarketPricesService {
 
   /**
    * Pin a card to a specific listing, or "none" for no market price. null means
-   * "link automatically now": the same Yuyu-tei → Dorasuta / TCGplayer search
+   * "link automatically now": the same Yuyu-tei → Cardrush / TCGplayer search
    * Link new stock does, for this one card.
    */
   async link(rawCardId: string, listingKey: string | null) {
@@ -992,14 +994,11 @@ export class MarketPricesService {
    * price shows immediately; the nightly sync keeps it fresh.
    */
   async linkByUrl(rawCardId: string, input: string) {
-    if (isDorasutaBuyUrl(input)) {
-      throw new BadRequestException("That's a Dorasuta buy-list link (what they pay you). Use the shop page on dorasuta.jp instead.");
-    }
-    const dorasuta = parseDorasutaProductUrl(input);
-    if (dorasuta) return this.linkDorasuta(rawCardId, dorasuta.listingKey);
+    const cardrush = parseCardrushProductUrl(input);
+    if (cardrush) return this.linkCardrush(rawCardId, cardrush.listingKey);
     const parsed = parseYuyuteiCardUrl(input);
     if (!parsed) {
-      throw new BadRequestException('Paste a Yuyu-tei or Dorasuta card link, e.g. https://yuyu-tei.jp/sell/opc/card/prb02/10217');
+      throw new BadRequestException('Paste a Yuyu-tei or Cardrush card link, e.g. https://yuyu-tei.jp/sell/opc/card/prb02/10217');
     }
     const card = await this.prisma.rawCard.findUnique({ where: { id: rawCardId }, select: { id: true } });
     if (!card) throw new NotFoundException('Raw card not found');
