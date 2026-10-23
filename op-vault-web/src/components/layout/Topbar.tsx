@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Search, Bell, Sun, Moon, LogOut, User as UserIcon, Check } from 'lucide-react';
+import { Menu, Search, Bell, Sun, Moon, X, LogOut, User as UserIcon, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -15,6 +15,7 @@ export function Topbar({ onToggleSidebar, onToggleMobile }: { onToggleSidebar: (
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [q, setQ] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
   // theme persisted in localStorage('op_theme'); applied pre-paint in index.html
   const unread = useUnreadCount();
@@ -26,18 +27,20 @@ export function Topbar({ onToggleSidebar, onToggleMobile }: { onToggleSidebar: (
     document.documentElement.classList.toggle('dark', next);
     try { localStorage.setItem('op_theme', next ? 'dark' : 'light'); } catch (e) { /* ignore */ }
   };
-  const onSearch = (e: React.FormEvent) => { e.preventDefault(); if (q.trim()) navigate(`/raw-cards?search=${encodeURIComponent(q.trim())}`); };
+  const onSearch = (e: React.FormEvent) => { e.preventDefault(); if (q.trim()) { navigate(`/raw-cards?search=${encodeURIComponent(q.trim())}`); setMobileSearchOpen(false); } };
 
   return (
-    <header className="flex h-[57px] shrink-0 items-center gap-1.5 border-b bg-card px-2 sm:gap-3 sm:px-4">
+    <header className="relative flex h-[57px] shrink-0 items-center gap-1.5 border-b bg-card px-2 sm:gap-3 sm:px-4">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onToggleMobile} aria-label="Open menu"><Menu className="size-5" /></Button>
       <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleSidebar} aria-label="Collapse sidebar"><Menu className="size-5" /></Button>
-      <form onSubmit={onSearch} className="relative min-w-0 max-w-md flex-1">
+      <span className="min-w-0 flex-1 truncate pl-1 text-sm font-semibold tracking-tight sm:hidden">OP Vault</span>
+      <Button type="button" variant="ghost" size="icon" className="sm:hidden" onClick={() => setMobileSearchOpen((open) => !open)} aria-label="Search inventory" aria-expanded={mobileSearchOpen}><Search className="size-5" /></Button>
+      <form onSubmit={onSearch} className="relative hidden min-w-0 max-w-md flex-1 sm:block">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cards, sets, customers…" className="bg-muted pl-9" aria-label="Global search" />
       </form>
       <div className="hidden flex-1 sm:block" />
-      <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">{dark ? <Sun className="size-5" /> : <Moon className="size-5" />}</Button>
+      <Button variant="ghost" size="icon" className="max-sm:hidden" onClick={toggleTheme} aria-label="Toggle theme">{dark ? <Sun className="size-5" /> : <Moon className="size-5" />}</Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -78,9 +81,17 @@ export function Topbar({ onToggleSidebar, onToggleMobile }: { onToggleSidebar: (
           <DropdownMenuLabel>{user?.email}</DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => navigate('/settings')}><UserIcon className="size-4" /> Settings</DropdownMenuItem>
+          <DropdownMenuItem className="sm:hidden" onSelect={toggleTheme}>{dark ? <Sun className="size-4" /> : <Moon className="size-4" />} {dark ? 'Light mode' : 'Dark mode'}</DropdownMenuItem>
           <DropdownMenuItem onSelect={() => logout()}><LogOut className="size-4" /> Sign out</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {mobileSearchOpen && (
+        <form onSubmit={onSearch} className="absolute inset-x-0 top-full z-50 flex items-center gap-2 border-b bg-card p-3 shadow-lg sm:hidden">
+          <Input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cards and sets…" aria-label="Search inventory" />
+          <Button type="submit" size="sm">Search</Button>
+          <Button type="button" variant="ghost" size="icon" onClick={() => setMobileSearchOpen(false)} aria-label="Close search"><X className="size-4" /></Button>
+        </form>
+      )}
     </header>
   );
 }
