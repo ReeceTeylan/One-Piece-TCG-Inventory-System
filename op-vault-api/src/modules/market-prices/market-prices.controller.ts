@@ -4,6 +4,7 @@ import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { MarketPricesService } from './market-prices.service';
+import { SlabPricesService } from './slab-prices.service';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 import { LinkListingDto } from './dto/link-listing.dto';
 import { LinkUrlDto } from './dto/link-url.dto';
@@ -13,7 +14,7 @@ import { SuggestPriceDto } from './dto/suggest-price.dto';
 @ApiBearerAuth()
 @Controller('market-prices')
 export class MarketPricesController {
-  constructor(private service: MarketPricesService) {}
+  constructor(private service: MarketPricesService, private slabs: SlabPricesService) {}
 
   @Get()
   @ApiOperation({ summary: 'In-stock raw cards with their Yuyu-tei price and underpriced flag' })
@@ -39,6 +40,35 @@ export class MarketPricesController {
   @ApiOperation({ summary: 'Suggested posted price for a card number + rarity (Add Card form)' })
   suggest(@Query() q: SuggestPriceDto) {
     return this.service.suggest(q.cardNumber, q.rarity, q.notes);
+  }
+
+  // ----- Slabs (Cardrush graded copies) -----
+
+  @Get('slabs')
+  @ApiOperation({ summary: 'Market price for in-stock graded slabs from Cardrush graded copies (optionally ?ids=a,b)' })
+  slabPrices(@Query('ids') ids?: string) {
+    const list = ids?.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 200);
+    return this.slabs.forSlabs(list?.length ? list : undefined);
+  }
+
+  @Get('slabs/:id/copies')
+  @ApiOperation({ summary: 'Graded Cardrush copies of the slab\'s card number, for the link picker' })
+  slabCopies(@Param('id') id: string, @Query('cardNumber') cardNumber?: string) {
+    return this.service.slabCopies(id, cardNumber);
+  }
+
+  @Patch('slabs/:id/link')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Link a slab to a Cardrush graded copy ("cardrush:<id>", "none", or null = find the exact match now)' })
+  linkSlab(@Param('id') id: string, @Body() dto: LinkListingDto) {
+    return this.service.linkSlab(id, dto.listingKey ?? null);
+  }
+
+  @Patch('slabs/:id/link-url')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Link a slab by pasting a Cardrush product link of a graded copy' })
+  linkSlabUrl(@Param('id') id: string, @Body() dto: LinkUrlDto) {
+    return this.service.linkSlabUrl(id, dto.url);
   }
 
   @Get('sync/status')

@@ -56,6 +56,7 @@ describe('MarketPricesService', () => {
       $queryRaw: jest.fn(() => Promise.resolve([stamp])), // the cache fingerprint
       $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
       setting: { upsert: jest.fn().mockResolvedValue({}) },
+      slabCard: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) },
       priceHistory: { createMany: jest.fn((a: any) => Promise.resolve({ count: a.data.length })) },
       rawCard: {
         findMany: jest.fn().mockResolvedValue(CARDS),
@@ -271,6 +272,27 @@ describe('MarketPricesService', () => {
       expect(prisma.rawCard.update.mock.calls.map((c: any) => [c[0].where.id, c[0].data.marketListingKey]))
         .toEqual([['n1', 'op01/10150'], ['n2', 'cardrush:541696']]);
       expect(service.status()).toMatchObject({ trigger: 'link', running: false, linked: 2, unmatched: 1 });
+    });
+
+    it('Link new stock also links graded slabs from Cardrush graded copies', async () => {
+      const html = `<li class="list_item_cell"><div class="item_data" data-product-id="950"><a href="u">
+        <span class="goods_name">〔PSA10鑑定済〕モンキー・D・ルフィ(パラレル)【L/P】{OP01-003}</span>
+        <span class="figure">85,000円</span><p class="stock">在庫数 1点</p></a></div></li>`;
+      const c = jest.spyOn(cardrushClient, 'fetchCardrushSearch').mockResolvedValue(html);
+      prisma.rawCard.findMany.mockResolvedValueOnce([]); // no raw cards to link
+      prisma.slabCard.findMany.mockResolvedValueOnce([
+        { id: 'slab1', cardNumber: 'op01-003', rarity: 'PL', gradingCompany: 'PSA', grade: new Prisma.Decimal(10) },
+      ]);
+      // After the search, the saved Cardrush rows are what the slab is matched against.
+      const saved: any[] = [];
+      prisma.marketPrice.upsert = jest.fn((a: any) => { saved.push({ ...a.create }); return Promise.resolve(a); });
+      const findMany = prisma.marketPrice.findMany;
+      prisma.marketPrice.findMany = jest.fn((args: any) => (args?.where?.source === 'CARDRUSH' && !args.select ? Promise.resolve(saved) : findMany(args)));
+      prisma.slabCard.update = jest.fn((a: any) => Promise.resolve(a));
+      await (service as any).runJob('link', 'marketLinkLastRun', () => (service as any).linkNewStock());
+      expect(c.mock.calls.map((x) => x[0])).toEqual(['OP01-003']);
+      expect(prisma.slabCard.update).toHaveBeenCalledWith({ where: { id: 'slab1' }, data: { marketListingKey: 'cardrush:950' } });
+      expect(service.status()).toMatchObject({ linked: 1, unmatched: 0 });
     });
 
     it('if Cardrush refuses (403) it stops asking and says so instead of "no listings"', async () => {

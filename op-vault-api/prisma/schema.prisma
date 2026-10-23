@@ -183,6 +183,8 @@ model SlabCard {
   notes          String?
   isPinned       Boolean     @default(false)
   soldAt         DateTime?
+  // Cardrush graded-copy link: "cardrush:<product id>", "none" = no market price, null = not linked yet.
+  marketListingKey String?
   images         CardImage[]
   saleItems      SaleItem[]
   restockLogs    RestockLog[]

@@ -6,6 +6,7 @@ import { SettingsService } from '../settings/settings.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RawCardsService } from '../raw-cards/raw-cards.service';
+import { SlabPricesService } from './slab-prices.service';
 import { fetchYuyuteiCardPage, fetchYuyuteiSearch } from './yuyutei.client';
 import { parseYuyuteiCardPage, parseYuyuteiCardUrl, parseYuyuteiSearch, YuyuteiListing } from './yuyutei.parser';
 import { fetchGroups, fetchPrices, fetchProducts, TcgcsvGroup } from './tcgcsv.client';
@@ -116,6 +117,7 @@ export class MarketPricesService {
     private audit: ActivityLogsService,
     private rawCards: RawCardsService,
     private notifications: NotificationsService,
+    private slabPrices: SlabPricesService,
   ) {}
 
   // ----------------------------- sync & link -----------------------------
@@ -205,6 +207,8 @@ export class MarketPricesService {
       else if (row?.source === SOURCE_LINK) pages.add(key);
       else yuyuteiNums.add(num); // a listing that vanished is looked for again under its number
     }
+    // Graded slabs are priced from Cardrush copies of their card number.
+    for (const n of await this.slabPrices.linkedSlabNumbers()) cardrushNums.add(n);
     this.state.total = yuyuteiNums.size + pages.size;
     this.logger.log(`Price sync: ${yuyuteiNums.size} Yuyu-tei searches, ${pages.size} linked pages, ${cardrushNums.size} Cardrush searches, ${tcgNums.size} English card numbers`);
 
@@ -234,8 +238,20 @@ export class MarketPricesService {
     });
     this.logger.log(`Link new stock: ${cards.length} unlinked cards`);
     const keys = await this.autoLink(cards, true);
-    this.state.linked = keys.size;
-    this.state.unmatched = cards.length - keys.size;
+
+    // Graded slabs: search Cardrush for their numbers (unless fresh), then link the unambiguous ones.
+    const slabs = await this.slabPrices.unlinkedSlabs();
+    const slabNums = [...new Set(slabs.map((x) => x.cardNumber?.trim().toUpperCase()).filter((n): n is string => !!n))];
+    if (slabNums.length) {
+      const have = groupBy(await this.prisma.marketPrice.findMany({
+        where: { source: SOURCE_CARDRUSH, cardNumber: { in: slabNums } }, select: { cardNumber: true, fetchedAt: true },
+      }), (r) => r.cardNumber);
+      const stale = slabNums.filter((n) => !isFresh(have.get(n) ?? [])).sort();
+      if (stale.length) await this.searchCardrush(stale, true);
+    }
+    const slabResult = slabs.length ? await this.slabPrices.autoLink(slabs) : { linked: 0, unmatched: 0 };
+    this.state.linked = keys.size + slabResult.linked;
+    this.state.unmatched = cards.length - keys.size + slabResult.unmatched;
   }
 
   /**
@@ -642,6 +658,7 @@ export class MarketPricesService {
         rate: rates.jpy, usdRate: rates.usd, jpyDamagedRate: rates.jpyDamaged, usdDamagedRate: rates.usdDamaged,
         pct: rates.pct, cards: searched, matched, underpriced, matchableUnderpriced, changed, view,
         notLinked, linkMissing,
+        slabsNotLinked: await this.prisma.slabCard.count({ where: { kind: 'SLAB', quantity: { gt: 0 }, marketListingKey: null } }),
         lastRun: all[LAST_RUN_KEY] ?? null, lastLink: all[LAST_LINK_KEY] ?? null, sync: this.status(),
       },
     };
@@ -878,6 +895,47 @@ export class MarketPricesService {
     await this.saveListings(num, listings, SOURCE_CARDRUSH);
     await this.prisma.rawCard.update({ where: { id: rawCardId }, data: { marketListingKey: listingKey } });
     return listing;
+  }
+
+  // ----------------------------- slabs -----------------------------
+
+  /** Graded Cardrush copies for the slab link picker (searches Cardrush if not fetched in the last day). */
+  async slabCopies(slabId: string, cardNumber?: string) {
+    const slab = await this.slabPrices.findSlab(slabId);
+    const num = norm(cardNumber || slab.cardNumber || '');
+    if (!num) throw new BadRequestException('Add the card number to this slab first (Edit), or type it in the search box.');
+    await this.cardrushPool(num, true);
+    return this.slabPrices.copiesFor(slab, num);
+  }
+
+  /** Link a slab: a Cardrush graded copy, "none", or null = find the exact match now. */
+  async linkSlab(slabId: string, key: string | null) {
+    if (key !== null) return this.slabPrices.link(slabId, key);
+    const slab = await this.slabPrices.findSlab(slabId);
+    await this.prisma.slabCard.update({ where: { id: slabId }, data: { marketListingKey: null } });
+    if (slab.cardNumber) await this.cardrushPool(norm(slab.cardNumber));
+    const r = await this.slabPrices.autoLink([slab]);
+    return { id: slabId, marketListingKey: r.keys.get(slabId) ?? null };
+  }
+
+  /** Link a slab by pasting a Cardrush product link of a graded copy. */
+  async linkSlabUrl(slabId: string, input: string) {
+    const parsed = parseCardrushProductUrl(input);
+    if (!parsed) throw new BadRequestException('Paste a Cardrush product link, e.g. https://www.cardrush-op.jp/product/2573');
+    const slab = await this.slabPrices.findSlab(slabId);
+    if (!slab.cardNumber) throw new BadRequestException('Add the card number to this slab first (Edit).');
+    const num = norm(slab.cardNumber);
+    let listings;
+    try {
+      listings = await this.cardrushSearch(num);
+    } catch (e: any) {
+      throw new BadRequestException(`Couldn't check that Cardrush link: ${e?.message ?? e}`);
+    }
+    if (!listings.some((l) => l.listingKey === parsed.listingKey)) {
+      throw new BadRequestException(`That Cardrush product isn't in Cardrush's ${num} results. Check the slab's card number.`);
+    }
+    await this.saveListings(num, listings, SOURCE_CARDRUSH);
+    return this.slabPrices.link(slabId, parsed.listingKey);
   }
 
   // ----------------------------- match -----------------------------
