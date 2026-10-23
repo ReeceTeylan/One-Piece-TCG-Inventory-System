@@ -71,7 +71,7 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2">
       {/* Multi-Page Toolbar */}
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm max-sm:gap-2 max-sm:p-2">
         <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-[auto_1fr_auto_auto_auto] max-sm:gap-1.5">
