@@ -68,17 +68,17 @@ export function SalesHistoryPage() {
 
       {data?.summary && (
         <div className="mb-3.5 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3 sm:gap-3">
-          <Card className="p-4">
+          <Card className="min-w-0 p-2.5 sm:p-4">
             <div className="text-xs text-muted-foreground">Total revenue</div>
-            <div className="mt-0.5 text-xl font-bold tabular-nums">{peso(data.summary.totalRevenue)}</div>
+            <div className="mt-0.5 break-words text-base font-bold tabular-nums sm:text-xl">{peso(data.summary.totalRevenue)}</div>
           </Card>
-          <Card className="p-4">
+          <Card className="min-w-0 p-2.5 sm:p-4">
             <div className="text-xs text-muted-foreground">Total profit</div>
-            <div className="mt-0.5 text-xl font-bold tabular-nums text-success">{peso(data.summary.totalProfit)}</div>
+            <div className="mt-0.5 break-words text-base font-bold tabular-nums text-success sm:text-xl">{peso(data.summary.totalProfit)}</div>
           </Card>
-          <Card className="p-4">
+          <Card className="min-w-0 p-2.5 sm:p-4">
             <div className="text-xs text-muted-foreground">Cards sold</div>
-            <div className="mt-0.5 text-xl font-bold tabular-nums">{data.summary.totalCardsSold}</div>
+            <div className="mt-0.5 break-words text-base font-bold tabular-nums sm:text-xl">{data.summary.totalCardsSold}</div>
           </Card>
         </div>
       )}

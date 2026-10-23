@@ -17,8 +17,8 @@ export function MarketMovers() {
   if (isError) return null;
 
   return (
-    <Card className="mt-3">
-      <CardContent className="p-4">
+    <Card className="mt-3 min-w-0">
+      <CardContent className="min-w-0 p-3 sm:p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold">Market movers</h3>
@@ -32,11 +32,11 @@ export function MarketMovers() {
           </button>
         </div>
         {isLoading ? (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-[62px]" />)}
           </div>
         ) : data?.data.length ? (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {data.data.map((m) => (
               <button key={m.id} onClick={() => navigate(`/market-prices?search=${encodeURIComponent(m.cardNumber)}`)}
                 className="flex min-w-0 items-center gap-2.5 rounded-lg border p-2 text-left transition-colors hover:border-primary/40">

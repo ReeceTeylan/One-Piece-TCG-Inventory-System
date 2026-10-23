@@ -11,11 +11,11 @@ function StatGrid({ title, items, loading }: { title: string; items: [string, st
   return (
     <div className="mb-5">
       <h3 className="mb-2.5 text-sm font-bold">{title}</h3>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid min-w-0 grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         {items.map(([label, value]) => (
-          <div key={label} className="rounded-lg border bg-card p-3.5 shadow-sm">
+          <div key={label} className="min-w-0 rounded-lg border bg-card p-2.5 shadow-sm sm:p-3.5">
             <div className="text-[11px] font-semibold text-muted-foreground">{label}</div>
-            {loading ? <Skeleton className="mt-1.5 h-6 w-20" /> : <div className="mt-1 text-lg font-bold tabular-nums">{value}</div>}
+            {loading ? <Skeleton className="mt-1.5 h-6 w-20" /> : <div className="mt-1 break-words text-base font-bold tabular-nums sm:text-lg">{value}</div>}
           </div>
         ))}
       </div>

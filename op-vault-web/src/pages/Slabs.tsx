@@ -145,7 +145,7 @@ export function SlabsPage() {
   return (
     <>
       <PageHeader title="Slabs & Sealed" subtitle={`${data?.meta.total ?? 0} items`}
-        actions={<Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus /> Add item</Button>} />
+        actions={<Button className="max-sm:h-8 max-sm:gap-1 max-sm:px-2.5 max-sm:text-xs" onClick={() => { setEditing(null); setFormOpen(true); }}><Plus /> Add item</Button>} />
 
       <div className="mb-3 flex flex-wrap items-center gap-2 sm:mb-3.5 sm:gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search name, cert #, set…" />
