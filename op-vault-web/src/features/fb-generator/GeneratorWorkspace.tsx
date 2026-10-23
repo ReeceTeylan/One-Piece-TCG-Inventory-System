@@ -142,24 +142,24 @@ export function GeneratorWorkspace({
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto xl:overflow-hidden">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 max-sm:gap-1.5">
         {tabs ?? <span />}
-        <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full max-sm:gap-1">
-          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs max-sm:w-[76px]">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 max-sm:grid max-sm:w-full max-sm:grid-cols-[72px_1fr_1fr_1fr] max-sm:gap-1">
+          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs max-sm:w-full max-sm:text-[11px]">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
           </Select>
-          <Button variant="outline" size="sm" className="max-sm:px-2" onClick={clearAll} disabled={!cards.length}>Clear</Button>
+          <Button variant="outline" size="sm" className="max-sm:min-w-0 max-sm:px-1" onClick={clearAll} disabled={!cards.length}>Clear</Button>
           {canShareFiles() && (
-            <Button size="sm" variant="outline" className="max-sm:flex-1 max-sm:px-2" onClick={() => shareImg.share(renderPng)} disabled={shareImg.busy || exporting || !cards.length}>
+            <Button size="sm" variant="outline" className="max-sm:min-w-0 max-sm:px-1 max-sm:text-[11px]" onClick={() => shareImg.share(renderPng)} disabled={shareImg.busy || exporting || !cards.length}>
               <Share2 className="size-4" /> {shareImg.busy ? 'Preparing…' : shareImg.ready ? 'Tap to share' : 'Share'}
             </Button>
           )}
-          <Button size="sm" className="max-sm:flex-1 max-sm:px-2" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
+          <Button size="sm" className="max-sm:min-w-0 max-sm:px-1 max-sm:text-[11px]" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
         </div>
       </div>
 
-      <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_1fr_260px] xl:overflow-hidden">
+      <div className="grid min-w-0 gap-3 sm:gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_1fr_260px] xl:overflow-hidden">
         <Card className="order-2 flex max-h-[60vh] flex-col p-4 max-sm:p-3 xl:order-1 xl:max-h-none xl:min-h-0">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Layers className="size-4" /> {mode.type === 'SEALED' ? 'Add product' : 'Inventory'}</h3>
           {mode.type === 'SEALED'
@@ -186,7 +186,7 @@ export function GeneratorWorkspace({
           {!cards.length ? (
             <EmptyState message="Add items from the inventory panel." />
           ) : (
-            <div className="w-full">
+            <div className="min-w-0 w-full overflow-hidden">
               <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'op-fb-preview mx-auto bg-[#0b0b0d]' : 'op-fb-preview mx-auto bg-white'}
                 // Square, so capping width by the leftover viewport height is what
                 // keeps it from overflowing the preview panel.
@@ -237,7 +237,7 @@ export function GeneratorWorkspace({
             </div>
           )}
           </Card>
-        <Card className="order-3 max-h-[60vh] overflow-y-auto p-4 xl:max-h-none xl:min-h-0">
+        <Card className="order-3 max-h-[60vh] overflow-y-auto p-4 max-sm:p-3 xl:max-h-none xl:min-h-0">
           <h3 className="mb-3 text-sm font-bold">Overlay controls</h3>
           <ControlsPanel config={config} setConfig={setConfig} />
 

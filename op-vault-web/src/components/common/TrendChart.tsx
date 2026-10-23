@@ -27,9 +27,9 @@ function ChartTooltip({ active, payload }: any) {
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-[15px] font-bold tabular-nums">{value}</div>
+      <div className="mt-0.5 break-words text-[12px] font-bold tabular-nums sm:text-[15px]">{value}</div>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendP
   return (
     <div>
       {bestIdx >= 0 && (
-        <div className="mb-3 flex flex-wrap gap-x-8 gap-y-3 border-b pb-3">
+        <div className="mb-3 grid min-w-0 grid-cols-2 gap-3 border-b pb-3 sm:flex sm:flex-wrap sm:gap-x-8 sm:gap-y-3">
           <Summary label="Best day" value={`${fmt(values[bestIdx])} · ${fmtDate(data[bestIdx].date)}`} />
           {bestMonthIdx >= 0 && (
             <Summary label="Best month"
@@ -62,7 +62,8 @@ export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendP
           <Summary label="Daily average" value={fmt(avg)} />
         </div>
       )}
-      <ResponsiveContainer width="100%" height={260}>
+      <div className="h-[215px] min-w-0 w-full sm:h-[260px]">
+      <ResponsiveContainer width="100%" height="100%">
         <AreaChart data={enriched} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             {/* Fading fill gives the line some mass without adding a new colour. */}
@@ -83,6 +84,7 @@ export function TrendChart({ data, metric = 'revenue', monthly }: { data: TrendP
             dot={false} activeDot={{ r: 5, strokeWidth: 2, stroke: 'hsl(var(--card))' }} />
         </AreaChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

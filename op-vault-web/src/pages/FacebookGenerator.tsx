@@ -13,10 +13,10 @@ export function FacebookGeneratorPage() {
 
   // Rendered inside each workspace's toolbar rather than as its own row.
   const tabs = (
-    <div className="flex gap-1 rounded-lg border bg-muted p-0.5">
+    <div className="flex min-w-0 gap-1 rounded-lg border bg-muted p-0.5 max-sm:w-full">
       {TABS.map((t) => (
         <button key={t} onClick={() => setActive(t)}
-          className={cn('rounded-md px-3 py-1 text-xs font-semibold', active === t ? 'bg-card shadow' : 'text-muted-foreground')}>
+          className={cn('min-w-0 rounded-md px-3 py-1 text-xs font-semibold max-sm:flex-1 max-sm:py-2', active === t ? 'bg-card shadow' : 'text-muted-foreground')}>
           {MODES[t].label}
         </button>
       ))}

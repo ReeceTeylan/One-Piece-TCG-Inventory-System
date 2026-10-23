@@ -270,7 +270,7 @@ export function RawCardsPage() {
                   if (!c) return null;
                   return (
                     <>
-                      <Button variant="ghost" size="sm" onClick={() => setRestockCard(c)}><PackagePlus className="size-4" /> Qty</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setRestockCard(c)} aria-label="Adjust quantity"><PackagePlus className="size-4" /> <span className="max-sm:hidden">Qty</span></Button>
                       <Button variant="ghost" size="icon" onClick={() => setEditCard(c)} aria-label="Edit"><Pencil className="size-4" /></Button>
                       {isOwner && <Button variant="ghost" size="icon" className="text-destructive" onClick={() => setDeleteCard(c)} aria-label="Delete"><Trash2 className="size-4" /></Button>}
                     </>

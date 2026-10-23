@@ -73,12 +73,12 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* Multi-Page Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm max-sm:gap-2 max-sm:p-2">
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-between max-sm:gap-1.5">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm max-sm:gap-2 max-sm:p-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-[auto_1fr_auto_auto_auto] max-sm:gap-1.5">
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.max(0, currentIndex - 1)]?.id)} disabled={currentIndex === 0 || isExporting}>
             <ChevronLeft className="size-4" />
           </Button>
-          <span className="min-w-[5rem] text-center text-sm font-semibold">
+          <span className="min-w-0 text-center text-sm font-semibold">
             Page {currentIndex + 1} / {pages.length}
           </span>
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.min(pages.length - 1, currentIndex + 1)]?.id)} disabled={currentIndex === pages.length - 1 || isExporting}>
@@ -88,33 +88,33 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
           <div className="mx-2 hidden h-4 w-px bg-border sm:block" />
 
           <Button variant="ghost" size="sm" onClick={addPage} disabled={isExporting}>
-            <Plus className="mr-1 size-4" /> Add
+            <Plus className="size-4 sm:mr-1" /><span className="max-sm:sr-only sm:not-sr-only">Add</span>
           </Button>
           <Button variant="ghost" size="sm" onClick={() => removePage(currentPageId)} disabled={pages.length === 1 || isExporting} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
-            <Trash2 className="mr-1 size-4" /> Remove
+            <Trash2 className="size-4 sm:mr-1" /><span className="max-sm:sr-only sm:not-sr-only">Remove</span>
           </Button>
 
-          {tabs && <><div className="mx-2 hidden h-4 w-px bg-border sm:block" /><div className="max-sm:w-full">{tabs}</div></>}
+          {tabs && <><div className="mx-2 hidden h-4 w-px bg-border sm:block" /><div className="max-sm:col-span-5 max-sm:w-full">{tabs}</div></>}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:grid max-sm:w-full max-sm:grid-cols-3 max-sm:gap-1.5">
           <span className="mr-2 text-xs text-muted-foreground max-sm:hidden">{totalCards} items</span>
-          <Button variant="outline" size="sm" className="max-sm:flex-1" onClick={handleAutoFill} disabled={loading || isExporting}>
+          <Button variant="outline" size="sm" className="max-sm:min-w-0 max-sm:px-1.5 max-sm:text-[11px]" onClick={handleAutoFill} disabled={loading || isExporting}>
             <Zap className="mr-1 size-4" /> {loading ? 'Loading…' : 'Auto-fill'}
           </Button>
           {canShareFiles() && (
-            <Button variant="outline" size="sm" className="max-sm:flex-1" onClick={() => shareAll.share(renderAll)} disabled={isExporting || shareAll.busy || totalCards === 0}>
+            <Button variant="outline" size="sm" className="max-sm:min-w-0 max-sm:px-1.5 max-sm:text-[11px]" onClick={() => shareAll.share(renderAll)} disabled={isExporting || shareAll.busy || totalCards === 0}>
               <Share2 className="mr-1 size-4" /> {shareAll.busy ? 'Preparing…' : shareAll.ready ? 'Tap to share' : 'Share all'}
             </Button>
           )}
-          <Button size="sm" className="max-sm:flex-1" onClick={exportAll} disabled={isExporting || totalCards === 0}>
+          <Button size="sm" className="max-sm:min-w-0 max-sm:px-1.5 max-sm:text-[11px]" onClick={exportAll} disabled={isExporting || totalCards === 0}>
             <Download className="mr-1 size-4" /> {isExporting ? 'Exporting…' : 'Export ZIP'}
           </Button>
         </div>
       </div>
 
       {/* The Controlled Workspace */}
-      <div className={`flex min-h-0 flex-1 flex-col ${isExporting ? 'pointer-events-none opacity-60 transition-opacity' : ''}`}>
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${isExporting ? 'pointer-events-none opacity-60 transition-opacity' : ''}`}>
         <GeneratorWorkspace
           mode={mode}
           cards={currentPage.cards}
