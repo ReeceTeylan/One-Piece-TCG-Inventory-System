@@ -21,12 +21,14 @@ import { CardThumb } from '@/components/common/CardImage';
 import { useShipmentImages } from '@/features/shipments/use-shipment-images';
 import type { Shipment } from '@/types';
 import { useShipments, useShipmentMutations, useShipmentTimeline, NEXT_STATUS } from '@/features/shipments/use-shipments';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 const STATUSES = ['TO_PACK', 'READY', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
 export function ShipmentsPage() {
-  const [status, setStatus] = useState('PENDING');
-  const [courier, setCourier] = useState('');
+  // Filters stay as you left them after a refresh.
+  const [status, setStatus] = useStickyState('shipments:status', 'PENDING', { allowed: ['PENDING', '', ...STATUSES] });
+  const [courier, setCourier] = useStickyState('shipments:courier', '', { allowed: ['', ...COURIERS.map((c) => c.value)] });
   const [page, setPage] = useState(1);
   const { data, isLoading, isError } = useShipments({
     page, limit: 20,

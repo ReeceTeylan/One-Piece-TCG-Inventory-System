@@ -15,6 +15,7 @@
   import { HeroAura } from '@/components/common/HeroAura';
   import { Input } from '@/components/ui/input';
   import { MarketMovers } from '@/components/common/MarketMovers';
+  import { useStickyState } from '@/hooks/use-sticky-state';
 
   function Delta({ value }: { value: number }) {
     const up = value >= 0;
@@ -57,10 +58,11 @@
 
   export function DashboardPage() {
     const navigate = useNavigate();
-    const [metric, setMetric] = useState<'revenue' | 'profit' | 'cardsSold'>('profit');
+    const [metric, setMetric] = useStickyState<'revenue' | 'profit' | 'cardsSold'>('dashboard:metric', 'profit', { allowed: ['revenue', 'profit', 'cardsSold'] });
     // Default to the current calendar month, matching the "this month" stat cards.
     const currentMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' }).slice(0, 7);
-    const [targetMonth, setTargetMonth] = useState(currentMonth);
+    // Kept for this visit only, so a new day still opens on the current month.
+    const [targetMonth, setTargetMonth] = useStickyState('dashboard:month', currentMonth, { session: true });
     const dash = useQuery({ queryKey: ['dashboard'], queryFn: analyticsService.dashboard });
     const trends = useQuery({ 
       queryKey: ['trends', 'daily', targetMonth], 

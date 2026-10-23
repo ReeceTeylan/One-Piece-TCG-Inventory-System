@@ -20,6 +20,7 @@ import { useSales, useSaleMutations } from '@/features/sales/use-sales';
 import { EditOrderDialog } from '@/features/sales/EditOrderDialog';
 import { ReceiptDialog } from '@/features/sales/ReceiptDialog';
 import { Receipt } from 'lucide-react';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 const RANGES = ['today', 'week', 'month', 'year'] as const;
 
@@ -27,8 +28,9 @@ export function SalesHistoryPage() {
   const { isOwner } = useAuth();
   const { cancel, refund } = useSaleMutations();
   const [search, setSearch] = useState('');
-  const [range, setRange] = useState<string>('');
-  const [status, setStatus] = useState('');
+  // Filters stay as you left them after a refresh.
+  const [range, setRange] = useStickyState<string>('sales:range', '', { allowed: ['', 'today', 'week', 'month', 'year'] });
+  const [status, setStatus] = useStickyState('sales:status', '', { allowed: ['', 'PAID', 'PARTIAL', 'UNPAID', 'CANCELLED', 'REFUNDED'] });
   const [page, setPage] = useState(1);
   const debounced = useDebounce(search);
   const { data, isLoading, isError } = useSales({ page, limit: 20, search: debounced || undefined, range: range || undefined, status: status || undefined });

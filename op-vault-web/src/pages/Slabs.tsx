@@ -25,15 +25,17 @@ import type { SlabCard } from '@/types';
 import { useSlabs, useSlabMutations, GRADES } from '@/features/slabs/use-slabs';
 import { SlabForm } from '@/features/slabs/SlabForm';
 import { SlabRestockDialog } from '@/features/slabs/SlabRestockDialog';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 export function SlabsPage() {
   const { isOwner } = useAuth();
   const { remove, upload } = useSlabMutations();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState('AVAILABLE');
-  const [grade, setGrade] = useState('');
-  const [kind, setKind] = useState('');
-  const [sort, setSort] = useState('sellPrice:desc');
+  // Filters stay as you left them after a refresh.
+  const [status, setStatus] = useStickyState('slabs:status', 'AVAILABLE', { allowed: ['', 'AVAILABLE', 'SOLD'] });
+  const [grade, setGrade] = useStickyState('slabs:grade', '', { allowed: ['', ...GRADES] });
+  const [kind, setKind] = useStickyState('slabs:kind', '', { allowed: ['', 'SLAB', 'SEALED'] });
+  const [sort, setSort] = useStickyState('slabs:sort', 'sellPrice:desc', { allowed: ['createdAt:desc', 'name:asc', 'sellPrice:desc', 'sellPrice:asc', 'grade:desc'] });
   const [page, setPage] = useState(1);
   // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
   const [limit, setLimit] = useState(() => {

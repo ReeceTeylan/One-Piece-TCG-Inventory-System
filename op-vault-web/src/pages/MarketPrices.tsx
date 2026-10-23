@@ -20,6 +20,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { apiError } from '@/lib/api';
 import { cn, peso } from '@/lib/utils';
 import { marketPricesService, type MarketRow, type MarketSort, type MarketSource, type MarketSummary } from '@/services';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 const yen = (n: number) => `¥${n.toLocaleString('ja-JP')}`;
 const usd = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -43,14 +44,15 @@ export function MarketPricesPage() {
   // ?search= lets the dashboard's Market movers open straight to a card.
   const [search, setSearch] = useState(() => sp.get('search') ?? '');
   const debounced = useDebounce(search);
-  const [underpricedOnly, setUnderpricedOnly] = useState(false);
+  // Filters stay as you left them after a refresh.
+  const [underpricedOnly, setUnderpricedOnly] = useStickyState('market:underpricedOnly', false);
   const [page, setPage] = useState(1);
   const [linking, setLinking] = useState<MarketRow | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
-  const [view, setView] = useState<'changes' | 'all' | 'unlinked'>('changes');
-  const [sort, setSort] = useState<MarketSort | ''>(''); // '' = default for the view
-  const [language, setLanguage] = useState<'' | 'JP' | 'EN'>('');
-  const [condition, setCondition] = useState<'' | 'clean' | 'issues'>('');
+  const [view, setView] = useStickyState<'changes' | 'all' | 'unlinked'>('market:view', 'changes', { allowed: ['changes', 'all', 'unlinked'] });
+  const [sort, setSort] = useStickyState<MarketSort | ''>('market:sort', '', { allowed: ['', 'change', 'price_desc', 'price_asc', 'recent', 'margin_desc', 'underpriced'] }); // '' = default for the view
+  const [language, setLanguage] = useStickyState<'' | 'JP' | 'EN'>('market:language', '', { allowed: ['', 'JP', 'EN'] });
+  const [condition, setCondition] = useStickyState<'' | 'clean' | 'issues'>('market:condition', '', { allowed: ['', 'clean', 'issues'] });
   const reset = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
 
   const params = {

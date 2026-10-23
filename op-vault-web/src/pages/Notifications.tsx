@@ -11,12 +11,13 @@ import { Pagination } from '@/components/common/Pagination';
 import { cn, fmtDate } from '@/lib/utils';
 import { notificationsService } from '@/services';
 import { apiError } from '@/lib/api';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 const TYPE_VARIANT: Record<string, any> = { LOW_STOCK: 'warning', OUT_OF_STOCK: 'destructive', SALE: 'success', SHIPMENT: 'info', SYSTEM: 'default' };
 
 export function NotificationsPage() {
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<string>('');
+  const [filter, setFilter] = useStickyState<string>('notifications:filter', '', { allowed: ['', 'unread', 'read'] });
   const [page, setPage] = useState(1);
   const { data, isLoading, isError } = useQuery({
     queryKey: ['notifications', page, filter],

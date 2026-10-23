@@ -28,6 +28,7 @@ import type { RawCard, StockStatus } from '@/types';
 import { rawCardsService, marketPricesService } from '@/services';
 import { useCardMarket, useMatchPrice } from '@/features/market/use-card-market';
 import { useBulkRun } from '@/features/raw-cards/use-bulk-run';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 const statusBadge = (s: StockStatus) =>
   s === 'OUT' ? <Badge variant="destructive">Sold</Badge>
@@ -37,13 +38,14 @@ export function RawCardsPage() {
   const { isOwner } = useAuth();
   const [sp, setSp] = useSearchParams();
   const [search, setSearch] = useState(sp.get('search') ?? '');
-  const [status, setStatus] = useState('IN_STOCK');
-  const [rarity, setRarity] = useState('');
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  // Filters stay as you left them after a refresh.
+  const [status, setStatus] = useStickyState('raw:status', 'IN_STOCK', { allowed: ['IN_STOCK', 'OUT', ''] });
+  const [rarity, setRarity] = useStickyState('raw:rarity', '', { allowed: ['', ...RARITIES] });
+  const [minPrice, setMinPrice] = useStickyState('raw:minPrice', '');
+  const [maxPrice, setMaxPrice] = useStickyState('raw:maxPrice', '');
   const minDebounced = useDebounce(minPrice);
   const maxDebounced = useDebounce(maxPrice);
-  const [sort, setSort] = useState('postedPrice:desc');
+  const [sort, setSort] = useStickyState('raw:sort', 'postedPrice:desc', { allowed: ['createdAt:desc', 'name:asc', 'name:desc', 'postedPrice:desc', 'postedPrice:asc', 'quantity:desc', 'quantity:asc'] });
   const [page, setPage] = useState(1);
   // Persisted so the choice survives reloads. Guarded against a stale/garbage value.
   const [limit, setLimit] = useState(() => {

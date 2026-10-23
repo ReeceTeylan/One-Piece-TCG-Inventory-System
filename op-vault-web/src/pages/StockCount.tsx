@@ -16,6 +16,7 @@ import { useDebounce } from '@/hooks/use-debounce';
 import { apiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { rawCardsService, slabsService, stockCountService } from '@/services';
+import { useStickyState } from '@/hooks/use-sticky-state';
 
 type Tab = 'RAW' | 'SLAB';
 interface Row {
@@ -40,12 +41,13 @@ const LIMIT = 50;
 
 export function StockCountPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>('RAW');
+  // Tab and toggles stay as you left them after a refresh.
+  const [tab, setTab] = useStickyState<Tab>('stockcount:tab', 'RAW', { allowed: ['RAW', 'SLAB'] });
   const [search, setSearch] = useState('');
   const debounced = useDebounce(search);
   const [page, setPage] = useState(1);
-  const [includeZero, setIncludeZero] = useState(false);
-  const [hideCounted, setHideCounted] = useState(false);
+  const [includeZero, setIncludeZero] = useStickyState('stockcount:includeZero', false);
+  const [hideCounted, setHideCounted] = useStickyState('stockcount:hideCounted', false);
   const [session, setSession] = useState<Record<string, number>>(loadSession);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [resetOpen, setResetOpen] = useState(false);
