@@ -168,7 +168,7 @@ export function RawCardsPage() {
     <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="Raw Cards" subtitle={query.data ? `${query.data.meta.total} titles` : undefined}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-sm:gap-1.5">
             <Button variant="outline" size="sm" onClick={() => setShowImport(true)}><Upload className="size-4" /> <span className="hidden sm:inline">Import CSV</span></Button>
             <Button size="sm" onClick={() => setShowAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Add raw card</span><span className="sm:hidden">Add</span></Button>
           </div>
@@ -179,10 +179,10 @@ export function RawCardsPage() {
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search…" className="pl-9" />
         </form>
-        <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setFiltersOpen((o) => !o)} aria-label="Filters">
+        <Button variant="outline" size="icon" className="sm:hidden" onClick={() => setFiltersOpen((o) => !o)} aria-label="Filters" aria-expanded={filtersOpen}>
           <SlidersHorizontal className="size-4" />
         </Button>
-        <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto`}>
+        <div className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 rounded-lg max-sm:border max-sm:bg-muted/20 max-sm:p-2 sm:flex sm:w-auto`}>
         <Select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="IN_STOCK">Available</option><option value="OUT">Sold</option><option value="">All</option></Select>
         <Select value={rarity} onChange={(e) => { setRarity(e.target.value); setPage(1); }}><option value="">All rarities</option>{RARITIES.map((r) => <option key={r} value={r}>{r}</option>)}</Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value)}>

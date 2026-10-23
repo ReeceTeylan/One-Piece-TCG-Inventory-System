@@ -24,7 +24,7 @@ export function FacebookGeneratorPage() {
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col max-sm:overflow-y-auto sm:overflow-hidden">
       {TABS.map((t) => (
         <div key={t} className={active === t ? 'flex min-h-0 flex-1 flex-col' : 'hidden'}>
           {t === 'RAW'

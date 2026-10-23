@@ -143,31 +143,31 @@ export function GeneratorWorkspace({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2 max-sm:gap-1.5">
         {tabs ?? <span />}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 max-sm:w-full max-sm:gap-1">
+          <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs max-sm:w-[76px]">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
           </Select>
-          <Button variant="outline" size="sm" onClick={clearAll} disabled={!cards.length}>Clear</Button>
+          <Button variant="outline" size="sm" className="max-sm:px-2" onClick={clearAll} disabled={!cards.length}>Clear</Button>
           {canShareFiles() && (
-            <Button size="sm" variant="outline" onClick={() => shareImg.share(renderPng)} disabled={shareImg.busy || exporting || !cards.length}>
+            <Button size="sm" variant="outline" className="max-sm:flex-1 max-sm:px-2" onClick={() => shareImg.share(renderPng)} disabled={shareImg.busy || exporting || !cards.length}>
               <Share2 className="size-4" /> {shareImg.busy ? 'Preparing…' : shareImg.ready ? 'Tap to share' : 'Share'}
             </Button>
           )}
-          <Button size="sm" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
+          <Button size="sm" className="max-sm:flex-1 max-sm:px-2" onClick={exportPng} disabled={exporting || !cards.length}><Download className="size-4" /> {exporting ? 'Exporting…' : 'Export PNG'}</Button>
         </div>
       </div>
 
       <div className="grid gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_1fr_260px] xl:overflow-hidden">
-        <Card className="order-2 flex max-h-[60vh] flex-col p-4 xl:order-1 xl:max-h-none xl:min-h-0">
+        <Card className="order-2 flex max-h-[60vh] flex-col p-4 max-sm:p-3 xl:order-1 xl:max-h-none xl:min-h-0">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Layers className="size-4" /> {mode.type === 'SEALED' ? 'Add product' : 'Inventory'}</h3>
           {mode.type === 'SEALED'
             ? <SealedForm onAdd={addCard} />
             : <InventoryPicker type={mode.type} selectedKeys={selectedKeys} onAdd={addCard} />}
         </Card>
 
-        <Card className="order-1 flex flex-col p-4 xl:order-2 xl:min-h-0 xl:overflow-y-auto">
+        <Card className="order-1 flex flex-col p-4 max-sm:p-3 xl:order-2 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-bold">Preview <span className="text-muted-foreground">· {cards.length}/{perPage}</span></h3>
           </div>

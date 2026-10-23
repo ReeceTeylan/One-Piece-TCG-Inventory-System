@@ -73,8 +73,8 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {/* Multi-Page Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card p-2 shadow-sm max-sm:gap-2 max-sm:p-2">
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-between max-sm:gap-1.5">
           <Button variant="outline" size="sm" onClick={() => setCurrent(pages[Math.max(0, currentIndex - 1)]?.id)} disabled={currentIndex === 0 || isExporting}>
             <ChevronLeft className="size-4" />
           </Button>
@@ -94,20 +94,20 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
             <Trash2 className="mr-1 size-4" /> Remove
           </Button>
 
-          {tabs && <><div className="mx-2 hidden h-4 w-px bg-border sm:block" />{tabs}</>}
+          {tabs && <><div className="mx-2 hidden h-4 w-px bg-border sm:block" /><div className="max-sm:w-full">{tabs}</div></>}
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="mr-2 text-xs text-muted-foreground">{totalCards} items</span>
-          <Button variant="outline" size="sm" onClick={handleAutoFill} disabled={loading || isExporting}>
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:gap-1.5">
+          <span className="mr-2 text-xs text-muted-foreground max-sm:hidden">{totalCards} items</span>
+          <Button variant="outline" size="sm" className="max-sm:flex-1" onClick={handleAutoFill} disabled={loading || isExporting}>
             <Zap className="mr-1 size-4" /> {loading ? 'Loading…' : 'Auto-fill'}
           </Button>
           {canShareFiles() && (
-            <Button variant="outline" size="sm" onClick={() => shareAll.share(renderAll)} disabled={isExporting || shareAll.busy || totalCards === 0}>
+            <Button variant="outline" size="sm" className="max-sm:flex-1" onClick={() => shareAll.share(renderAll)} disabled={isExporting || shareAll.busy || totalCards === 0}>
               <Share2 className="mr-1 size-4" /> {shareAll.busy ? 'Preparing…' : shareAll.ready ? 'Tap to share' : 'Share all'}
             </Button>
           )}
-          <Button size="sm" onClick={exportAll} disabled={isExporting || totalCards === 0}>
+          <Button size="sm" className="max-sm:flex-1" onClick={exportAll} disabled={isExporting || totalCards === 0}>
             <Download className="mr-1 size-4" /> {isExporting ? 'Exporting…' : 'Export ZIP'}
           </Button>
         </div>
