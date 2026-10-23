@@ -11,7 +11,7 @@ const TABS = [
 
 /** Phone-only tab bar: the four most-used pages one tap away; "More" opens the full menu. */
 export function BottomTabs({ onMore }: { onMore: () => void }) {
-  const tab = 'flex flex-1 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-[10.5px] font-medium transition-colors';
+  const tab = 'flex min-h-[56px] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 pt-1.5 pb-1 text-[10.5px] font-medium transition-colors';
   return (
     <nav aria-label="Main"
       className="fixed inset-x-0 bottom-0 z-20 flex border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">

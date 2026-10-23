@@ -176,16 +176,16 @@ export function SalesWizardPage() {
           )}
 
           <div className="mb-3 border-t pt-4"><h3 className="mb-3 text-sm font-semibold">or create new customer</h3></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div><Label>Name</Label><Input value={newCustomer.name} disabled={!!existing} onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })} className="mt-1" /></div>
             <div><Label>Facebook name</Label><Input value={newCustomer.facebookName} disabled={!!existing} onChange={(e) => setNewCustomer({ ...newCustomer, facebookName: e.target.value })} className="mt-1" /></div>
             <div><Label>Contact number</Label><Input value={newCustomer.contactNumber} disabled={!!existing} onChange={(e) => setNewCustomer({ ...newCustomer, contactNumber: e.target.value })} className="mt-1" /></div>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 border-t pt-4">
+          <div className="mt-4 grid grid-cols-1 gap-3 border-t pt-4 sm:grid-cols-2">
             <div><Label>Shipping method</Label><Select value={courier} onChange={(e) => setCourier(e.target.value)} className="mt-1 w-full">{COURIERS.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</Select></div>
             <div><Label>Shipping fee (₱)</Label><Input type="number" value={shippingFee} onChange={(e) => setShippingFee(Number(e.target.value))} className="mt-1" /></div>
-            <div className="col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" /></div>
+            <div className="sm:col-span-2"><Label>Notes</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" /></div>
           </div>
           <div className="mt-5 flex justify-end"><Button onClick={goProducts}>Continue to products <ArrowRight /></Button></div>
         </Card>

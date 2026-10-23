@@ -10,7 +10,7 @@ export function Pagination({ page, totalPages, total, onPage, limit, onLimit }: 
   limit?: number; onLimit?: (n: number) => void;
 }) {
   return (
-    <div className="flex flex-1 items-center justify-between gap-2 px-4 py-3 text-sm text-muted-foreground">
+    <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-3 sm:px-4 text-sm text-muted-foreground">
       <span className="min-w-0 truncate">{total} total · page {page} of {totalPages}</span>
       <div className="flex shrink-0 items-center gap-1.5">
         {limit !== undefined && onLimit && (
@@ -22,8 +22,8 @@ export function Pagination({ page, totalPages, total, onPage, limit, onLimit }: 
             </Select>
           </div>
         )}
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="size-4" /> Prev</Button>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Next <ChevronRight className="size-4" /></Button>
+        <Button variant="outline" size="sm" aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}><ChevronLeft className="size-4" /> <span className="max-sm:hidden">Prev</span></Button>
+        <Button variant="outline" size="sm" aria-label="Next page" disabled={page >= totalPages} onClick={() => onPage(page + 1)}><span className="max-sm:hidden">Next</span> <ChevronRight className="size-4" /></Button>
       </div>
     </div>
   );

@@ -136,7 +136,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? 'Edit raw card' : 'Add raw card'}</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-3">
+          <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {field('Card name', 'name')}
             {field('Card number', 'cardNumber')}
             {field('Set', 'setName')}
@@ -145,11 +145,11 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
             <div><Label>Rarity</Label><Select {...register('rarity')} className="mt-1 w-full">{RARITIES.map((r) => <option key={r}>{r}</option>)}</Select></div>
             {field('Buying cost (₱)', 'buyCost', 'number')}
             {field('Posted price (₱)', 'postedPrice', 'number')}
-            <PriceHint className="col-span-2" loading={suggestion.isFetching && !suggestion.data} s={suggestion.data}
+            <PriceHint className="sm:col-span-2" loading={suggestion.isFetching && !suggestion.data} s={suggestion.data}
               current={posted} onUse={(v) => setValue('postedPrice', v, { shouldDirty: true })} />
             {field('Quantity', 'quantity', 'number')}
-            <div className="col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
-            <div className="col-span-2">
+            <div className="sm:col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
+            <div className="sm:col-span-2">
               <Label>Card image</Label>
               <ImageUploader
                 className="mt-1"
@@ -161,7 +161,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
                 disabled={busy}
               />
             </div>
-            <DialogFooter className="col-span-2">
+            <DialogFooter className="sm:col-span-2">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={busy}>{busy ? (uploading ? 'Uploading…' : 'Saving…') : editing ? 'Save changes' : 'Add card'}</Button>
             </DialogFooter>

@@ -113,8 +113,8 @@ export function SlabForm({ open, onOpenChange, editing }: { open: boolean; onOpe
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader><DialogTitle>{editing ? (editing.kind === 'SEALED' ? 'Edit sealed product' : 'Edit slab') : isSealed ? 'Add sealed product' : 'Add graded slab'}</DialogTitle></DialogHeader>
-        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
+        <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="sm:col-span-2">
             <Label>Product type</Label>
             {editing ? (
               <>
@@ -145,8 +145,8 @@ export function SlabForm({ open, onOpenChange, editing }: { open: boolean; onOpe
           {field('Rarity', 'rarity')}
           {field('Buying cost (₱)', 'buyCost', 'number', { step: '0.01' })}
           {field('Selling price (₱)', 'sellPrice', 'number', { step: '0.01' })}
-          <div className="col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
+          <div className="sm:col-span-2">
             <Label>Slab image</Label>
             <ImageUploader
               className="mt-1"
@@ -158,7 +158,7 @@ export function SlabForm({ open, onOpenChange, editing }: { open: boolean; onOpe
               disabled={pending}
             />
           </div>
-          <DialogFooter className="col-span-2">
+          <DialogFooter className="sm:col-span-2">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={pending}>{pending ? (uploading ? 'Uploading…' : 'Saving…') : editing ? 'Save changes' : 'Add slab'}</Button>
           </DialogFooter>

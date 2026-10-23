@@ -9,7 +9,7 @@ export function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100dvh] overflow-hidden md:h-screen">
       <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onNavigate={() => setMobileOpen(false)} />
       {mobileOpen && <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setMobileOpen(false)} />}
       {/* min-w-0 lets this column shrink below its content width — without it the
@@ -21,7 +21,7 @@ export function AppLayout() {
         {/* min-h-0 lets children shrink below their content height so the table,
             not the page, is what scrolls. */}
         {/* Bottom padding on phones keeps the last row clear of the tab bar. */}
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-4"><Outlet /></main>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain p-3 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:p-4 md:overflow-hidden md:pb-4"><Outlet /></main>
       </div>
       <BottomTabs onMore={() => setMobileOpen(true)} />
     </div>

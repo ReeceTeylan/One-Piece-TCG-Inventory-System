@@ -85,3 +85,18 @@
   .gl-coin-flip, .gl-rise, .gl-twinkle { animation: none !important; }
   .gl-coin, .gl-motion-only { display: none !important; }
 }
+
+/* Keep row actions visible while a wide data table scrolls on narrow phones. */
+@media (max-width: 639px) {
+  .mobile-actions-table th:last-child,
+  .mobile-actions-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 11;
+    background: hsl(var(--card));
+    box-shadow: -5px 0 8px -7px rgba(0,0,0,.4);
+  }
+  .mobile-actions-table th:last-child { background: hsl(var(--muted)); z-index: 12; }
+  .mobile-actions-table td:last-child button { min-width: 36px; min-height: 36px; }
+  .op-fb-preview { --op-preview-max-width: min(100%, 900px); }
+}

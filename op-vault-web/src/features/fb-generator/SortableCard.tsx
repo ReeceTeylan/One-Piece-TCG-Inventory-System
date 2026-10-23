@@ -29,7 +29,7 @@ export function SortableCard({ card, config, selected, inSet, aspect, onRemove, 
         </div>
       )}
 
-      <div className="absolute inset-x-0 top-0 flex items-center justify-between p-1 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-x-0 top-0 hidden items-center justify-between p-1 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 sm:flex">
         <button {...attributes} {...listeners} className="grid size-6 cursor-grab place-items-center rounded bg-black/60 text-white" aria-label="Drag to reorder">
           <GripVertical className="size-3.5" />
         </button>

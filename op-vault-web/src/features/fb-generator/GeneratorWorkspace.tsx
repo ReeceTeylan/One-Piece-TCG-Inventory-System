@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
 import { toPng } from 'html-to-image';
-import { Download, Layers, Share2, X } from 'lucide-react';
+import { Download, Layers, Share2, X, Tag, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { canShareFiles, dataUrlToFile, useShareImages } from '@/lib/share';
 import { toast } from 'sonner';
 import { Card } from '@/components/ui/card';
@@ -145,7 +145,7 @@ export function GeneratorWorkspace({
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto xl:overflow-hidden">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         {tabs ?? <span />}
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Select value={resolution} onChange={(e) => setResolution(Number(e.target.value))} aria-label="Export resolution" className="h-8 w-[88px] text-xs">
             {RESOLUTIONS.map((r) => <option key={r.width} value={r.width}>{r.label}</option>)}
           </Select>
@@ -187,10 +187,10 @@ export function GeneratorWorkspace({
             <EmptyState message="Add items from the inventory panel." />
           ) : (
             <div className="w-full">
-              <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'mx-auto bg-[#0b0b0d]' : 'mx-auto bg-white'}
+              <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'op-fb-preview mx-auto bg-[#0b0b0d]' : 'op-fb-preview mx-auto bg-white'}
                 // Square, so capping width by the leftover viewport height is what
                 // keeps it from overflowing the preview panel.
-                style={{ width: '100%', maxWidth: 'min(900px, calc(100vh - 260px))', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mode.type === 'SLAB' ? '0.2%' : '0.5%' }}>
+                style={{ width: '100%', maxWidth: 'var(--op-preview-max-width, min(900px, calc(100vh - 260px)))', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mode.type === 'SLAB' ? '0.2%' : '0.5%' }}>
                 <div className="relative" style={{ height: '100%', maxWidth: '100%', aspectRatio: `${cols * aspectW} / ${rows * aspectH}` }}>
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                     <SortableContext items={cards.map((c) => c.key)} strategy={rectSortingStrategy}>
@@ -220,6 +220,20 @@ export function GeneratorWorkspace({
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+          {!!cards.length && (
+            <div className="mt-3 space-y-2 sm:hidden" aria-label="Mobile card actions">
+              <p className="text-xs text-muted-foreground">Manage cards here; tap the preview to select cards for grouping.</p>
+              {cards.map((card, index) => (
+                <div key={card.key} className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border p-2">
+                  <span className="min-w-0 flex-1 basis-24 truncate text-xs font-medium">{index + 1}. {card.name}</span>
+                  <Button size="icon" variant="outline" className="size-9" disabled={index === 0} aria-label={`Move ${card.name} earlier`} onClick={() => setCards((prev) => arrayMove(prev, index, index - 1))}><ArrowUp /></Button>
+                  <Button size="icon" variant="outline" className="size-9" disabled={index === cards.length - 1} aria-label={`Move ${card.name} later`} onClick={() => setCards((prev) => arrayMove(prev, index, index + 1))}><ArrowDown /></Button>
+                  <Button size="icon" variant="outline" className="size-9" aria-label={`Change badge for ${card.name}`} onClick={() => cycleBadge(card.key)}><Tag /></Button>
+                  <Button size="icon" variant="ghost" className="size-9 text-destructive" aria-label={`Remove ${card.name}`} onClick={() => removeCard(card.key)}><Trash2 /></Button>
+                </div>
+              ))}
             </div>
           )}
           </Card>

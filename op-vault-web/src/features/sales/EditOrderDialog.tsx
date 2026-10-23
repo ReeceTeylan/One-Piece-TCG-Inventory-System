@@ -149,9 +149,9 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
           <DialogTitle>Edit Order Items — {sale?.reference}</DialogTitle>
         </DialogHeader>
         
-        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr] mt-2">
+        <div className="mt-2 grid min-w-0 gap-3 sm:gap-4 lg:grid-cols-[1.4fr_1fr]">
           {/* Left: Product Search */}
-          <Card className="p-5 flex flex-col h-[500px]">
+          <Card className="flex max-sm:max-h-[35dvh] flex-col p-3 sm:h-[500px] sm:p-5">
             <div className="relative mb-3">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} placeholder="Search raw cards or slabs…" className="pl-9" />
@@ -176,7 +176,7 @@ export function EditOrderDialog({ sale, open, onOpenChange, onSuccess }: EditOrd
           </Card>
 
           {/* Right: Cart Editor */}
-          <Card className="p-5 flex flex-col h-[500px]">
+          <Card className="flex max-sm:max-h-[45dvh] flex-col p-3 sm:h-[500px] sm:p-5">
             <h3 className="mb-3 text-sm font-semibold flex justify-between">
               Current Items <span className="text-muted-foreground">{cart.length} item(s)</span>
             </h3>

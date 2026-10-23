@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, RefreshCw, ExternalLink, Loader2, Check, Link2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Search, SlidersHorizontal, RefreshCw, ExternalLink, Loader2, Check, Link2, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Card } from '@/components/ui/card';
@@ -49,6 +49,7 @@ export function MarketPricesPage() {
   const [page, setPage] = useState(1);
   const [linking, setLinking] = useState<MarketRow | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useStickyState<'changes' | 'all' | 'unlinked'>('market:view', 'changes', { allowed: ['changes', 'all', 'unlinked'] });
   const [sort, setSort] = useStickyState<MarketSort | ''>('market:sort', '', { allowed: ['', 'change', 'price_desc', 'price_asc', 'recent', 'margin_desc', 'underpriced'] }); // '' = default for the view
   const [language, setLanguage] = useStickyState<'' | 'JP' | 'EN'>('market:language', '', { allowed: ['', 'JP', 'EN'] });
@@ -182,11 +183,13 @@ export function MarketPricesPage() {
       )}
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-72 sm:flex-none">
+        <div className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search name or card #…" className="pl-9" aria-label="Search" />
         </div>
+        <Button size="icon" variant="outline" className="sm:hidden" aria-label="Toggle market filters" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}><SlidersHorizontal className="size-4" /></Button>
+        <div className={cn('w-full flex-wrap items-center gap-2 sm:flex sm:w-auto', filtersOpen ? 'flex' : 'hidden')}>
         <Select value={view} onChange={(e) => { reset(setView)(e.target.value as 'changes' | 'all' | 'unlinked'); setSort(''); }} aria-label="Show">
           <option value="changes">Price changes (last day){summary ? ` · ${summary.changed}` : ''}</option>
           <option value="all">All in-stock cards</option>
@@ -215,6 +218,7 @@ export function MarketPricesPage() {
           <Switch checked={underpricedOnly} onCheckedChange={(v) => { setUnderpricedOnly(v); setPage(1); }} />
           Underpriced only
         </label>
+        </div>
       </div>
 
       <Card className={cn('flex min-h-0 flex-1 flex-col transition-opacity', query.isPlaceholderData && 'opacity-60')}>
@@ -300,7 +304,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-end justify-between gap-4 pl-[50px] text-right sm:pl-0">
+      <div className="grid min-w-0 grid-cols-2 gap-2 text-left sm:flex sm:shrink-0 sm:items-end sm:justify-between sm:gap-4 sm:text-right">
         <div>
           <div className="text-[11px] text-muted-foreground">Your price</div>
           <div className="text-sm font-semibold tabular-nums">{peso(row.postedPrice)}</div>
@@ -319,7 +323,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
           )}
           {row.marginPct !== null && <div className="text-[11px] tabular-nums text-muted-foreground">Margin {row.marginPct}%</div>}
         </div>
-        <div className="w-[92px]">
+        <div className="col-span-2 w-full sm:col-span-1 sm:w-[92px]">
           {row.diffPct !== null && (
             <Badge variant={row.underpriced ? 'warning' : row.diffPct < 0 ? 'default' : 'success'} className="tabular-nums">
               {row.diffPct > 0 ? '+' : ''}{row.diffPct}%
