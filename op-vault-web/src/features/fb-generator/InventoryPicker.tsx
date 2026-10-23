@@ -21,23 +21,23 @@ export function InventoryPicker({ type, selectedKeys, onAdd }: {
   const { data: promo } = usePromo();
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       <div className="relative mb-2">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={`Search ${type === 'RAW' ? 'raw cards' : 'slabs'}…`} className="pl-9" />
       </div>
-      <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+      <div className="min-h-0 min-w-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
         {isLoading ? <div className="flex justify-center py-6"><Spinner /></div>
           : !data?.data.length ? <p className="py-8 text-center text-sm text-muted-foreground">No items found.</p>
           : data.data.map((item: any) => {
             const card = toFbCard(item, type, promo);
             const selected = selectedKeys.has(card.key);
             return (
-              <div key={card.key} className="flex items-center gap-2.5 rounded-lg border p-2">
+              <div key={card.key} className="flex min-w-0 items-center gap-2 rounded-lg border p-2">
                 <CardThumb url={card.imageUrl} alt={card.name} className="h-12 w-9" />
                 <div className="min-w-0 flex-1">
                   <b className="block truncate text-[13px]">{card.name}</b>
-                  <span className="text-[11px] text-muted-foreground">{card.cardNumber} · {peso(card.price)}</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">{card.cardNumber} · {peso(card.price)}</span>
                 </div>
                 <Button size="sm" variant={selected ? 'outline' : 'default'} disabled={selected} onClick={() => onAdd(card)} aria-label="Add card">
                   {selected ? <Check /> : <Plus />}

@@ -48,7 +48,7 @@ export function ControlsPanel({ config, setConfig }: { config: OverlayConfig; se
           ))}
         </div>
         <SliderRow label="Opacity" value={config.opacity} min={0} max={1} step={0.05} onChange={(v) => setConfig({ opacity: v })} format={(v) => `${Math.round(v * 100)}%`} />
-        <SliderRow label="Font size" value={config.fontSize} min={10} max={26} step={1} onChange={(v) => setConfig({ fontSize: v })} format={(v) => `${v}px`} />
+        <SliderRow label="Font size" value={config.fontSize} min={4} max={26} step={1} onChange={(v) => setConfig({ fontSize: v })} format={(v) => `${v}px`} />
         <SliderRow label="Border radius" value={config.borderRadius} min={0} max={28} step={1} onChange={(v) => setConfig({ borderRadius: v })} format={(v) => `${v}px`} />
         <Toggle label="Shadow" checked={config.shadow} onChange={(v) => setConfig({ shadow: v })} />
       </div>

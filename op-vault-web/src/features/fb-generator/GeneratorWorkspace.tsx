@@ -45,7 +45,11 @@ export function GeneratorWorkspace({
   const sets = setsProp ?? setsInternal;
   const setSets = onSetsChange ?? setSetsInternal;
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [config, setConfigState] = useState<OverlayConfig>(DEFAULT_CONFIG);
+  const [config, setConfigState] = useState<OverlayConfig>(() => ({
+    ...DEFAULT_CONFIG,
+    // Compact 5-column previews need smaller labels on a phone.
+    fontSize: typeof window !== 'undefined' && window.matchMedia('(max-width: 639px)').matches ? 8 : DEFAULT_CONFIG.fontSize,
+  }));
   const [resolution, setResolution] = useState<number>(RESOLUTIONS[1].width);
   const [setPrice, setSetPrice] = useState('');
   const [setLabel, setSetLabel] = useState('');
@@ -160,24 +164,24 @@ export function GeneratorWorkspace({
       </div>
 
       <div className="grid min-w-0 gap-3 sm:gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[320px_1fr_260px] xl:overflow-hidden">
-        <Card className="order-2 flex max-h-[60vh] flex-col p-4 max-sm:p-3 xl:order-1 xl:max-h-none xl:min-h-0">
+        <Card className="order-2 flex max-h-[60vh] flex-col p-4 max-sm:max-h-[32dvh] max-sm:min-h-[150px] max-sm:p-3 xl:order-1 xl:max-h-none xl:min-h-0">
           <h3 className="mb-2 flex items-center gap-1.5 text-sm font-bold"><Layers className="size-4" /> {mode.type === 'SEALED' ? 'Add product' : 'Inventory'}</h3>
           {mode.type === 'SEALED'
             ? <SealedForm onAdd={addCard} />
             : <InventoryPicker type={mode.type} selectedKeys={selectedKeys} onAdd={addCard} />}
         </Card>
 
-        <Card className="order-1 flex flex-col p-4 max-sm:p-3 xl:order-2 xl:min-h-0 xl:overflow-y-auto">
+        <Card className="order-1 flex min-w-0 flex-col p-4 max-sm:p-3 xl:order-2 xl:min-h-0 xl:overflow-y-auto">
           <div className="mb-2 flex items-center justify-between">
             <h3 className="text-sm font-bold">Preview <span className="text-muted-foreground">· {cards.length}/{perPage}</span></h3>
           </div>
 
           {selected.size > 0 && (
-            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
+            <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 p-2.5">
               <span className="text-[13px] font-semibold">{selected.size} selected</span>
-              <Input value={setLabel} onChange={(e) => setSetLabel(e.target.value)} placeholder="Set label (optional)" className="h-8 w-44" />
-              <Input value={setPrice} onChange={(e) => setSetPrice(e.target.value)} type="number" placeholder="Set price ₱" className="h-8 w-28" />
-              <Input value={setQty} onChange={(e) => setSetQty(e.target.value)} type="number" placeholder="Qty" className="h-8 w-20" title="How many of this set" />
+              <Input value={setLabel} onChange={(e) => setSetLabel(e.target.value)} placeholder="Set label (optional)" className="h-8 w-44 max-sm:min-w-0 max-sm:flex-1" />
+              <Input value={setPrice} onChange={(e) => setSetPrice(e.target.value)} type="number" placeholder="Set price ₱" className="h-8 w-28 max-sm:min-w-0 max-sm:flex-1" />
+              <Input value={setQty} onChange={(e) => setSetQty(e.target.value)} type="number" placeholder="Qty" className="h-8 w-20 max-sm:w-16" title="How many of this set" />
               <Button size="sm" onClick={groupSelected} disabled={selected.size < 2}>Group as set</Button>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Cancel</Button>
             </div>
@@ -237,7 +241,7 @@ export function GeneratorWorkspace({
             </div>
           )}
           </Card>
-        <Card className="order-3 max-h-[60vh] overflow-y-auto p-4 max-sm:p-3 xl:max-h-none xl:min-h-0">
+        <Card className="order-3 max-h-[60vh] overflow-y-auto p-4 max-sm:max-h-none max-sm:overflow-visible max-sm:p-3 xl:max-h-none xl:min-h-0">
           <h3 className="mb-3 text-sm font-bold">Overlay controls</h3>
           <ControlsPanel config={config} setConfig={setConfig} />
 

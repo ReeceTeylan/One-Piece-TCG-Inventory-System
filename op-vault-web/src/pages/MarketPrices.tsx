@@ -281,75 +281,105 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
   const l = row.listing;
   const lower = row.matchPrice !== null && row.matchPrice < row.postedPrice;
   return (
-    <div className={cn('flex flex-col gap-2 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4', row.underpriced && 'bg-warning/5')}>
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
-        <CardThumb url={row.imageUrl} alt={row.name} className="aspect-[63/88] w-[38px]" />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold sm:font-medium">{row.name}</span>
-            {row.language === 'EN' && <Badge variant="info" className="shrink-0">English</Badge>}
-            {row.damage && (
-              <Badge variant="warning" className="shrink-0" title={row.damagedRateMissing ? 'Damaged rate not set — using the normal rate' : 'Priced at the damaged rate'}>
-                {row.damage}{row.damagedRateMissing ? ' · rate not set' : ''}
+    <>
+      <div className={cn('border-b px-2.5 py-2 sm:hidden', row.underpriced && 'bg-warning/5')}>
+        <div className="flex min-w-0 items-center gap-2">
+          <CardThumb url={row.imageUrl} alt={row.name} className="aspect-[63/88] w-[33px] shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[13px] font-semibold">{row.name}</span>
+              {row.language === 'EN' && <Badge variant="info" className="shrink-0 text-[10px]">EN</Badge>}
+              {row.damage && <Badge variant="warning" className="max-w-[75px] truncate text-[10px]">{row.damage}</Badge>}
+            </div>
+            <div className="truncate text-[10px] text-muted-foreground">{row.cardNumber} · {row.rarity} · Qty {row.quantity}</div>
+            <div className="flex min-w-0 items-center gap-2 text-xs">
+              <span className="font-semibold tabular-nums">{peso(row.postedPrice)}</span>
+              <span className="shrink-0 text-muted-foreground">→</span>
+              <span className="font-semibold tabular-nums">{row.marketPhp !== null ? peso(row.marketPhp) : l ? foreign(l.price, l.currency) : '—'}</span>
+              {row.diffPct !== null && <span className={cn('ml-auto shrink-0 text-[10px] font-semibold tabular-nums', row.underpriced ? 'text-warning' : 'text-muted-foreground')}>{row.diffPct > 0 ? '+' : ''}{row.diffPct}%</span>}
+            </div>
+          </div>
+          {canEdit && <button type="button" className="shrink-0 rounded-md border px-2 py-2 text-[11px] font-medium" onClick={onChange} aria-label={row.linkState === 'new' ? 'Link market listing' : 'Change market listing'}>{row.linkState === 'new' ? 'Link' : 'Change'}</button>}
+        </div>
+        {canEdit && row.matchPrice !== null && row.underpriced && (
+          <Button size="sm" variant="outline" className="mt-1.5 h-7 w-full text-[11px]" onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
+            {matching ? <Loader2 className="size-3.5 animate-spin" /> : <><ArrowUpRight className="size-3.5" /> Match price · {peso(row.matchPrice)}</>}
+          </Button>
+        )}
+      </div>
+      <div className="hidden sm:block">
+      <div className={cn('flex flex-col gap-2 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4', row.underpriced && 'bg-warning/5')}>
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <CardThumb url={row.imageUrl} alt={row.name} className="aspect-[63/88] w-[38px]" />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-sm font-semibold sm:font-medium">{row.name}</span>
+              {row.language === 'EN' && <Badge variant="info" className="shrink-0">English</Badge>}
+              {row.damage && (
+                <Badge variant="warning" className="shrink-0" title={row.damagedRateMissing ? 'Damaged rate not set — using the normal rate' : 'Priced at the damaged rate'}>
+                  {row.damage}{row.damagedRateMissing ? ' · rate not set' : ''}
+                </Badge>
+              )}
+            </div>
+            <div className="truncate text-xs text-muted-foreground">{row.cardNumber} · {row.rarity} · qty {row.quantity}</div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+              {l ? (
+                <>
+                  <span className="truncate" title={l.name}>Linked{l.source === 'CARDRUSH' ? ' (Cardrush)' : ''}: {l.name}</span>
+                  {l.inStock === false && <span className="shrink-0">· sold out there</span>}
+                  <a href={l.url} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground" aria-label={`Open on ${sourceName(row)}`}>
+                    <ExternalLink className="size-3.5" />
+                  </a>
+                </>
+              ) : <span>{LINK_TEXT[row.linkState]}</span>}
+              {canEdit && (
+                <button type="button" onClick={onChange} className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline">
+                  {row.linkState === 'new' ? 'Link' : 'Change'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+  
+        <div className="grid min-w-0 grid-cols-2 gap-2 text-left sm:flex sm:shrink-0 sm:items-end sm:justify-between sm:gap-4 sm:text-right">
+          <div>
+            <div className="text-[11px] text-muted-foreground">Your price</div>
+            <div className="text-sm font-semibold tabular-nums">{peso(row.postedPrice)}</div>
+          </div>
+          <div>
+            <div className="text-[11px] text-muted-foreground">{sourceName(row)}</div>
+            <div className="text-sm font-semibold tabular-nums">
+              {l ? (row.marketPhp !== null ? peso(row.marketPhp) : foreign(l.price, l.currency)) : '—'}
+            </div>
+            {l && row.marketPhp !== null && <div className="text-[11px] tabular-nums text-muted-foreground">{foreign(l.price, l.currency)}</div>}
+            {row.changePhp !== null && l?.prevPrice != null && (
+              <div className={cn('text-[11px] font-semibold tabular-nums', row.changePhp > 0 ? 'text-success' : 'text-destructive')}
+                title={`Was ${foreign(l.prevPrice, l.currency)} before the last sync`}>
+                {row.changePhp > 0 ? '▲' : '▼'} {peso(Math.abs(row.changePhp))}
+              </div>
+            )}
+            {row.marginPct !== null && <div className="text-[11px] tabular-nums text-muted-foreground">Margin {row.marginPct}%</div>}
+          </div>
+          <div className="col-span-2 w-full sm:col-span-1 sm:w-[92px]">
+            {row.diffPct !== null && (
+              <Badge variant={row.underpriced ? 'warning' : row.diffPct < 0 ? 'default' : 'success'} className="tabular-nums">
+                {row.diffPct > 0 ? '+' : ''}{row.diffPct}%
               </Badge>
             )}
-          </div>
-          <div className="truncate text-xs text-muted-foreground">{row.cardNumber} · {row.rarity} · qty {row.quantity}</div>
-          <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            {l ? (
-              <>
-                <span className="truncate" title={l.name}>Linked{l.source === 'CARDRUSH' ? ' (Cardrush)' : ''}: {l.name}</span>
-                {l.inStock === false && <span className="shrink-0">· sold out there</span>}
-                <a href={l.url} target="_blank" rel="noreferrer" className="shrink-0 hover:text-foreground" aria-label={`Open on ${sourceName(row)}`}>
-                  <ExternalLink className="size-3.5" />
-                </a>
-              </>
-            ) : <span>{LINK_TEXT[row.linkState]}</span>}
-            {canEdit && (
-              <button type="button" onClick={onChange} className="shrink-0 font-medium text-foreground underline-offset-2 hover:underline">
-                {row.linkState === 'new' ? 'Link' : 'Change'}
-              </button>
+            {row.underpriced && <div className="mt-1 text-[11px] font-semibold text-warning">Underpriced</div>}
+            {canEdit && row.matchPrice !== null && (
+              <Button size="sm" variant={row.underpriced ? 'default' : 'outline'} className="mt-1.5 h-9 w-full px-2 text-xs sm:h-7 sm:text-[11px]"
+                onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
+                {matching ? <Loader2 className="size-3.5 animate-spin" />
+                  : <>{lower ? <ArrowDownRight className="size-3.5" /> : <ArrowUpRight className="size-3.5" />} {peso(row.matchPrice)}</>}
+              </Button>
             )}
           </div>
         </div>
       </div>
-
-      <div className="grid min-w-0 grid-cols-2 gap-2 text-left sm:flex sm:shrink-0 sm:items-end sm:justify-between sm:gap-4 sm:text-right">
-        <div>
-          <div className="text-[11px] text-muted-foreground">Your price</div>
-          <div className="text-sm font-semibold tabular-nums">{peso(row.postedPrice)}</div>
-        </div>
-        <div>
-          <div className="text-[11px] text-muted-foreground">{sourceName(row)}</div>
-          <div className="text-sm font-semibold tabular-nums">
-            {l ? (row.marketPhp !== null ? peso(row.marketPhp) : foreign(l.price, l.currency)) : '—'}
-          </div>
-          {l && row.marketPhp !== null && <div className="text-[11px] tabular-nums text-muted-foreground">{foreign(l.price, l.currency)}</div>}
-          {row.changePhp !== null && l?.prevPrice != null && (
-            <div className={cn('text-[11px] font-semibold tabular-nums', row.changePhp > 0 ? 'text-success' : 'text-destructive')}
-              title={`Was ${foreign(l.prevPrice, l.currency)} before the last sync`}>
-              {row.changePhp > 0 ? '▲' : '▼'} {peso(Math.abs(row.changePhp))}
-            </div>
-          )}
-          {row.marginPct !== null && <div className="text-[11px] tabular-nums text-muted-foreground">Margin {row.marginPct}%</div>}
-        </div>
-        <div className="col-span-2 w-full sm:col-span-1 sm:w-[92px]">
-          {row.diffPct !== null && (
-            <Badge variant={row.underpriced ? 'warning' : row.diffPct < 0 ? 'default' : 'success'} className="tabular-nums">
-              {row.diffPct > 0 ? '+' : ''}{row.diffPct}%
-            </Badge>
-          )}
-          {row.underpriced && <div className="mt-1 text-[11px] font-semibold text-warning">Underpriced</div>}
-          {canEdit && row.matchPrice !== null && (
-            <Button size="sm" variant={row.underpriced ? 'default' : 'outline'} className="mt-1.5 h-9 w-full px-2 text-xs sm:h-7 sm:text-[11px]"
-              onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
-              {matching ? <Loader2 className="size-3.5 animate-spin" />
-                : <>{lower ? <ArrowDownRight className="size-3.5" /> : <ArrowUpRight className="size-3.5" />} {peso(row.matchPrice)}</>}
-            </Button>
-          )}
-        </div>
+  
       </div>
-    </div>
+    </>
   );
 }
 
