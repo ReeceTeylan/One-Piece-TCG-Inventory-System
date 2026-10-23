@@ -13,7 +13,7 @@ export function WizardSteps({ step }: { step: number }) {
     <div className="mb-6 flex">
       {STEPS.map((s, i) => (
         <div key={s.n} className={cn(
-          'flex flex-1 items-center gap-2.5 border bg-card px-3.5 py-3',
+          'flex min-w-0 flex-1 items-center justify-center gap-1 border bg-card px-1.5 py-2 sm:justify-start sm:gap-2.5 sm:px-3.5 sm:py-3',
           i === 0 && 'rounded-l-lg', i === STEPS.length - 1 && 'rounded-r-lg', i !== STEPS.length - 1 && 'border-r-0',
           step === s.n && 'ring-1 ring-inset ring-primary',
         )}>
@@ -21,7 +21,7 @@ export function WizardSteps({ step }: { step: number }) {
             step > s.n ? 'bg-success text-white' : step === s.n ? 'bg-primary text-primary-foreground' : 'border bg-muted text-muted-foreground')}>
             {step > s.n ? <Check className="size-3.5" /> : s.n}
           </span>
-          <div className="min-w-0"><b className="text-[13px]">{s.title}</b><span className="block truncate text-[11px] text-muted-foreground max-sm:hidden">{s.sub}</span></div>
+          <div className="min-w-0 max-sm:hidden"><b className="text-[13px]">{s.title}</b><span className="block truncate text-[11px] text-muted-foreground max-sm:hidden">{s.sub}</span></div>
         </div>
       ))}
     </div>

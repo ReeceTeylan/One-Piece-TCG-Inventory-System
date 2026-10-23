@@ -44,7 +44,7 @@ export function PaymentsPage() {
       </div>
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !rows.length ? <EmptyState message="No outstanding balances." /> : (
-          <Table>
+          <Table className="mobile-actions-table">
             <THead><TR><TH>Reference</TH><TH>Customer</TH><TH className="text-right">Total</TH><TH className="text-right">Paid</TH><TH className="text-right">Balance</TH><TH>Status</TH><TH>Date</TH><TH></TH></TR></THead>
             <TBody>
               {rows.map((s) => {

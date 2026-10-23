@@ -55,7 +55,7 @@ export function SalesHistoryPage() {
       <PageHeader title="Sales History" subtitle={`${data?.meta.total ?? 0} transactions`} />
       <div className="mb-3.5 flex flex-wrap items-center gap-2.5">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search reference, customer…" />
-        <div className="flex gap-1 rounded-lg border bg-muted p-0.5">
+        <div className="flex max-w-full flex-wrap gap-1 rounded-lg border bg-muted p-0.5">
           <button onClick={() => { setRange(''); setPage(1); }} className={cn('rounded-md px-3 py-1 text-xs font-semibold', !range ? 'bg-card shadow' : 'text-muted-foreground')}>All</button>
           {RANGES.map((r) => (
             <button key={r} onClick={() => { setRange(r); setPage(1); }} className={cn('rounded-md px-3 py-1 text-xs font-semibold capitalize', range === r ? 'bg-card shadow' : 'text-muted-foreground')}>{r}</button>
@@ -67,7 +67,7 @@ export function SalesHistoryPage() {
       </div>
 
       {data?.summary && (
-        <div className="mb-3.5 grid grid-cols-3 gap-3">
+        <div className="mb-3.5 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3 sm:gap-3">
           <Card className="p-4">
             <div className="text-xs text-muted-foreground">Total revenue</div>
             <div className="mt-0.5 text-xl font-bold tabular-nums">{peso(data.summary.totalRevenue)}</div>
@@ -85,7 +85,7 @@ export function SalesHistoryPage() {
 
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No sales found." /> : (
-          <Table>
+          <Table className="mobile-actions-table">
             <THead><TR>
               <TH>Reference</TH><TH>Customer</TH><TH className="text-right">Total</TH><TH className="text-right">Profit</TH>
               <TH>Date</TH><TH>Status</TH><TH>Shipping</TH><TH></TH>

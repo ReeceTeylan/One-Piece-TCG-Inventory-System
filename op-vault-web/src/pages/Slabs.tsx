@@ -237,7 +237,7 @@ export function SlabsPage() {
             }}
           />
         ) : (
-          <Table>
+          <Table className="mobile-actions-table">
             <THead><TR>
               <TH className="w-8">
                 <input type="checkbox" aria-label="Select all on page"

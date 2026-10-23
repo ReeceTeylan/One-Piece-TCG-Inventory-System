@@ -59,7 +59,7 @@ export function CustomersPage() {
 
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No customers found." /> : (
-          <Table>
+          <Table className="mobile-actions-table">
             <THead><TR><TH>Name</TH><TH>Facebook</TH><TH>Contact</TH><TH className="text-right">Orders</TH><TH className="text-right">Profit</TH><TH>Since</TH><TH></TH></TR></THead>
             <TBody>
               {data.data.map((c) => (

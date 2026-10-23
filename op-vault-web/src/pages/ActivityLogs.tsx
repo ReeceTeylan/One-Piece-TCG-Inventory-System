@@ -28,7 +28,7 @@ export function ActivityLogsPage() {
       </div>
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No activity yet." /> : (
-          <Table>
+          <Table className="mobile-actions-table">
             <THead><TR><TH>Action</TH><TH>Entity</TH><TH>User</TH><TH>When</TH></TR></THead>
             <TBody>
               {data.data.map((log: any) => (
