@@ -29,14 +29,14 @@ export function Topbar({ onToggleSidebar, onToggleMobile }: { onToggleSidebar: (
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); if (q.trim()) navigate(`/raw-cards?search=${encodeURIComponent(q.trim())}`); };
 
   return (
-    <header className="flex h-[57px] items-center gap-3 border-b bg-card px-4">
+    <header className="flex h-[57px] shrink-0 items-center gap-1.5 border-b bg-card px-2 sm:gap-3 sm:px-4">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={onToggleMobile} aria-label="Open menu"><Menu className="size-5" /></Button>
       <Button variant="ghost" size="icon" className="hidden md:inline-flex" onClick={onToggleSidebar} aria-label="Collapse sidebar"><Menu className="size-5" /></Button>
-      <form onSubmit={onSearch} className="relative max-w-md flex-1">
+      <form onSubmit={onSearch} className="relative min-w-0 max-w-md flex-1">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search cards, sets, customers…" className="bg-muted pl-9" aria-label="Global search" />
       </form>
-      <div className="flex-1" />
+      <div className="hidden flex-1 sm:block" />
       <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">{dark ? <Sun className="size-5" /> : <Moon className="size-5" />}</Button>
 
       <DropdownMenu>
@@ -46,7 +46,7 @@ export function Topbar({ onToggleSidebar, onToggleMobile }: { onToggleSidebar: (
             {(unread.data?.unread ?? 0) > 0 && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-destructive ring-2 ring-card" />}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-1rem))]">
           <div className="flex items-center justify-between px-2 py-1.5">
             <DropdownMenuLabel>Notifications</DropdownMenuLabel>
             <Button variant="ghost" size="sm" onClick={() => markAllRead.mutate()} className="h-7 text-xs">Mark all read</Button>
