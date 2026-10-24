@@ -56,16 +56,17 @@ export class NotificationsService {
     return { unread: count };
   }
 
-  async markRead(id: string, userId: string) {
+  async markRead(id: string, userId: string, role: string) {
     const n = await this.prisma.notification.findUnique({ where: { id } });
     if (!n) throw new NotFoundException('Notification not found');
-    if (n.userId && n.userId !== userId) throw new ForbiddenException('Notification belongs to another user');
+    if ((n.userId && n.userId !== userId) || (!n.userId && role !== 'OWNER'))
+      throw new ForbiddenException('Only the notification owner may mark this notification read');
     return this.prisma.notification.update({ where: { id }, data: { isRead: true } });
   }
 
-  async markAllRead(userId: string) {
+  async markAllRead(userId: string, role: string) {
     const res = await this.prisma.notification.updateMany({
-      where: { isRead: false, OR: [{ userId }, { userId: null }] },
+      where: { isRead: false, ...(role === 'OWNER' ? { OR: [{ userId }, { userId: null }] } : { userId }) },
       data: { isRead: true },
     });
     return { updated: res.count };

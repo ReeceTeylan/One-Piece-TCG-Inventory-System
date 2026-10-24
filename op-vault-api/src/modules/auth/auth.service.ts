@@ -57,6 +57,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
     const user = await this.users.findById(payload.sub);
+    if (!user.isActive) throw new UnauthorizedException('Account is disabled');
     if (!user.hashedRefreshToken || !(await bcrypt.compare(refreshToken, user.hashedRefreshToken))) {
       throw new UnauthorizedException('Refresh token revoked');
     }
