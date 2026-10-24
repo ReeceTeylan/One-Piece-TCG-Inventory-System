@@ -6,6 +6,18 @@ DO $$ BEGIN
     CREATE TYPE "ProductKind" AS ENUM ('SLAB','SEALED');
   END IF;
 END $$;
+-- Historical enum was MARIBANK; the current application uses BANK_TRANSFER.
+-- Rename in place to preserve existing payment history.
+DO $ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid=t.oid
+             WHERE t.typname='PaymentMethod' AND e.enumlabel='MARIBANK') THEN
+    IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid=t.oid
+               WHERE t.typname='PaymentMethod' AND e.enumlabel='BANK_TRANSFER') THEN
+      RAISE EXCEPTION 'Both MARIBANK and BANK_TRANSFER enum values exist; manually review historic payments';
+    END IF;
+    ALTER TYPE "PaymentMethod" RENAME VALUE 'MARIBANK' TO 'BANK_TRANSFER';
+  END IF;
+END $;
 ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'MAYA' BEFORE 'OTHER';
 
 ALTER TABLE "raw_cards" ADD COLUMN IF NOT EXISTS "marketListingKey" TEXT;

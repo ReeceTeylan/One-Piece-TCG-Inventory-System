@@ -29,3 +29,5 @@ CREATE TABLE IF NOT EXISTS "card_catalog_entries" (
   "source" TEXT NOT NULL DEFAULT 'manual-import',
   "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE "card_catalog_entries" ALTER COLUMN "updatedAt" DROP DEFAULT;
