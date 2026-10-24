@@ -394,16 +394,22 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
 function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => void }) {
   const qc = useQueryClient();
   const isEnglish = row?.language === 'EN';
-  // Japanese cards: Yuyu-tei is the main shop, Cardrush the backup. English: TCGplayer only.
+  // Japanese cards: choose between Yuyu-tei and Cardrush; English cards use TCGplayer.
   const [tab, setTab] = useState<MarketSource>('YUYUTEI');
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [url, setUrl] = useState('');
   useEffect(() => {
+    setSelectedKey(null);
+    setUrl('');
     if (row) setTab(row.language === 'EN' ? 'TCGPLAYER' : row.listing?.source === 'CARDRUSH' ? 'CARDRUSH' : 'YUYUTEI');
-  }, [row]);
+  }, [row?.id, row?.language, row?.listing?.source]);
   const listings = useQuery({
     queryKey: ['market-listings', row?.cardNumber, tab],
     queryFn: () => marketPricesService.listings(row!.cardNumber, tab),
     enabled: !!row && (tab === 'TCGPLAYER') === isEnglish,
   });
+  const current = row?.listing;
+  const chosen = listings.data?.find((l) => l.listingKey === selectedKey) ?? null;
   const relink = useMutation({
     mutationFn: () => marketPricesService.link(row!.id, null),
     onSuccess: (r) => {
@@ -425,9 +431,6 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
     },
     onError: (e) => toast.error(apiError(e).message),
   });
-  const current = row?.listing;
-  const [url, setUrl] = useState('');
-  useEffect(() => { if (!row) setUrl(''); }, [row]);
   const linkUrl = useMutation({
     mutationFn: () => marketPricesService.linkUrl(row!.id, url.trim()),
     onSuccess: (l) => {
@@ -442,82 +445,138 @@ function LinkDialog({ row, onClose }: { row: MarketRow | null; onClose: () => vo
   const rate = row?.rateUsed ?? null;
 
   return (
-    <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+    <Dialog open={!!row} onOpenChange={(o) => !o && !busy && onClose()}>
+      <DialogContent className="flex h-[calc(100dvh-1.5rem)] max-h-[900px] w-[calc(100vw-1.5rem)] max-w-4xl flex-col overflow-hidden p-0 max-sm:h-[calc(100dvh-1rem)] max-sm:max-h-[calc(100dvh-1rem)] max-sm:w-[calc(100vw-1rem)]">
+        <DialogHeader className="mb-0 shrink-0 border-b px-4 py-3 pr-12 sm:px-6">
           <DialogTitle>Match {row?.cardNumber} {row?.rarity}{isEnglish ? ' (English)' : ''}</DialogTitle>
-          <DialogDescription>
-            {isEnglish
-              ? 'Pick the TCGplayer product that matches the printing you have.'
-              : 'Pick the listing that matches the printing you have, or paste a Yuyu-tei or Cardrush card link.'}
-          </DialogDescription>
+          <DialogDescription>Compare your saved card with the marketplace artwork, select the exact printing, then confirm the link.</DialogDescription>
         </DialogHeader>
-        {!isEnglish && (
-          <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (url.trim()) linkUrl.mutate(); }}>
-            <div className="relative min-w-0 flex-1">
-              <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} inputMode="url"
-                placeholder="Yuyu-tei or Cardrush card link" className="pl-9" aria-label="Card link" />
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-5">
+          {row && <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-3">
+            <CardThumb url={row.imageUrl} alt={row.name} zoomable={false} className="h-28 w-20 object-contain" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Your inventory photo</p>
+              <p className="text-sm font-semibold">{row.name}</p>
+              <p className="text-xs text-muted-foreground">{row.cardNumber} · {row.rarity} · {row.language === 'EN' ? 'English' : 'Japanese'}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Only the market reference will change; your saved inventory photo stays the same.</p>
             </div>
-            <Button type="submit" disabled={busy || !url.trim()}>
-              {linkUrl.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Use link'}
-            </Button>
-          </form>
-        )}
-        {current && (
-          <p className="mb-2 text-xs text-muted-foreground">Currently linked to <a href={current.url} target="_blank" rel="noreferrer" className="underline">{current.name}</a> on {SOURCE_NAME[current.source]}.</p>
-        )}
-        <div className="mb-2 space-y-1.5">
-          <OptionButton selected={false} disabled={busy} onClick={() => relink.mutate()}>
-            <div className="flex items-center gap-1.5 text-sm font-medium">
-              Link automatically {relink.isPending && <Loader2 className="size-3.5 animate-spin" />}
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {isEnglish ? 'Search TCGplayer now for the same printing and rarity' : 'Search now: Yuyu-tei first, then Cardrush'}
-            </div>
-          </OptionButton>
-          <OptionButton selected={row?.linkState === 'none'} disabled={busy} onClick={() => link.mutate('none')}>
-            <div className="text-sm font-medium">No market price</div>
-            <div className="text-xs text-muted-foreground">Remove the match if it&apos;s wrong and the shop doesn&apos;t sell this card. Counted at 80% of your price.</div>
-          </OptionButton>
-        </div>
-        {!isEnglish && (
-          <div className="mb-2 flex gap-1 rounded-md border bg-muted p-0.5" role="tablist">
-            {(['YUYUTEI', 'CARDRUSH'] as const).map((t) => (
-              <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
-                className={cn('flex-1 rounded px-3 py-1 text-xs font-semibold', tab === t ? 'bg-card shadow-sm' : 'text-muted-foreground')}>
-                {SOURCE_NAME[t]}
-              </button>
-            ))}
-          </div>
-        )}
-        <div className="max-h-[42vh] space-y-1.5 overflow-y-auto">
-          {listings.isLoading && <TableSkeleton rows={3} />}
-          {listings.data && !listings.data.length && (
-            <p className="py-4 text-center text-sm text-muted-foreground">{SOURCE_NAME[tab]} has no listings for {row?.cardNumber}.</p>
+          </div>}
+
+          {!isEnglish && (
+            <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (url.trim()) linkUrl.mutate(); }}>
+              <div className="relative min-w-0 flex-1">
+                <Link2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} disabled={busy} inputMode="url"
+                  placeholder="Yuyu-tei or Cardrush card link" className="pl-9" aria-label="Card link" />
+              </div>
+              <Button type="submit" disabled={busy || !url.trim()}>
+                {linkUrl.isPending ? <Loader2 className="size-4 animate-spin" /> : 'Use link'}
+              </Button>
+            </form>
           )}
-          {listings.isError && <p className="py-4 text-center text-sm text-muted-foreground">{apiError(listings.error).message}</p>}
-          {listings.data?.map((l) => (
-            <OptionButton key={l.listingKey} selected={current?.listingKey === l.listingKey}
-              disabled={busy} onClick={() => link.mutate(l.listingKey)}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">{l.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {[l.rarity, l.source === 'CARDRUSH' ? null : l.setLabel, l.inStock === null ? null : l.inStock ? `${l.stockCount ?? ''} in stock` : 'sold out'].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right text-sm font-semibold tabular-nums">
-                  {foreign(l.price, l.currency)}
-                  {rate && <div className="text-[11px] font-normal text-muted-foreground">≈ {peso(Math.round(l.price * rate))}</div>}
-                </div>
+          {current && (
+            <p className="text-xs text-muted-foreground">Currently linked to <a href={current.url} target="_blank" rel="noreferrer" className="underline">{current.name}</a> on {SOURCE_NAME[current.source]}.</p>
+          )}
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <OptionButton selected={false} disabled={busy} onClick={() => relink.mutate()}>
+              <div className="flex items-center gap-1.5 text-sm font-medium">
+                Link automatically {relink.isPending && <Loader2 className="size-3.5 animate-spin" />}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {isEnglish ? 'Find the nearest TCGplayer match' : 'Search Yuyu-tei first, then Cardrush'}
               </div>
             </OptionButton>
-          ))}
+            <OptionButton selected={row?.linkState === 'none'} disabled={busy} onClick={() => link.mutate('none')}>
+              <div className="text-sm font-medium">No market price</div>
+              <div className="text-xs text-muted-foreground">Remove an incorrect match; value counts at 80% of your price.</div>
+            </OptionButton>
+          </div>
+
+          {!isEnglish && (
+            <div className="flex gap-1 rounded-md border bg-muted p-0.5" role="tablist">
+              {(['YUYUTEI', 'CARDRUSH'] as const).map((t) => (
+                <button key={t} type="button" role="tab" aria-selected={tab === t}
+                  disabled={busy} onClick={() => { setTab(t); setSelectedKey(null); }}
+                  className={cn('flex-1 rounded px-3 py-2 text-xs font-semibold', tab === t ? 'bg-card shadow-sm' : 'text-muted-foreground')}>
+                  {SOURCE_NAME[t]}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-sm font-semibold">{SOURCE_NAME[tab]} artwork {listings.data?.length ? `(${listings.data.length} listings)` : ''}</p>
+                <p className="text-[11px] text-muted-foreground">Tap the artwork to select it. Nothing changes until you press Confirm link.</p>
+              </div>
+              {listings.isFetching && <span className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="size-3.5 animate-spin" /> Loading artwork…</span>}
+            </div>
+            {listings.isLoading && <div role="status" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {Array.from({ length: 4 }, (_, i) => <div key={i} className="h-44 animate-pulse rounded-lg border bg-muted/40" />)}
+            </div>}
+            {listings.isError && <div role="alert" className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">
+              Failed to load {SOURCE_NAME[tab]} listings: {apiError(listings.error).message}
+              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => void listings.refetch()}>Try again</Button>
+            </div>}
+            {listings.isSuccess && !listings.data?.length && (
+              <p className="rounded-lg border p-4 text-center text-sm text-muted-foreground">{SOURCE_NAME[tab]} has no listings for {row?.cardNumber}. Try another source if available.</p>
+            )}
+            {!!listings.data?.length && <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+              {listings.data.map((l) => (
+                <button type="button" key={l.listingKey} disabled={busy}
+                  aria-pressed={selectedKey === l.listingKey}
+                  aria-label={`Select ${l.name} on ${SOURCE_NAME[l.source]}`}
+                  onClick={() => setSelectedKey(l.listingKey)}
+                  className={cn('relative min-w-0 rounded-lg border p-2 text-left transition-colors hover:bg-muted disabled:opacity-60',
+                    selectedKey === l.listingKey && 'border-primary bg-primary/10 ring-1 ring-primary')}>
+                  {current?.listingKey === l.listingKey && <Badge className="absolute right-2 top-2 z-10 text-[10px]" variant="success">Linked</Badge>}
+                  <MarketListingArtwork url={l.imageUrl} name={l.name} />
+                  <p className="mt-2 line-clamp-2 min-h-[2rem] text-xs font-semibold" title={l.name}>{l.name}</p>
+                  <p className="truncate text-[10px] text-muted-foreground">{[l.rarity, l.source === 'CARDRUSH' ? null : l.setLabel].filter(Boolean).join(' · ') || 'Printing not specified'}</p>
+                  <p className="mt-1 text-xs font-semibold tabular-nums">{foreign(l.price, l.currency)}</p>
+                  {rate && <p className="text-[10px] text-muted-foreground">≈ {peso(Math.round(l.price * rate))}</p>}
+                  {l.inStock === false && <p className="text-[10px] text-muted-foreground">Sold out at source</p>}
+                  {selectedKey === l.listingKey && <Check className="absolute bottom-2 right-2 size-4 text-primary" aria-hidden="true" />}
+                </button>
+              ))}
+            </div>}
+          </div>
+        </div>
+
+        <div className="mt-0 flex shrink-0 flex-wrap items-center justify-between gap-2 border-t bg-card p-3 sm:px-5">
+          <div className="min-w-0 flex-1 text-xs">
+            {chosen ? <>
+              <p className="truncate font-semibold" title={chosen.name}>Selected: {chosen.name}</p>
+              <a href={chosen.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Check reference listing <ExternalLink className="size-3" />
+              </a>
+            </> : <p className="text-muted-foreground">Choose an artwork above to link this card.</p>}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button type="button" variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button>
+            <Button type="button" disabled={!chosen || busy} onClick={() => chosen && link.mutate(chosen.listingKey)}>
+              {link.isPending ? <Loader2 className="size-4 animate-spin" /> : <Link2 className="size-4" />}
+              Confirm link
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
+}
+
+/** The exact shop artwork (not a derivative of the inventory thumbnail). */
+function MarketListingArtwork({ url, name }: { url?: string | null; name: string }) {
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null);
+  return <div className="flex h-32 items-center justify-center overflow-hidden rounded bg-muted/40 sm:h-36">
+    {url && brokenUrl !== url
+      ? <img src={url} alt={name} loading="lazy" referrerPolicy="no-referrer"
+          onError={() => setBrokenUrl(url)} className="h-full w-full object-contain" />
+      : <span className="px-2 text-center text-[11px] text-muted-foreground">No reference image</span>}
+  </div>;
 }
 
 function OptionButton({ selected, disabled, onClick, children }: {
