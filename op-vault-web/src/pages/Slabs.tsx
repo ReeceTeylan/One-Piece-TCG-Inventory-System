@@ -175,8 +175,9 @@ export function SlabsPage() {
         <div className={`ml-auto w-[112px] shrink-0 sm:hidden ${view === 'grid' ? '' : 'invisible pointer-events-none'}`} aria-hidden={view !== 'grid'}>
           <Select value={density} disabled={view !== 'grid'} onChange={(e) => setDensity(e.target.value as GridDensity)} className="h-8 w-full text-xs" aria-label="Card grid density">
           <option value="compact">5 per row</option><option value="standard">4 per row</option><option value="comfortable">3 per row</option>
-        </Select>}
-        <div className={`${view === 'grid' ? '' : 'ml-auto'} flex shrink-0 gap-0.5 rounded-md border bg-muted p-0.5`}>
+        </Select>
+        </div>
+        <div className="flex shrink-0 gap-0.5 rounded-md border bg-muted p-0.5 sm:ml-auto">
           {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:slabs:view', v); }}
               aria-label={`${v} view`} aria-pressed={view === v}
