@@ -12,12 +12,14 @@ import { LinkListingDto } from './dto/link-listing.dto';
 import { LinkUrlDto } from './dto/link-url.dto';
 import { SuggestPriceDto } from './dto/suggest-price.dto';
 import { ArtworkSource } from './artwork-compare';
+import { QuickAddService } from './quick-add.service';
+import { QuickAddDto } from './dto/quick-add.dto';
 
 @ApiTags('market-prices')
 @ApiBearerAuth()
 @Controller('market-prices')
 export class MarketPricesController {
-  constructor(private service: MarketPricesService, private slabs: SlabPricesService) {}
+  constructor(private service: MarketPricesService, private slabs: SlabPricesService, private quick: QuickAddService) {}
 
   @Get()
   @ApiOperation({ summary: 'In-stock raw cards with their Yuyu-tei price and underpriced flag' })
@@ -43,6 +45,18 @@ export class MarketPricesController {
   @ApiOperation({ summary: 'Suggested posted price for a card number + rarity (Add Card form)' })
   suggest(@Query() q: SuggestPriceDto) {
     return this.service.suggest(q.cardNumber, q.rarity, q.notes);
+  }
+
+  @Get('quick-add/preview')
+  @Roles(Role.OWNER)
+  previewQuickAdd(@Query('cardNumber') number: string, @Query('source') source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER', @Query('listingKey') key: string, @Query('notes') notes?: string) {
+    return this.quick.preview(number, source, key, notes);
+  }
+
+  @Post('quick-add')
+  @Roles(Role.OWNER)
+  quickAdd(@Body() dto: QuickAddDto, @CurrentUser('id') userId: string) {
+    return this.quick.add(dto, userId);
   }
 
   @Post('artwork/compare')
