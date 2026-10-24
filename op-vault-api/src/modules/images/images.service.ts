@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { imageUrlForSource, readReferenceImage, yuyuteiImageFallback, type ArtworkSource } from '../market-prices/artwork-compare';
 import sharp from 'sharp';
 import { PrismaService } from '../../prisma/prisma.service';
 import { STORAGE_PROVIDER, StorageProvider } from './storage/storage.interface';
@@ -68,6 +70,49 @@ export class ImagesService {
       },
     });
     return { ...image, thumbnailUrl: saved.url.replace('.webp', '_thumb.webp') };
+  }
+
+  /**
+   * Opt-in import from a specifically chosen and verified market catalog listing.
+   * The client never supplies a URL; all lookup and fetching is server-side.
+   * Image copying is only allowed after the owner confirms reuse rights.
+   */
+  async importMarketArtwork(dto: {
+    itemId: string; listingKey: string; source: ArtworkSource; authorized: boolean;
+  }) {
+    if (dto.authorized !== true) throw new ForbiddenException('Confirm permission to reuse this third-party artwork');
+    if (!['YUYUTEI', 'CARDRUSH', 'TCGPLAYER'].includes(dto.source)) throw new BadRequestException('Invalid market source');
+    const card = await this.prisma.rawCard.findUnique({
+      where: { id: dto.itemId },
+      select: { id: true, cardNumber: true, marketListingKey: true },
+    });
+    if (!card) throw new NotFoundException('Raw card not found');
+    if (!dto.listingKey || card.marketListingKey !== dto.listingKey)
+      throw new BadRequestException('Select and save the verified listing before importing its image');
+
+    const listing = dto.source === 'TCGPLAYER'
+      ? await this.prisma.tcgplayerPrice.findFirst({
+          where: { listingKey: dto.listingKey, cardNumber: card.cardNumber },
+          select: { imageUrl: true },
+        })
+      : await this.prisma.marketPrice.findFirst({
+          where: { listingKey: dto.listingKey, cardNumber: card.cardNumber,
+            source: dto.source === 'CARDRUSH' ? 'CARDRUSH' : { in: ['YUYUTEI', 'YUYUTEI_LINK'] } },
+          select: { imageUrl: true },
+        });
+    if (!listing) throw new BadRequestException('The selected source image is no longer linked to this card');
+    const url = imageUrlForSource(listing.imageUrl, dto.source)
+      ?? (dto.source === 'YUYUTEI' ? yuyuteiImageFallback(dto.listingKey) : null);
+    if (!url) throw new BadRequestException('This source listing has no usable artwork');
+    let image: Buffer;
+    try {
+      image = await readReferenceImage(url, dto.source);
+      await sharp(image, { limitInputPixels: 16000000 }).metadata();
+    } catch {
+      throw new BadRequestException('Artwork unavailable from this source. Upload your own photo instead.');
+    }
+    // Reuse the standard image processing, storage, and replacement path.
+    return this.upload({ buffer: image } as Express.Multer.File, { itemType: 'RAW', itemId: dto.itemId });
   }
 
   /**
