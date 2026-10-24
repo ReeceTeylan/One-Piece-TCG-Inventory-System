@@ -636,7 +636,9 @@ export class MarketPricesService {
     const searched = rows.length;
     const matched = rows.filter((r) => r.listing).length;
     const underpriced = rows.filter((r) => r.underpriced).length;
-    const matchableUnderpriced = rows.filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice).length;
+    const matchableUnderpriced = rows.filter((r) => r.underpriced && r.matchPrice !== null && r.matchPrice > r.postedPrice
+        && r.matchPrice >= r.buyCost
+        && (!r.listing?.fetchedAt || Date.now() - new Date(r.listing.fetchedAt).getTime() <= 72 * 3600000)).length;
     const changed = rows.filter((r) => r.changePhp !== null).length;
     const notLinked = rows.filter((r) => r.linkState === 'new').length;
     const linkMissing = rows.filter((r) => r.linkState === 'missing').length;
@@ -954,6 +956,10 @@ export class MarketPricesService {
       throw new BadRequestException('No market price for this card yet. Match it to a listing and set the exchange rate first.');
     }
     if (row.matchPrice === null) return { id: card.id, from: row.postedPrice, to: row.postedPrice, changed: false };
+    if (row.listing?.fetchedAt && Date.now() - new Date(row.listing.fetchedAt).getTime() > 72 * 3600000)
+      throw new BadRequestException('Marketplace quote is more than 72 hours old. Sync prices before matching.');
+    if (row.matchPrice < Number(card.buyCost))
+      throw new BadRequestException('Suggested price is below your recorded buying cost. Review before pricing at a loss.');
     await this.rawCards.update(card.id, { postedPrice: row.matchPrice });
     await this.audit.log({
       userId, action: 'market-prices.match', entityType: 'RawCard', entityId: card.id,
