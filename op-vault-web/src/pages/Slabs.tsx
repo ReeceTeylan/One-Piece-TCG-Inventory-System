@@ -11,6 +11,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
 import { CardGrid } from '@/components/common/CardGrid';
+import type { GridDensity } from '@/components/common/CardGrid';
 import { CardThumb } from '@/components/common/CardImage';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SearchInput } from '@/components/common/Toolbar';
@@ -43,6 +44,7 @@ export function SlabsPage() {
     const saved = Number(localStorage.getItem('opv:slabs:limit'));
     return PAGE_SIZES.includes(saved) ? saved : 20;
   });
+  const [density, setDensity] = useStickyState<GridDensity>('slabs:gridDensity', 'standard', { allowed: ['compact','standard','comfortable'] });
   const [view, setView] = useState<'list' | 'grid'>(
     () => (localStorage.getItem('opv:slabs:view') === 'grid' ? 'grid' : 'list'),
   );
@@ -170,7 +172,10 @@ export function SlabsPage() {
           <option value="grade:desc">Grade high→low</option>
         </Select>
         </div>
-        <div className="ml-auto flex shrink-0 gap-0.5 rounded-md border bg-muted p-0.5">
+        {view === 'grid' && <Select value={density} onChange={(e) => setDensity(e.target.value as GridDensity)} className="ml-auto h-8 w-[112px] text-xs sm:hidden" aria-label="Card grid density">
+          <option value="compact">5 per row</option><option value="standard">4 per row</option><option value="comfortable">3 per row</option>
+        </Select>}
+        <div className={`${view === 'grid' ? '' : 'ml-auto'} flex shrink-0 gap-0.5 rounded-md border bg-muted p-0.5`}>
           {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:slabs:view', v); }}
               aria-label={`${v} view`} aria-pressed={view === v}
@@ -211,6 +216,7 @@ export function SlabsPage() {
       <Card className="flex min-h-0 flex-1 flex-col">
         {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : view === 'grid' ? (
           <CardGrid
+            density={density}
             items={data.data.map((s) => ({
               id: s.id,
               imageUrl: s.images?.[0]?.url,

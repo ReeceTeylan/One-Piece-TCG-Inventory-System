@@ -1,0 +1,41 @@
+name: OP Vault Checks
+on:
+  push:
+    branches: [main, feat/mobile-ux-and-fb-export-20261024]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: op-vault-web/package-lock.json
+      - run: npm ci
+        working-directory: op-vault-web
+      - run: npm run build
+        working-directory: op-vault-web
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: op-vault-api/package-lock.json
+      - run: npm ci
+        working-directory: op-vault-api
+      - run: npm run build
+        working-directory: op-vault-api
+      - run: npm test -- --runInBand --passWithNoTests
+        working-directory: op-vault-api

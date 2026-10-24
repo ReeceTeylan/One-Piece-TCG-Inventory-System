@@ -1,14 +1,16 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { GeneratorWorkspace } from './GeneratorWorkspace';
 import { usePagedGenerator } from './usePagedGenerator';
 import { useBatchFill } from './use-batch-fill';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Download, Plus, Share2, Trash2, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Plus, Share2, Trash2, Zap, X } from 'lucide-react';
 import { canShareFiles, dataUrlToFile, useShareImages } from '@/lib/share';
 import { toPng } from 'html-to-image';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import type { GenMode } from './types';
+import { awaitExportPage } from './export-helpers';
+import { toast } from 'sonner';
 
 export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode }) {
   const {
@@ -17,6 +19,10 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   } = usePagedGenerator(mode.perPage);
   const { fetchAllRawSortedByValue, loading } = useBatchFill();
   const [isExporting, setIsExporting] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const abort = useRef<AbortController | null>(null);
+  useEffect(() => () => abort.current?.abort(), []);
+
 
   const handleAutoFill = async () => {
     const allCards = await fetchAllRawSortedByValue();
@@ -26,48 +32,49 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
   // Every page as an image, straight to the phone's share sheet (Messenger etc.).
   const shareAll = useShareImages();
   useEffect(() => { shareAll.clear(); }, [pages]); // eslint-disable-line react-hooks/exhaustive-deps
-  const renderAll = async () => {
-    setIsExporting(true);
+  const capturePages = async (asZip: boolean): Promise<File[]> => {
+    if (abort.current) throw new Error('Another export is in progress');
+    const controller = new AbortController();
+    abort.current = controller;
     const originalId = currentPageId;
-    const files: File[] = [];
+    const nonempty = pages.filter(p => p.cards.length);
+    setIsExporting(true);
+    setProgress({ done: 0, total: nonempty.length });
     try {
-      for (let i = 0; i < pages.length; i++) {
-        if (!pages[i].cards.length) continue;
-        setCurrent(pages[i].id);
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        const node = document.getElementById('fb-export-node');
-        if (node) files.push(await dataUrlToFile(await toPng(node, { quality: 1, pixelRatio: 2 }), `Page_${i + 1}.png`));
+      const files: File[] = [];
+      for (let i = 0; i < nonempty.length; i++) {
+        const page = nonempty[i];
+        if (controller.signal.aborted) throw new DOMException('Export cancelled', 'AbortError');
+        setCurrent(page.id);
+        const node = await awaitExportPage(page.id, page.cards.length, controller.signal);
+        const png = await toPng(node, { quality: 1, pixelRatio: 2, cacheBust: false });
+        if (controller.signal.aborted) throw new DOMException('Export cancelled', 'AbortError');
+        files.push(await dataUrlToFile(png, `Page_${pages.indexOf(page) + 1}.png`));
+        setProgress({ done: i + 1, total: nonempty.length });
+      }
+      if (asZip && !controller.signal.aborted) {
+        const zip = new JSZip();
+        for (const file of files) zip.file(file.name, file);
+        const content = await zip.generateAsync({ type: 'blob' });
+        if (controller.signal.aborted) throw new DOMException('Export cancelled', 'AbortError');
+        saveAs(content, `Facebook_Batch_${Date.now()}.zip`);
+        toast.success(`Exported ${files.length} pages`);
       }
       return files;
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') toast('Export cancelled');
+      else toast.error((e as Error).message || 'Export failed');
+      throw e;
     } finally {
       setCurrent(originalId);
+      abort.current = null;
       setIsExporting(false);
     }
   };
 
+  const renderAll = () => capturePages(false);
   const exportAll = async () => {
-    setIsExporting(true);
-    const zip = new JSZip();
-    const originalId = currentPageId;
-    try {
-      for (let i = 0; i < pages.length; i++) {
-        setCurrent(pages[i].id);
-        // Wait for React to render the new props and the DOM to paint
-        await new Promise(resolve => setTimeout(resolve, 400));
-        const exportNode = document.getElementById('fb-export-node');
-        if (exportNode) {
-          const dataUrl = await toPng(exportNode, { quality: 1, pixelRatio: 2 });
-          const blob = await (await fetch(dataUrl)).blob();
-          zip.file(`Page_${i + 1}.png`, blob);
-        }
-      }
-      const content = await zip.generateAsync({ type: 'blob' });
-      saveAs(content, `Facebook_Batch_${Date.now()}.zip`);
-    } finally {
-      // Restore the UI to the page the user was originally on
-      setCurrent(originalId);
-      setIsExporting(false);
-    }
+    try { await capturePages(true); } catch { /* message shown above */ }
   };
 
   return (
@@ -108,15 +115,23 @@ export function PagedWorkspace({ mode, tabs }: { mode: GenMode; tabs?: ReactNode
             </Button>
           )}
           <Button size="sm" className="max-sm:min-w-0 max-sm:px-1.5 max-sm:text-[11px]" onClick={exportAll} disabled={isExporting || totalCards === 0}>
-            <Download className="mr-1 size-4" /> {isExporting ? 'Exporting…' : 'Export ZIP'}
+            <Download className="mr-1 size-4" /> {isExporting ? `Export ${progress.done}/${progress.total}` : 'Export ZIP'}
           </Button>
         </div>
       </div>
 
+      {isExporting && <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2" role="status" aria-live="polite">
+        <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+          <div className="h-full rounded-full bg-primary transition-[width]" style={{ width: progress.total ? `${progress.done / progress.total * 100}%` : '0%' }} />
+        </div>
+        <span className="whitespace-nowrap text-xs font-semibold">Preparing {progress.done}/{progress.total} pages</span>
+        <Button size="sm" variant="outline" className="h-8" onClick={() => abort.current?.abort()}><X className="size-3.5" /> Cancel</Button>
+      </div>}
       {/* The Controlled Workspace */}
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${isExporting ? 'pointer-events-none opacity-60 transition-opacity' : ''}`}>
         <GeneratorWorkspace
           mode={mode}
+          exportPageId={currentPageId}
           cards={currentPage.cards}
           onCardsChange={setCardsFor(currentPageId)}
           sets={currentPage.sets}

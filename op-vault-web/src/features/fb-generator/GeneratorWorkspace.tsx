@@ -22,6 +22,7 @@ import { computeSetBanners, groupContiguous, newId } from './set-utils';
 export function GeneratorWorkspace({
   mode,
   tabs,
+  exportPageId,
   cards: cardsProp,
   onCardsChange,
   sets: setsProp,
@@ -29,6 +30,7 @@ export function GeneratorWorkspace({
 }: {
   mode: GenMode;
   tabs?: React.ReactNode;
+  exportPageId?: string;
   cards?: FbCard[];
   onCardsChange?: React.Dispatch<React.SetStateAction<FbCard[]>>;
   sets?: FbSet[];
@@ -191,7 +193,7 @@ export function GeneratorWorkspace({
             <EmptyState message="Add items from the inventory panel." />
           ) : (
             <div className="min-w-0 w-full overflow-hidden">
-              <div id="fb-export-node" ref={exportRef} className={config.theme === 'dark' ? 'op-fb-preview mx-auto bg-[#0b0b0d]' : 'op-fb-preview mx-auto bg-white'}
+              <div id="fb-export-node" data-export-page={exportPageId ?? ''} data-card-count={cards.length} ref={exportRef} className={config.theme === 'dark' ? 'op-fb-preview mx-auto bg-[#0b0b0d]' : 'op-fb-preview mx-auto bg-white'}
                 // Square, so capping width by the leftover viewport height is what
                 // keeps it from overflowing the preview panel.
                 style={{ width: '100%', maxWidth: 'var(--op-preview-max-width, min(900px, calc(100vh - 260px)))', aspectRatio: '1 / 1', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: mode.type === 'SLAB' ? '0.2%' : '0.5%' }}>
