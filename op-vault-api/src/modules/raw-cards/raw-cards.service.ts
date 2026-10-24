@@ -21,8 +21,9 @@ export class RawCardsService {
   }
 
   async create(dto: CreateRawCardDto, userId: string) {
-    // Server-side duplicate detection on (cardNumber, setName, rarity)
-    const existing = await this.repo.findByIdentity(dto.cardNumber, dto.setName, dto.rarity);
+    // Distinct art variants must not collapse into a single stock record.
+    const variantKey = dto.variantKey || (dto.marketListingKey ? `source:${dto.marketListingKey}` : 'standard');
+    const existing = await this.repo.findByIdentity(dto.cardNumber, dto.setName, dto.rarity, variantKey);
     if (existing) {
       throw new ConflictException({
         code: 'CARD_EXISTS',
@@ -41,6 +42,7 @@ export class RawCardsService {
     }
     const card = await this.repo.create({
       ...dto,
+      variantKey,
       status: this.computeStatus(dto.quantity),
     });
     await this.prisma.inventoryLog.create({
@@ -60,7 +62,7 @@ export class RawCardsService {
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
-        const existing = await this.repo.findByIdentity(row.cardNumber, row.setName, row.rarity);
+        const existing = await this.repo.findByIdentity(row.cardNumber, row.setName, row.rarity, row.variantKey || (row.marketListingKey ? `source:${row.marketListingKey}` : 'standard'));
         if (existing) {
           await this.addQuantity(existing.id, row.quantity, Number(row.buyCost) || 0, userId);
           restocked++;
@@ -133,38 +135,30 @@ export class RawCardsService {
   }
 
   async addQuantity(id: string, quantity: number, buyCost: number, userId: string) {
-    const card = await this.findOne(id);
-    const newQty = card.quantity + quantity;
-
-    // Weighted-average cost: only recompute when a real (>0) new cost is given.
-    // The quick "+Qty" flow passes 0 → keep the existing cost untouched.
-    let newBuyCost = Number(card.buyCost);
-    if (buyCost > 0) {
-      const oldQty = card.quantity;
-      const oldCost = Number(card.buyCost);
-      const totalQty = oldQty + quantity;
-      newBuyCost = totalQty > 0
-        ? (oldQty * oldCost + quantity * buyCost) / totalQty
-        : buyCost;
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const c = await tx.rawCard.update({
-        where: { id },
-        data: {
-          quantity: newQty,
-          status: this.computeStatus(newQty),
-          buyCost: new Prisma.Decimal(newBuyCost.toFixed(2)),
-        },
+    if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isFinite(buyCost) || buyCost < 0)
+      throw new BadRequestException('Quantity must be positive and buying cost must be nonnegative');
+    // Compare-and-swap protects a concurrent sale, stock count, or second restock
+    // from being silently lost. A stale calculation fails and can be retried.
+    return this.prisma.$transaction(async tx => {
+      const card = await tx.rawCard.findUnique({ where: { id } });
+      if (!card) throw new NotFoundException('Raw card not found');
+      const newQty = card.quantity + quantity;
+      const average = buyCost > 0
+        ? (card.quantity * Number(card.buyCost) + quantity * buyCost) / newQty
+        : Number(card.buyCost);
+      const changed = await tx.rawCard.updateMany({
+        where: { id, quantity: card.quantity },
+        data: { quantity: newQty, status: this.computeStatus(newQty), buyCost: new Prisma.Decimal(average.toFixed(2)) },
       });
+      if (changed.count !== 1)
+        throw new ConflictException('Inventory changed while restocking. Refresh and retry.');
       await tx.restockLog.create({ data: { rawCardId: id, quantityAdded: quantity, buyCost, userId } });
       await tx.inventoryLog.create({
         data: { itemType: 'RAW', rawCardId: id, action: 'RESTOCK',
           quantityDelta: quantity, quantityAfter: newQty, userId },
       });
-      return c;
+      return tx.rawCard.findUniqueOrThrow({ where: { id } });
     });
-    return updated;
   }
 
   restock(id: string, dto: RestockDto, userId: string) {
