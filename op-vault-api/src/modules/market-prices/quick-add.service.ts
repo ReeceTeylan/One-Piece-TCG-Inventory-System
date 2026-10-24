@@ -38,10 +38,13 @@ export class QuickAddService {
     if (official?.colors?.length) metadata.color = official.colors.join(' / ');
     if (official?.setName && !metadata.setName) metadata.setName = official.setName;
     const prices = quickCardPrices(listing, await this.settings.getAll(), notes);
-    const existing = await this.prisma.rawCard.findFirst({
+    const linked = await this.prisma.rawCard.findMany({
       where: { marketListingKey: listingKey },
+      take: 2,
       select: { id: true, name: true, cardNumber: true, quantity: true, postedPrice: true, buyCost: true, notes: true, images: { take: 1, select: { id: true } } },
     });
+    if (linked.length > 1) throw new ConflictException('Marketplace listing is linked to multiple inventory records. Please correct the links manually before restocking.');
+    const existing = linked[0];
     if (existing && existing.cardNumber.trim().toUpperCase() !== num)
       throw new ConflictException('This marketplace listing is linked to a different card number. Review the existing record.');
     return {
@@ -138,7 +141,9 @@ export class QuickAddService {
               return { action: prior.action, card, hasImage: !!image };
             }
           }
-          const exact = await tx.rawCard.findFirst({ where: { marketListingKey: dto.listingKey } });
+          const matches = await tx.rawCard.findMany({ where: { marketListingKey: dto.listingKey }, take: 2 });
+          if (matches.length > 1) throw new ConflictException('Marketplace listing is linked to multiple stock records. Review and correct these links manually.');
+          const exact = matches[0];
           let card;
           let action: string;
           let hasImage = false;
