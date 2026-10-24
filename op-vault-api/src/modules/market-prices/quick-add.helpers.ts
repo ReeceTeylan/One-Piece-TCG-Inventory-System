@@ -4,7 +4,7 @@ import { roundPrice, damageReason } from './market-match';
 export type QuickSource = 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER';
 export interface QuickCandidate {
   source: QuickSource; listingKey: string; cardNumber: string; name: string; rarity: string | null;
-  setLabel: string; price: number; currency: 'JPY' | 'USD'; imageUrl?: string | null; url: string;
+  setLabel: string; price: number; currency: string; imageUrl?: string | null; url: string;
 }
 const clean = (s: string) => s.trim().replace(/\s+/g, ' ');
 
