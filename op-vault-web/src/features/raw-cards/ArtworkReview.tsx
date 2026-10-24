@@ -36,13 +36,13 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
     } catch (e) { toast.error(apiError(e).message); }
     finally { setChecking(false); }
   }
-  return <section className="space-y-2 rounded-lg border p-3 sm:col-span-2">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div><h3 className="text-sm font-semibold">Verify artwork before listing</h3><p className="text-xs text-muted-foreground">Compare the exact art, print and language before saving.</p></div>
-      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(v => !v)}><Images className="size-4" /> {open ? 'Hide artwork' : 'Cross-check'}</Button>
+  return <section className="min-w-0 space-y-2 rounded-xl border bg-muted/10 p-2.5 sm:col-span-2 sm:p-3">
+    <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+      <div className="min-w-0"><h3 className="text-sm font-semibold">Verify artwork before listing</h3><p className="text-xs text-muted-foreground">Compare the exact art, print and language before saving.</p></div>
+      <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => setOpen(v => !v)}><Images className="size-4" /> {open ? 'Hide artwork' : 'Cross-check'}</Button>
     </div>
-    {open && <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    {open && <div className="min-w-0 space-y-2">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <Select className="max-w-[170px]" value={source} disabled={english} onChange={e => setShop(e.target.value as MarketSource)}>
           <option value="YUYUTEI">Yuyu-tei</option><option value="CARDRUSH">Cardrush</option><option value="TCGPLAYER">TCGplayer</option>
         </Select>
@@ -55,9 +55,9 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
       {candidates.isFetching && <p className="text-xs text-muted-foreground">Looking up artwork…</p>}
       {candidates.isError && <p className="text-xs text-destructive">Reference artwork is unavailable. Please verify the card manually.</p>}
       {candidates.data?.length === 0 && <p className="text-xs text-muted-foreground">No listings returned for this card number. The catalog may be missing this printing; try another source or Retry.</p>}
-      <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
-        {candidates.data?.map(item => <div key={item.listingKey} className={`min-w-0 rounded-md border p-2 ${selected === item.listingKey ? 'border-primary ring-1 ring-primary' : ''}`}>
-          <div className="flex h-28 items-center justify-center overflow-hidden rounded bg-muted/30">
+      <div className="grid max-h-[min(320px,40dvh)] min-w-0 grid-cols-2 gap-2 overflow-y-auto overscroll-contain pr-1 sm:grid-cols-3 lg:grid-cols-4">
+        {candidates.data?.map(item => <div key={item.listingKey} className={`min-w-0 overflow-hidden rounded-lg border bg-card p-2 transition-colors ${selected === item.listingKey ? 'border-primary ring-1 ring-primary' : 'hover:border-foreground/30'}`}>
+          <div className="flex h-28 items-center justify-center overflow-hidden rounded bg-muted/30 sm:h-32">
             {item.imageUrl ? <img src={item.imageUrl} loading="lazy" referrerPolicy="no-referrer" alt={item.name} className="max-h-full max-w-full object-contain" /> : <span className="text-center text-xs text-muted-foreground">No thumbnail</span>}
           </div>
           <p className="mt-1 truncate text-xs font-semibold" title={item.name}>{item.name}</p>
@@ -71,7 +71,7 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
           </div>
         </div>)}
       </div>
-      <p className="text-xs text-muted-foreground">A photo score is not proof: glare, crops, special artworks and reprints can look alike. The choice links pricing to the selected listing; the vendor image is not copied into OP Vault.</p>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">Image similarity is only a guide—confirm the correct art, edition and language. Choose a reference to link pricing; importing artwork requires permission.</p>
     </div>}
   </section>;
 }
