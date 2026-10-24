@@ -14,6 +14,7 @@ import { SuggestPriceDto } from './dto/suggest-price.dto';
 import { ArtworkSource } from './artwork-compare';
 import { QuickAddService } from './quick-add.service';
 import { QuickAddDto } from './dto/quick-add.dto';
+import { QuickAddBatchDto } from './dto/quick-add-batch.dto';
 
 @ApiTags('market-prices')
 @ApiBearerAuth()
@@ -51,6 +52,12 @@ export class MarketPricesController {
   @Roles(Role.OWNER)
   previewQuickAdd(@Query('cardNumber') number: string, @Query('source') source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER', @Query('listingKey') key: string, @Query('notes') notes?: string) {
     return this.quick.preview(number, source, key, notes);
+  }
+
+  @Post('quick-add/batch')
+  @Roles(Role.OWNER)
+  quickAddBatch(@Body() dto: QuickAddBatchDto, @CurrentUser('id') userId: string) {
+    return this.quick.addBatch(dto, userId);
   }
 
   @Post('quick-add')
