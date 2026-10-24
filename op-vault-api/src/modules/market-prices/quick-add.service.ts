@@ -57,6 +57,124 @@ export class QuickAddService {
     };
   }
 
+
+  /** Show sold-out inventory for an exact card ID without changing marketplace links. */
+  async soldOutListings(cardNumber: string) {
+    const num = cardNumber.trim().toUpperCase();
+    if (!/^[A-Z0-9]+-\d{2,3}$/.test(num))
+      throw new BadRequestException('Enter a valid card number');
+    const rows = await this.prisma.rawCard.findMany({
+      where: { cardNumber: { equals: num, mode: 'insensitive' }, quantity: 0 },
+      orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
+      take: 40,
+      select: {
+        id: true, name: true, cardNumber: true, setName: true, character: true,
+        rarity: true, color: true, buyCost: true, postedPrice: true,
+        marketListingKey: true, quantity: true,
+        images: { take: 1, orderBy: { isPrimary: 'desc' }, select: { url: true } },
+      },
+    });
+    return rows.map(({ images, buyCost, postedPrice, ...row }) => ({
+      ...row, buyCost: Number(buyCost), postedPrice: Number(postedPrice),
+      imageUrl: images[0]?.url ?? null,
+    }));
+  }
+
+  /** Explicitly selected existing record: restock by ID and keep existing artwork/link untouched. */
+  private async restockSelected(dto: QueuedQuickAddItemDto, userId: string) {
+    const id = dto.existingCardId!;
+    if (dto.listingKey !== `existing:${id}`)
+      throw new BadRequestException('Existing record selection does not match the queued listing');
+    const buyCost = dto.buyCost;
+    const postedPrice = dto.postedPrice;
+    if (buyCost === undefined || !Number.isFinite(buyCost) || buyCost < 0 ||
+        (postedPrice !== undefined && (!Number.isFinite(postedPrice) || postedPrice < 0)))
+      throw new BadRequestException('Enter valid buying and selling prices');
+
+    const replay = async () => {
+      if (!dto.requestId) return null;
+      const receipt = await this.prisma.quickAddReceipt.findUnique({ where: { id: dto.requestId } });
+      if (!receipt) return null;
+      if (receipt.userId !== userId || receipt.listingKey !== dto.listingKey || receipt.cardId !== id)
+        throw new ConflictException('This request ID has already been used for a different card');
+      const card = await this.prisma.rawCard.findUnique({ where: { id } });
+      if (!card) throw new ConflictException('The previously restocked card no longer exists');
+      const image = await this.prisma.cardImage.findFirst({ where: { rawCardId: id }, select: { id: true } });
+      return { action: receipt.action, card, hasImage: !!image };
+    };
+    const previous = await replay();
+    if (previous) return previous;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          if (dto.requestId) {
+            const receipt = await tx.quickAddReceipt.findUnique({ where: { id: dto.requestId } });
+            if (receipt) {
+              if (receipt.userId !== userId || receipt.listingKey !== dto.listingKey || receipt.cardId !== id)
+                throw new ConflictException('Request ID collision');
+              const card = await tx.rawCard.findUniqueOrThrow({ where: { id } });
+              const image = await tx.cardImage.findFirst({ where: { rawCardId: id }, select: { id: true } });
+              return { action: receipt.action, card, hasImage: !!image };
+            }
+          }
+          const existing = await tx.rawCard.findUnique({ where: { id } });
+          if (!existing) throw new NotFoundException('Existing card was removed');
+          if (existing.cardNumber.trim().toUpperCase() !== dto.cardNumber.trim().toUpperCase())
+            throw new ConflictException('Card number changed. Choose the correct existing listing again.');
+          const nextQty = existing.quantity + dto.quantity;
+          const avg = buyCost > 0
+            ? (existing.quantity * Number(existing.buyCost) + dto.quantity * buyCost) / nextQty
+            : Number(existing.buyCost);
+          const reactivated = existing.quantity === 0;
+          const changedPrice = reactivated && postedPrice !== undefined &&
+            Number(existing.postedPrice) !== postedPrice;
+          const notes = dto.notes?.trim();
+          const nextNotes = notes && !(existing.notes ?? '').includes(notes)
+            ? [existing.notes, notes].filter(Boolean).join(' · ')
+            : existing.notes;
+          const changed = await tx.rawCard.updateMany({
+            where: { id, quantity: existing.quantity },
+            data: {
+              quantity: nextQty, status: nextQty <= 3 ? 'LOW' : 'AVAILABLE',
+              buyCost: new Prisma.Decimal(avg.toFixed(2)),
+              ...(changedPrice ? { postedPrice: new Prisma.Decimal(postedPrice!) } : {}),
+              ...(nextNotes !== existing.notes ? { notes: nextNotes } : {}),
+            },
+          });
+          if (changed.count !== 1) throw new ConflictException('Stock changed during restock. Retry this item.');
+          if (changedPrice) {
+            await tx.priceHistory.create({
+              data: { itemType: 'RAW', itemId: id, field: 'postedPrice',
+                oldValue: existing.postedPrice, newValue: new Prisma.Decimal(postedPrice!) },
+            });
+          }
+          await tx.restockLog.create({
+            data: { rawCardId: id, quantityAdded: dto.quantity, buyCost, userId },
+          });
+          await tx.inventoryLog.create({
+            data: { itemType: 'RAW', rawCardId: id, action: 'RESTOCK',
+              quantityDelta: dto.quantity, quantityAfter: nextQty, userId },
+          });
+          if (dto.requestId) await tx.quickAddReceipt.create({
+            data: { id: dto.requestId, listingKey: dto.listingKey,
+              userId, cardId: id, action: reactivated ? 'reactivated' : 'restocked' },
+          });
+          const card = await tx.rawCard.findUniqueOrThrow({ where: { id } });
+          const image = await tx.cardImage.findFirst({ where: { rawCardId: id }, select: { id: true } });
+          return { action: reactivated ? 'reactivated' : 'restocked', card, hasImage: !!image };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 25000 });
+      } catch (error: any) {
+        if (dto.requestId && ['P2002', 'P2034'].includes(error?.code)) {
+          const saved = await replay();
+          if (saved) return saved;
+        }
+        if (error?.code === 'P2034' && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Concurrent stock change. Retry the batch.');
+  }
+
   async addBatch(dto: QuickAddBatchDto, userId: string) {
     // One final submission. Item-level errors are returned so remaining stock is not lost.
     // Reject duplicate listing keys in the batch to avoid accidental repeat additions.
@@ -78,6 +196,7 @@ export class QuickAddService {
   }
 
   async add(dto: QueuedQuickAddItemDto, userId: string) {
+    if (dto.existingCardId) return this.restockSelected(dto, userId);
     // Resolve a completed request before relying on a marketplace that may be temporarily down.
     if (dto.requestId) {
       const prior = await this.prisma.quickAddReceipt.findUnique({ where: { id: dto.requestId } });

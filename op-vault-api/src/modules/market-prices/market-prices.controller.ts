@@ -48,6 +48,12 @@ export class MarketPricesController {
     return this.service.suggest(q.cardNumber, q.rarity, q.notes);
   }
 
+  @Get('quick-add/sold-out')
+  @Roles(Role.OWNER)
+  soldOutQuickAdd(@Query('cardNumber') number: string) {
+    return this.quick.soldOutListings(number ?? '');
+  }
+
   @Get('quick-add/preview')
   @Roles(Role.OWNER)
   previewQuickAdd(@Query('cardNumber') number: string, @Query('source') source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER', @Query('listingKey') key: string, @Query('notes') notes?: string) {
