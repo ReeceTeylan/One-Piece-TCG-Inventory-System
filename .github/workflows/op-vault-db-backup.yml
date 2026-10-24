@@ -1,0 +1,55 @@
+name: Encrypted PostgreSQL Backup
+on:
+  schedule:
+    - cron: '37 18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Verify backup destination is configured
+        id: config
+        env:
+          DB: ${{ secrets.OP_VAULT_BACKUP_DATABASE_URL }}
+          BUCKET: ${{ secrets.OP_VAULT_BACKUP_S3_BUCKET }}
+          KEY: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          SECRET: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          PASSWORD: ${{ secrets.OP_VAULT_BACKUP_PASSPHRASE }}
+        run: |
+          if [ -z "$DB" ] || [ -z "$BUCKET" ] || [ -z "$KEY" ] || [ -z "$SECRET" ] || [ -z "$PASSWORD" ]; then
+            echo "::warning::Database backups are NOT ACTIVE. Configure required repository secrets (see docs)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Export, encrypt and upload backup
+        if: steps.config.outputs.ready == 'true'
+        env:
+          PG_BACKUP_URL: ${{ secrets.OP_VAULT_BACKUP_DATABASE_URL }}
+          BACKUP_PASSPHRASE: ${{ secrets.OP_VAULT_BACKUP_PASSPHRASE }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.OP_VAULT_BACKUP_AWS_REGION }}
+          BACKUP_BUCKET: ${{ secrets.OP_VAULT_BACKUP_S3_BUCKET }}
+          BACKUP_ENDPOINT: ${{ vars.OP_VAULT_BACKUP_S3_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          umask 077
+          command -v pg_dump >/dev/null || { echo "pg_dump missing"; exit 1; }
+          command -v aws >/dev/null || { echo "aws CLI missing"; exit 1; }
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          pg_dump --dbname="$PG_BACKUP_URL" --format=custom --no-owner --no-acl --file="$work/op-vault.dump"
+          test -s "$work/op-vault.dump"
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$work/op-vault.dump" -out "$work/op-vault.dump.enc" -pass env:BACKUP_PASSPHRASE
+          test -s "$work/op-vault.dump.enc"
+          dst="s3://$BACKUP_BUCKET/op-vault/$(date -u '+%Y-%m-%dT%H-%M-%SZ').dump.enc"
+          if [ -n "$BACKUP_ENDPOINT" ]; then
+            aws --endpoint-url "$BACKUP_ENDPOINT" s3 cp "$work/op-vault.dump.enc" "$dst"
+          else
+            aws s3 cp "$work/op-vault.dump.enc" "$dst"
+          fi
+          echo "Encrypted backup uploaded successfully."
