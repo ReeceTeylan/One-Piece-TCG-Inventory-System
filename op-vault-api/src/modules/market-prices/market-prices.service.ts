@@ -1007,7 +1007,7 @@ export class MarketPricesService {
       return rows.map((l) => ({
         source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
         setLabel: 'Cardrush', price: l.priceJpy, currency: 'JPY',
-        inStock: l.inStock, stockCount: l.stockCount, url: l.url, imageUrl: imageUrlForSource(l.imageUrl, source), imageUrl: imageUrlForSource(l.imageUrl, source),
+        inStock: l.inStock, stockCount: l.stockCount, url: l.url, imageUrl: imageUrlForSource(l.imageUrl, source),
       }));
     }
     const rows = await this.prisma.marketPrice.findMany({
@@ -1016,7 +1016,7 @@ export class MarketPricesService {
     return rows.map((l) => ({
       source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
       setLabel: l.listingKey.split('/')[0].toUpperCase(), price: l.priceJpy, currency: 'JPY',
-      inStock: l.inStock, stockCount: l.stockCount, url: l.url,
+      inStock: l.inStock, stockCount: l.stockCount, url: l.url, imageUrl: imageUrlForSource(l.imageUrl, source),
     }));
   }
 
