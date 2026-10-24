@@ -1,7 +1,8 @@
 import { Type } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Min, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Min, MaxLength, IsUUID } from 'class-validator';
 
 export class QuickAddDto {
+  @IsOptional() @IsUUID('4') requestId?: string;
   @IsString() @Matches(/^[A-Za-z0-9]+-\d{2,3}$/) cardNumber: string;
   @IsIn(['YUYUTEI', 'CARDRUSH', 'TCGPLAYER']) source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER';
   @IsString() @MaxLength(150) listingKey: string;
