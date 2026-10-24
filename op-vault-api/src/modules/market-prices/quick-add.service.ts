@@ -5,6 +5,8 @@ import { SettingsService } from '../settings/settings.service';
 import { MarketPricesService } from './market-prices.service';
 import { QuickAddDto } from './dto/quick-add.dto';
 import { QuickSource, quickCardMetadata, quickCardPrices } from './quick-add.helpers';
+import { selectEnglishCharacter, isEnglishCharacter } from './quick-add.english';
+import { QuickAddBatchDto, QueuedQuickAddItemDto } from './dto/quick-add-batch.dto';
 
 @Injectable()
 export class QuickAddService {
@@ -24,6 +26,14 @@ export class QuickAddService {
     const listing = candidates.find(c => c.listingKey === listingKey && c.source === source);
     if (!listing) throw new NotFoundException('Listing not found for this card number. Refresh the source catalog.');
     const metadata = quickCardMetadata(listing);
+    // Prefer a direct English catalogue match; never guess when several character names share a card number.
+    let englishCatalog: typeof candidates = [];
+    if (source !== 'TCGPLAYER') {
+      try { englishCatalog = await this.market.listingsFor(num, 'TCGPLAYER'); } catch { /* keep quick add available offline */ }
+    }
+    const english = selectEnglishCharacter(listing, englishCatalog);
+    metadata.character = english ?? '';
+    metadata.name = english ?? '';
     const prices = quickCardPrices(listing, await this.settings.getAll(), notes);
     const existing = await this.prisma.rawCard.findFirst({
       where: { marketListingKey: listingKey },
@@ -41,13 +51,39 @@ export class QuickAddService {
     };
   }
 
-  async add(dto: QuickAddDto, userId: string) {
+  async addBatch(dto: QuickAddBatchDto, userId: string) {
+    // One final submission. Item-level errors are returned so remaining stock is not lost.
+    // Reject duplicate listing keys in the batch to avoid accidental repeat additions.
+    const seen = new Set<string>();
+    for (const item of dto.items) {
+      if (seen.has(item.listingKey)) throw new BadRequestException('The same source listing is queued twice. Combine quantities before processing.');
+      seen.add(item.listingKey);
+    }
+    const results: { listingKey: string; status: string; cardId?: string; reason?: string; hasImage?: boolean }[] = [];
+    for (const item of dto.items) {
+      try {
+        const result = await this.add(item, userId);
+        results.push({ listingKey: item.listingKey, status: result.action, cardId: result.card.id, hasImage: result.hasImage });
+      } catch (error: any) {
+        results.push({ listingKey: item.listingKey, status: 'failed', reason: error?.response?.message ?? error?.message ?? 'Failed' });
+      }
+    }
+    return { total: results.length, succeeded: results.filter(x => x.status !== 'failed').length, results };
+  }
+
+  async add(dto: QueuedQuickAddItemDto, userId: string) {
     const notesInput = (dto.notes ?? '').trim();
     const notes = dto.source === 'TCGPLAYER' && !/\b(?:english|eng)\b/i.test(notesInput)
       ? [notesInput, 'English'].filter(Boolean).join(' · ') : notesInput;
     if (dto.source !== 'TCGPLAYER' && /\b(?:english|eng)\b/i.test(notes))
       throw new BadRequestException('English notes require a TCGplayer listing; select the matching source.');
     const resolved = await this.preview(dto.cardNumber, dto.source, dto.listingKey, notes);
+    const englishName = dto.englishName?.trim() || resolved.metadata.name;
+    const englishCharacterName = dto.englishCharacter?.trim() || resolved.metadata.character;
+    if (!isEnglishCharacter(englishName) || !isEnglishCharacter(englishCharacterName))
+      throw new BadRequestException('Confirm an English name and character before saving this listing');
+    resolved.metadata.name = englishName;
+    resolved.metadata.character = englishCharacterName;
     if (resolved.postedPrice === null && dto.postedPrice === undefined)
       throw new BadRequestException('Configure the currency conversion rate in Settings first');
     const buyCost = dto.buyCost ?? resolved.buyCost;
