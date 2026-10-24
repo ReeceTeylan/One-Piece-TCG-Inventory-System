@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { NotifType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -56,23 +56,27 @@ export class NotificationsService {
     return { unread: count };
   }
 
-  async markRead(id: string) {
+  async markRead(id: string, userId: string, role: string) {
     const n = await this.prisma.notification.findUnique({ where: { id } });
     if (!n) throw new NotFoundException('Notification not found');
+    if ((n.userId && n.userId !== userId) || (!n.userId && role !== 'OWNER'))
+      throw new ForbiddenException('Only the notification owner may mark this notification read');
     return this.prisma.notification.update({ where: { id }, data: { isRead: true } });
   }
 
-  async markAllRead(userId: string) {
+  async markAllRead(userId: string, role: string) {
     const res = await this.prisma.notification.updateMany({
-      where: { isRead: false, OR: [{ userId }, { userId: null }] },
+      where: { isRead: false, ...(role === 'OWNER' ? { OR: [{ userId }, { userId: null }] } : { userId }) },
       data: { isRead: true },
     });
     return { updated: res.count };
   }
 
-  async dismiss(id: string) {
+  async dismiss(id: string, userId: string, role: string) {
     const n = await this.prisma.notification.findUnique({ where: { id } });
     if (!n) throw new NotFoundException('Notification not found');
+    if ((n.userId && n.userId !== userId) || (!n.userId && role !== 'OWNER'))
+      throw new ForbiddenException('Only the notification owner may dismiss this notification');
     await this.prisma.notification.delete({ where: { id } });
     return { message: 'Notification dismissed' };
   }

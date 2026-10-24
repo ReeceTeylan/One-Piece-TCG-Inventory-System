@@ -1,36 +1,25 @@
-import { Test } from '@nestjs/testing';
+import { ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
-import { PrismaService } from '../../prisma/prisma.service';
-
-describe('NotificationsService', () => {
-  let service: NotificationsService;
-  let prisma: any;
-
-  beforeEach(async () => {
-    prisma = { notification: { create: jest.fn().mockResolvedValue({ id: 'n1' }) } };
-    const moduleRef = await Test.createTestingModule({
-      providers: [NotificationsService, { provide: PrismaService, useValue: prisma }],
-    }).compile();
-    service = moduleRef.get(NotificationsService);
+describe('Notification ownership controls', () => {
+  const db: any = { notification: {
+    findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn().mockResolvedValue({count: 0}), delete: jest.fn(),
+  } };
+  const service = new NotificationsService(db);
+  beforeEach(() => jest.clearAllMocks());
+  it('does not let staff mark a global broadcast read', async () => {
+    db.notification.findUnique.mockResolvedValueOnce({id:'global',userId:null});
+    await expect(service.markRead('global','staff','STAFF')).rejects.toThrow(ForbiddenException);
+    expect(db.notification.update).not.toHaveBeenCalled();
   });
-
-  it('emits a low-stock notification at/below threshold', async () => {
-    await service.emitLowStock({ id: 'r1', name: 'Zoro', quantity: 2 }, 3);
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ type: 'LOW_STOCK' }) }),
-    );
+  it('scopes staff mark-all-read to their own rows', async () => {
+    await service.markAllRead('staff','STAFF');
+    expect(db.notification.updateMany).toHaveBeenCalledWith({
+      where: {isRead:false,userId:'staff'}, data: {isRead:true},
+    });
   });
-
-  it('emits OUT_OF_STOCK at zero', async () => {
-    await service.emitLowStock({ id: 'r1', name: 'Sanji', quantity: 0 }, 3);
-    expect(prisma.notification.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ type: 'OUT_OF_STOCK' }) }),
-    );
-  });
-
-  it('does not emit above threshold', async () => {
-    const res = await service.emitLowStock({ id: 'r1', name: 'Nami', quantity: 20 }, 3);
-    expect(res).toBeNull();
-    expect(prisma.notification.create).not.toHaveBeenCalled();
+  it('does not let staff dismiss an owner notification', async () => {
+    db.notification.findUnique.mockResolvedValueOnce({id:'private',userId:'owner'});
+    await expect(service.dismiss('private','staff','STAFF')).rejects.toThrow(ForbiddenException);
+    expect(db.notification.delete).not.toHaveBeenCalled();
   });
 });

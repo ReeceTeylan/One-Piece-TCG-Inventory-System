@@ -233,7 +233,7 @@ export function MarketPricesPage() {
 
       <Card className={cn('flex min-h-0 flex-1 flex-col transition-opacity', query.isPlaceholderData && 'opacity-60')}>
         {query.isLoading ? <TableSkeleton />
-        : query.isError ? <ErrorState onRetry={() => { void query.refetch(); }} />
+        : query.isError ? <ErrorState />
         : !query.data?.data.length
           ? (view === 'changes' && !underpricedOnly && !search && !language && !condition
               ? <div className="flex flex-col items-center">
@@ -280,6 +280,10 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
 }) {
   const l = row.listing;
   const lower = row.matchPrice !== null && row.matchPrice < row.postedPrice;
+  const stale = !!l?.fetchedAt && Date.now() - new Date(l.fetchedAt).getTime() > 72 * 3600000;
+  const lossRisk = row.matchPrice !== null && row.matchPrice < row.buyCost;
+  const canMatch = !stale && !lossRisk;
+  const expectedMargin = row.postedPrice > 0 ? Math.round((row.postedPrice - row.buyCost) / row.postedPrice * 1000) / 10 : null;
   return (
     <>
       <div className={cn('border-b px-2.5 py-2 sm:hidden', row.underpriced && 'bg-warning/5')}>
@@ -292,6 +296,8 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
               {row.damage && <Badge variant="warning" className="max-w-[75px] truncate text-[10px]">{row.damage}</Badge>}
             </div>
             <div className="truncate text-[10px] text-muted-foreground">{row.cardNumber} · {row.rarity} · Qty {row.quantity}</div>
+            <div className="text-[10px] text-muted-foreground">Cost {peso(row.buyCost)} · Posted margin {expectedMargin ?? '—'}%</div>
+            {(stale || lossRisk) && <div className="text-[10px] font-semibold text-warning">{stale ? 'Market price stale · sync first' : 'Suggested price below buying cost'}</div>}
             <div className="flex min-w-0 items-center gap-2 text-xs">
               <span className="font-semibold tabular-nums">{peso(row.postedPrice)}</span>
               <span className="shrink-0 text-muted-foreground">→</span>
@@ -301,7 +307,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
           </div>
           {canEdit && <button type="button" className="shrink-0 rounded-md border px-2 py-2 text-[11px] font-medium" onClick={onChange} aria-label={row.linkState === 'new' ? 'Link market listing' : 'Change market listing'}>{row.linkState === 'new' ? 'Link' : 'Change'}</button>}
         </div>
-        {canEdit && row.matchPrice !== null && row.underpriced && (
+        {canEdit && row.matchPrice !== null && row.underpriced && canMatch && (
           <Button size="sm" variant="outline" className="mt-1.5 h-7 w-full text-[11px]" onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
             {matching ? <Loader2 className="size-3.5 animate-spin" /> : <><ArrowUpRight className="size-3.5" /> Match price · {peso(row.matchPrice)}</>}
           </Button>
@@ -322,6 +328,8 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
               )}
             </div>
             <div className="truncate text-xs text-muted-foreground">{row.cardNumber} · {row.rarity} · qty {row.quantity}</div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground">Acquisition {peso(row.buyCost)} · Posted margin {expectedMargin ?? '—'}%</div>
+            {(stale || lossRisk) && <div className="text-[11px] font-semibold text-warning">{stale ? 'Stale quote · sync prices' : 'Below buying cost · review before matching'}</div>}
             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {l ? (
                 <>
@@ -367,7 +375,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
               </Badge>
             )}
             {row.underpriced && <div className="mt-1 text-[11px] font-semibold text-warning">Underpriced</div>}
-            {canEdit && row.matchPrice !== null && (
+            {canEdit && row.matchPrice !== null && canMatch && (
               <Button size="sm" variant={row.underpriced ? 'default' : 'outline'} className="mt-1.5 h-9 w-full px-2 text-xs sm:h-7 sm:text-[11px]"
                 onClick={onMatch} disabled={matching} title={`Set your price to ${peso(row.matchPrice)}`}>
                 {matching ? <Loader2 className="size-3.5 animate-spin" />
