@@ -45,7 +45,21 @@ jobs:
         with: { persist-credentials: false }
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with: { node-version: '22' }
-      - run: npm ci && npx prisma migrate deploy
+      - run: npm ci
+        working-directory: op-vault-api
+      - name: Diagnose old migration baseline drift
+        working-directory: op-vault-api
+        run: |
+          mv prisma/migrations/20261024000100_inventory_variants_receipts_sale_sequence /tmp/op-vault-new-migration
+          npx prisma migrate deploy
+          mv /tmp/op-vault-new-migration prisma/migrations/20261024000100_inventory_variants_receipts_sale_sequence
+          git fetch --depth=1 origin main
+          git show origin/main:op-vault-api/prisma/schema.prisma > /tmp/main-prisma-schema.prisma
+          cp /tmp/main-prisma-schema.prisma prisma/schema.base.prisma
+          npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.base.prisma --script > /tmp/op-vault-baseline.sql
+          echo "=== ORIGINAL MIGRATION / CURRENT MAIN SCHEMA DIFFERENCES ==="
+          cat /tmp/op-vault-baseline.sql
+      - run: npx prisma migrate deploy
         working-directory: op-vault-api
       - name: Check migration/schema parity
         run: |
