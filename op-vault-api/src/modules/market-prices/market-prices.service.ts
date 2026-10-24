@@ -17,6 +17,7 @@ import {
   comparePrice, damageReason, isEnglish, pickAutoListing, pickCardrushListing, pickTcgListing, roundPrice, toYuyuteiRarity,
 } from './market-match';
 import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
+import { ArtworkSource, differenceHash, imageUrlForSource, readReferenceImage, similarityPercent } from './artwork-compare';
 
 const DELAY_MS = 1500;          // gap between Yuyu-tei requests — be a polite visitor
 const TCGCSV_DELAY_MS = 300;    // TCGCSV asks for a short pause between requests
@@ -998,7 +999,7 @@ export class MarketPricesService {
       return rows.map((t) => ({
         source, listingKey: t.listingKey, cardNumber: t.cardNumber, name: `${t.name} · ${t.subTypeName}`,
         rarity: t.rarity, setLabel: t.groupAbbr ?? String(t.groupId), price: Number(t.priceUsd), currency: 'USD',
-        inStock: null, stockCount: null, url: t.url,
+        inStock: null, stockCount: null, url: t.url, imageUrl: imageUrlForSource(t.imageUrl, source),
       }));
     }
     if (source === 'CARDRUSH') {
@@ -1006,7 +1007,7 @@ export class MarketPricesService {
       return rows.map((l) => ({
         source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
         setLabel: 'Cardrush', price: l.priceJpy, currency: 'JPY',
-        inStock: l.inStock, stockCount: l.stockCount, url: l.url,
+        inStock: l.inStock, stockCount: l.stockCount, url: l.url, imageUrl: imageUrlForSource(l.imageUrl, source),
       }));
     }
     const rows = await this.prisma.marketPrice.findMany({
@@ -1015,8 +1016,42 @@ export class MarketPricesService {
     return rows.map((l) => ({
       source, listingKey: l.listingKey, cardNumber: l.cardNumber, name: l.name, rarity: l.rarity,
       setLabel: l.listingKey.split('/')[0].toUpperCase(), price: l.priceJpy, currency: 'JPY',
-      inStock: l.inStock, stockCount: l.stockCount, url: l.url,
+      inStock: l.inStock, stockCount: l.stockCount, url: l.url, imageUrl: imageUrlForSource(l.imageUrl, source),
     }));
+  }
+
+  /**
+   * Compare a user's uploaded photograph to catalog artwork for the same card number.
+   * No photo is stored and no choice is applied automatically. Images that cannot
+   * be fetched simply receive null similarity; they remain available for manual review.
+   */
+  async compareArtwork(cardNumber: string, source: ArtworkSource, photo: Buffer) {
+    const num = norm(cardNumber);
+    if (!/^[A-Z0-9]+-\d{2,3}$/.test(num)) throw new BadRequestException('Enter a valid card number');
+    if (!['YUYUTEI', 'CARDRUSH', 'TCGPLAYER'].includes(source)) throw new BadRequestException('Invalid source');
+    let userHash: bigint;
+    try { userHash = await differenceHash(photo); }
+    catch { throw new BadRequestException('Upload a valid JPEG, PNG or WebP photo'); }
+
+    const listings = (await this.listingsFor(num, source)).filter((l) => !!l.imageUrl).slice(0, 12);
+    // Fetch in batches of 3 to avoid hammering shops or exhausting server resources.
+    const results: { listingKey: string; similarity: number | null }[] = [];
+    for (let i = 0; i < listings.length; i += 3) {
+      const group = listings.slice(i, i + 3);
+      const groupResults = await Promise.all(group.map(async (l) => {
+        try {
+          const image = await readReferenceImage(l.imageUrl!, source);
+          const hash = await differenceHash(image);
+          return { listingKey: l.listingKey, similarity: similarityPercent(userHash, hash) };
+        } catch { return { listingKey: l.listingKey, similarity: null }; }
+      }));
+      results.push(...groupResults);
+    }
+    return {
+      cardNumber: num, source, checked: results.filter((r) => r.similarity !== null).length,
+      results: results.sort((a, b) => (b.similarity ?? -1) - (a.similarity ?? -1)),
+      warning: 'Similarity is an approximate image hint, not proof of matching edition, language or condition. Confirm the actual artwork before saving.',
+    };
   }
 
   /**

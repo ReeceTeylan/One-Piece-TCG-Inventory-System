@@ -1,4 +1,6 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -9,6 +11,7 @@ import { QueryMarketPricesDto } from './dto/query-market-prices.dto';
 import { LinkListingDto } from './dto/link-listing.dto';
 import { LinkUrlDto } from './dto/link-url.dto';
 import { SuggestPriceDto } from './dto/suggest-price.dto';
+import { ArtworkSource } from './artwork-compare';
 
 @ApiTags('market-prices')
 @ApiBearerAuth()
@@ -40,6 +43,24 @@ export class MarketPricesController {
   @ApiOperation({ summary: 'Suggested posted price for a card number + rarity (Add Card form)' })
   suggest(@Query() q: SuggestPriceDto) {
     return this.service.suggest(q.cardNumber, q.rarity, q.notes);
+  }
+
+  @Post('artwork/compare')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Compare a private uploaded card image to cached source artwork, without saving the image' })
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => /^image\/(jpeg|png|webp)$/.test(file.mimetype)
+      ? cb(null, true) : cb(new BadRequestException('Only JPEG, PNG and WebP images are allowed'), false),
+  }))
+  compareArtwork(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('cardNumber') cardNumber: string,
+    @Body('source') source: ArtworkSource,
+  ) {
+    if (!file?.buffer) throw new BadRequestException('Card photo is required');
+    return this.service.compareArtwork(cardNumber ?? '', source, file.buffer);
   }
 
   // ----- Slabs (Cardrush graded copies) -----
