@@ -21,6 +21,7 @@ function makeTx(overrides: any = {}) {
       create: jest.fn().mockResolvedValue({ id: 'sale1' }),
       findUnique: jest.fn().mockResolvedValue({ id: 'sale1', items: [] }),
     },
+    $queryRaw: jest.fn().mockResolvedValue([{ serial: 1001n }]),
     ...overrides,
   };
 }

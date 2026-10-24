@@ -59,8 +59,8 @@ export class SalesService {
         const status = PaymentsService.deriveStatus(amountPaid, grandTotal);
 
         // 4. Human-facing reference
-        const count = await tx.sale.count();
-        const reference = `SALE-${1001 + count}`;
+        const [{ serial }] = await tx.$queryRaw<{ serial: bigint }[]>`SELECT nextval('op_vault_sale_reference_seq') AS serial`;
+        const reference = `SALE-${serial.toString()}`;
 
         // 5. Create Sale + items
         const sale = await tx.sale.create({

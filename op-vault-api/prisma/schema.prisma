@@ -143,7 +143,8 @@ model RawCard {
   isPinned     Boolean     @default(false)
   totalSold    Int         @default(0)
   lastSoldAt   DateTime?
-  marketListingKey String? // manual Yuyu-tei match (MarketPrice.listingKey); null = automatic
+  marketListingKey String? // source listing key; nullable for manual stock
+  variantKey String @default("standard") // immutable printing identity; older cards stay "standard"
   images       CardImage[]
   saleItems    SaleItem[]
   restockLogs  RestockLog[]
@@ -153,7 +154,8 @@ model RawCard {
   updatedAt    DateTime    @updatedAt
 
   // Duplicate-detection key
-  @@unique([cardNumber, setName, rarity], name: "rawCardIdentity")
+  @@unique([cardNumber, setName, rarity, variantKey], name: "rawCardIdentity")
+  @@index([marketListingKey])
   @@index([status])
   @@index([quantity])
   @@index([rarity])
@@ -502,4 +504,27 @@ model TcgplayerPrice {
 
   @@index([cardNumber])
   @@map("tcgplayer_prices")
+}
+
+model QuickAddReceipt {
+  id String @id // client-generated idempotency key, unique across retries
+  listingKey String
+  cardId String
+  action String
+  userId String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@map("quick_add_receipts")
+}
+
+model CardCatalogEntry {
+  cardNumber String @id
+  englishName String
+  category String?
+  colors String[] @default([])
+  rarity String?
+  setName String?
+  source String @default("manual-import")
+  updatedAt DateTime @updatedAt
+  @@map("card_catalog_entries")
 }

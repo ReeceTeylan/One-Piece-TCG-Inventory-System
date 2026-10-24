@@ -7,9 +7,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class RawCardsRepository {
   constructor(private prisma: PrismaService) {}
 
-  findByIdentity(cardNumber: string, setName: string, rarity: string) {
+  findByIdentity(cardNumber: string, setName: string, rarity: string, variantKey = 'standard') {
     return this.prisma.rawCard.findUnique({
-      where: { rawCardIdentity: { cardNumber, setName, rarity } },
+      where: { rawCardIdentity: { cardNumber, setName, rarity, variantKey } },
     });
   }
 
