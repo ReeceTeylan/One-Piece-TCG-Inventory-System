@@ -8,7 +8,7 @@ DO $$ BEGIN
 END $$;
 -- Historical enum was MARIBANK; the current application uses BANK_TRANSFER.
 -- Rename in place to preserve existing payment history.
-DO $ BEGIN
+DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid=t.oid
              WHERE t.typname='PaymentMethod' AND e.enumlabel='MARIBANK') THEN
     IF EXISTS (SELECT 1 FROM pg_enum e JOIN pg_type t ON e.enumtypid=t.oid
@@ -17,7 +17,7 @@ DO $ BEGIN
     END IF;
     ALTER TYPE "PaymentMethod" RENAME VALUE 'MARIBANK' TO 'BANK_TRANSFER';
   END IF;
-END $;
+END $$;
 ALTER TYPE "PaymentMethod" ADD VALUE IF NOT EXISTS 'MAYA' BEFORE 'OTHER';
 
 ALTER TABLE "raw_cards" ADD COLUMN IF NOT EXISTS "marketListingKey" TEXT;
