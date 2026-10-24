@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Search, CheckCircle2, ExternalLink, Sparkles } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, ExternalLink, Sparkles, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,11 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [authorized, setAuthorized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
+  type Queued = { cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
+  const [queue, setQueue] = useState<Queued[]>([]);
+  const [englishName, setEnglishName] = useState('');
+  const [englishCharacter, setEnglishCharacter] = useState('');
+  const [results, setResults] = useState<{listingKey:string; status:string; reason?:string}[]>([]);
   const debounced = useDebounce(number.trim().toUpperCase(), 350);
   const valid = /^[A-Z0-9]+-\d{2,3}$/.test(debounced);
   const listings = useQuery({
@@ -42,37 +47,59 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   useEffect(() => { setKey(''); setDone(null); }, [debounced, source]);
   useEffect(() => {
     if (!preview.data) return;
+    setEnglishName(preview.data.metadata.name || '');
+    setEnglishCharacter(preview.data.metadata.character || '');
+  }, [preview.data]);
+  useEffect(() => {
+    if (!preview.data) return;
     if (!customBuy) setBuy(preview.data.buyCost.toFixed(2));
     if (!customSell) setSell(preview.data.postedPrice === null ? '' : String(preview.data.postedPrice));
   }, [preview.data, customBuy, customSell]);
   useEffect(() => {
-    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); }
+    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setQueue([]); setResults([]); }
   }, [open]);
 
   const record = preview.data;
   const existing = record?.existing;
   const canSave = !!record && Number.isInteger(Number(qty)) && Number(qty) > 0 &&
     buy.trim() !== '' && sell.trim() !== '' && Number.isFinite(Number(buy)) &&
-    Number.isFinite(Number(sell)) && Number(buy) >= 0 && Number(sell) >= 0 && !saving;
+    Number.isFinite(Number(sell)) && Number(buy) >= 0 && Number(sell) >= 0 &&
+    englishName.trim().length > 1 && englishCharacter.trim().length > 1 &&
+    !/[\u3040-\u30ff\u3400-\u9fff]/u.test(englishName + englishCharacter) && !saving;
   const action = existing ? existing.quantity > 0 ? 'Add stock' : 'Reactivate listing' : 'Create listing';
 
-  async function save() {
+  function enqueue() {
     if (!canSave || !record) return;
+    const item: Queued = { cardNumber: debounced, source, listingKey: key, quantity: Number(qty), notes,
+      buyCost: Number(buy), postedPrice: Number(sell),
+      englishName: englishName.trim(), englishCharacter: englishCharacter.trim(),
+      imageRequested: authorized, imageUrl: record.listing.imageUrl ?? null };
+    setQueue(items => {
+      const old = items.find(x => x.listingKey === item.listingKey);
+      return old ? items.map(x => x.listingKey === item.listingKey ? { ...x, quantity: x.quantity + item.quantity, notes: [x.notes, item.notes].filter(Boolean).join(' · ') } : x) : [...items, item];
+    });
+    setKey(''); setNumber(''); setQty('1'); setNotes(''); setBuy(''); setSell('');
+    setCustomBuy(false); setCustomSell(false); setAuthorized(false);
+    toast.success('Added to queue. No stock changed yet.');
+  }
+
+  async function processQueue() {
+    if (!queue.length || saving) return;
     setSaving(true);
     try {
-      const result = await marketPricesService.quickAdd({
-        cardNumber: debounced, source, listingKey: key, quantity: Number(qty),
-        notes, buyCost: Number(buy), postedPrice: Number(sell),
-      });
-      if (authorized && (!result.hasImage || result.action === 'created')) {
+      const response = await marketPricesService.quickAddBatch({ items: queue.map(({ imageRequested, imageUrl, ...dto }) => dto) });
+      const successes = new Set(response.results.filter(x => x.status !== 'failed').map(x => x.listingKey));
+      setResults(response.results);
+      for (const item of queue) {
+        const result = response.results.find(x => x.listingKey === item.listingKey);
+        if (!item.imageRequested || !result?.cardId || (result.hasImage && result.status !== 'created')) continue;
         try {
-          await marketPricesService.importArtwork({ itemId: result.card.id, listingKey: key, source, authorized: true });
-        } catch { toast.info('Stock saved; source image unavailable. Add your own image later.'); }
+          await marketPricesService.importArtwork({ itemId: result.cardId, listingKey: item.listingKey, source: item.source, authorized: true });
+        } catch { toast.info('Some images could not be imported; stock saved successfully.'); }
       }
-      setDone(result.action === 'created' ? 'New listing created' : result.action === 'reactivated' ? 'Listing reactivated' : 'Quantity added to existing listing');
+      setQueue(items => items.filter(x => !successes.has(x.listingKey)));
       for (const k of ['raw-cards','card-market','market-prices','dashboard']) qc.invalidateQueries({ queryKey: [k] });
-      toast.success('Stock saved');
-      setKey(''); setNumber(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false);
+      toast[response.succeeded === response.total ? 'success' : 'warning'](`${response.succeeded}/${response.total} queued listings processed`);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setSaving(false); }
   }
@@ -84,6 +111,9 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
         <p className="text-xs text-muted-foreground">Enter a card number, select the exact art, then confirm quantity and prices.</p>
       </DialogHeader>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-5">
+        {results.some(x => x.status === 'failed') && <div className="space-y-1 rounded-lg border border-destructive/30 p-3 text-xs"><strong>Some listings failed; they remain queued</strong>{results.filter(x=>x.status==='failed').map(x=><p key={x.listingKey}>{x.listingKey}: {x.reason}</p>)}</div>}
+        {queue.length > 0 && <section className="rounded-lg border p-3 space-y-2"><div className="flex justify-between"><b className="text-sm">Queued listings</b><span className="text-xs text-muted-foreground">{queue.length} items · {queue.reduce((n,x)=>n+x.quantity,0)} cards</span></div>
+          <div className="max-h-36 space-y-1 overflow-y-auto">{queue.map(x=><div key={x.listingKey} className="flex min-w-0 items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs"><span className="min-w-0 flex-1 truncate">{x.englishName} · {x.cardNumber} · ×{x.quantity}</span><span className="text-muted-foreground">{peso(x.postedPrice)}</span><button type="button" onClick={()=>setQueue(q=>q.filter(c=>c.listingKey!==x.listingKey))} aria-label="Remove from queue"><Trash2 className="size-4"/></button></div>)}</div></section>}
         {done && <div className="rounded-lg border border-success/30 p-3 text-sm text-success"><CheckCircle2 className="mr-2 inline size-4" />{done}. Ready for the next card.</div>}
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
           <div><Label>Card number</Label><div className="relative mt-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={number} onChange={e => setNumber(e.target.value.toUpperCase())} placeholder="OP01-120" className="pl-9" /></div></div>
@@ -106,6 +136,8 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
         {preview.isError && <p className="text-xs text-destructive">Could not prepare selected card: {apiError(preview.error).message}</p>}
         {record && <section className="space-y-3 rounded-lg border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">{record.metadata.name}</span><span className="rounded bg-muted px-2 py-1 text-xs">{existing ? `Existing · ${existing.quantity} in stock` : 'New listing'}</span></div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><div><Label>English card name</Label><Input className="mt-1" value={englishName} onChange={e=>setEnglishName(e.target.value)} placeholder="Confirm English name" /></div><div><Label>English character</Label><Input className="mt-1" value={englishCharacter} onChange={e=>setEnglishCharacter(e.target.value)} placeholder="Confirm English character" /></div></div>
+          {(!record.metadata.character || !record.metadata.name) && <p className="text-xs text-warning">English catalog match is ambiguous or unavailable. Confirm both names before queueing.</p>}
           <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4"><div><span className="text-muted-foreground">Set</span><p className="font-semibold">{record.metadata.setName}</p></div><div><span className="text-muted-foreground">Rarity</span><p className="font-semibold">{record.metadata.rarity}</p></div><div><span className="text-muted-foreground">Character</span><p className="font-semibold">{record.metadata.character}</p></div><div><span className="text-muted-foreground">Color</span><p className="font-semibold">{record.metadata.color ?? 'Not provided'}</p></div></div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div><Label>Quantity to add</Label><Input className="mt-1" type="number" min="1" step="1" value={qty} onChange={e => setQty(e.target.value)} /></div>
@@ -121,7 +153,8 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
       </div>
       <DialogFooter className="mt-0 shrink-0 items-center border-t bg-card p-3 max-sm:static sm:p-4">
         <Button variant="ghost" type="button" onClick={()=>onOpenChange(false)}>Close</Button>
-        <Button type="button" disabled={!canSave} onClick={save}>{saving ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}{action}</Button>
+        <Button type="button" disabled={!canSave} variant="outline" onClick={enqueue}><Sparkles className="size-4" /> Queue card</Button>
+        <Button type="button" disabled={!queue.length || saving} onClick={processQueue}>{saving ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />} Process all ({queue.length})</Button>
       </DialogFooter>
     </DialogContent>
   </Dialog>;
