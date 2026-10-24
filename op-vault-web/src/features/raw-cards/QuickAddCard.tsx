@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Search, CheckCircle2, ExternalLink, Sparkles, Trash2 } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, ExternalLink, Sparkles, Trash2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -57,8 +57,9 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     queryKey: ['quick-add-sold-out', debounced],
     queryFn: () => marketPricesService.soldOut(debounced),
     enabled: open && valid,
-    staleTime: 10_000,
-    retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: 1,
   });
   const preview = useQuery({
     queryKey: ['quick-add-preview', debounced, source, key, notes],
@@ -67,27 +68,27 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   });
   useEffect(() => { setKey(''); setSelectedExisting(null); setDone(null); }, [debounced, source]);
   useEffect(() => {
-    if (!preview.data) return;
+    if (!preview.data || selectedExisting) return;
     setEnglishName(preview.data.metadata.name || '');
     setEnglishCharacter(preview.data.metadata.character || '');
-  }, [preview.data]);
+  }, [preview.data, selectedExisting]);
   useEffect(() => {
-    if (!preview.data) return;
+    if (!preview.data || selectedExisting) return;
     if (!customBuy) setBuy(preview.data.buyCost.toFixed(2));
     if (!customSell) setSell(preview.data.postedPrice === null ? '' : String(preview.data.postedPrice));
-  }, [preview.data, customBuy, customSell]);
+  }, [preview.data, customBuy, customSell, selectedExisting]);
   useEffect(() => {
     if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setResults([]); }
   }, [open]);
 
-  const record = preview.data;
+  const record = selectedExisting ? undefined : preview.data;
   const existing = record?.existing;
   const canSave = !!(record || selectedExisting) && Number.isInteger(Number(qty)) && Number(qty) > 0 &&
     buy.trim() !== '' && sell.trim() !== '' && Number.isFinite(Number(buy)) &&
     Number.isFinite(Number(sell)) && Number(buy) >= 0 && Number(sell) >= 0 &&
     (selectedExisting !== null || (englishName.trim().length > 1 && englishCharacter.trim().length > 1 &&
     !/[\u3040-\u30ff\u3400-\u9fff]/u.test(englishName + englishCharacter))) && !saving;
-  const action = existing ? existing.quantity > 0 ? 'Add stock' : 'Reactivate listing' : 'Create listing';
+  const action = selectedExisting ? 'Reactivate listing' : existing ? existing.quantity > 0 ? 'Add stock' : 'Reactivate listing' : 'Create listing';
 
   function chooseExisting(item: NonNullable<typeof selectedExisting>) {
     setKey('');
@@ -162,11 +163,24 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
           <div><Label>Price / card catalog</Label><Select value={source} className="mt-1 w-full" onChange={e => setSource(e.target.value as MarketSource)}><option value="YUYUTEI">Yuyu-tei</option><option value="CARDRUSH">Cardrush</option><option value="TCGPLAYER">TCGplayer</option></Select></div>
         </div>
         {!valid && <p className="text-xs text-muted-foreground">Enter a full card number to load variants and find sold-out inventory.</p>}
-        {soldOut.isLoading && valid && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Checking your sold-out listings…</p>}
-        {soldOut.isError && <p className="text-xs text-destructive">Couldn't check existing stock: {apiError(soldOut.error).message}</p>}
-        {!!soldOut.data?.length && <section className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
-          <div className="text-sm font-semibold">Already in your inventory · sold out ({soldOut.data.length})</div>
-          <p className="text-[11px] text-muted-foreground">Select the exact existing artwork to reactivate its listing and keep its current uploaded image. Marketplace links remain unchanged.</p>
+        {valid && <section className="space-y-2 rounded-lg border border-primary/30 bg-primary/5 p-3" aria-label="Existing sold-out stock matches">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">Reuse an existing sold-out listing {soldOut.data?.length ? `(${soldOut.data.length})` : ''}</p>
+              <p className="text-[11px] text-muted-foreground">Checks your own inventory first. Selecting an existing card keeps its saved photo and original marketplace link.</p>
+            </div>
+            <Button size="sm" variant="outline" type="button" className="shrink-0"
+              onClick={() => { void soldOut.refetch(); }} disabled={soldOut.isFetching}>
+              {soldOut.isFetching ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              Check existing
+            </Button>
+          </div>
+          {soldOut.isFetching && <p role="status" className="text-xs text-muted-foreground">Searching your saved cards for {debounced}…</p>}
+          {soldOut.isError && <p role="alert" className="text-xs text-destructive">Existing-stock lookup failed: {apiError(soldOut.error).message}. Tap Check existing to retry.</p>}
+          {soldOut.isSuccess && !soldOut.data?.length && !soldOut.isFetching &&
+            <p className="text-xs text-muted-foreground">No sold-out cards found for {debounced}. You can select a marketplace printing below.</p>}
+          {!!soldOut.data?.length && <>
+            <p className="text-[11px] font-medium">Already in your inventory · sold out. Choose the exact record to add stock without uploading an image.</p>
           <div className="grid max-h-[220px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-4">
             {soldOut.data.map(item => <button type="button" key={item.id}
               onClick={() => chooseExisting(item)}
@@ -180,6 +194,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
               <p className="text-[10px] text-primary">{item.imageUrl ? 'Saved photo retained' : 'Reuse listing without photo'}</p>
             </button>)}
           </div>
+          </>}
         </section>}
         {selectedExisting && <section className="space-y-3 rounded-lg border border-primary/30 p-3">
           <div className="flex items-center justify-between gap-2"><b className="min-w-0 truncate text-sm">{selectedExisting.name}</b><span className="shrink-0 rounded bg-primary/10 px-2 py-1 text-xs">Reactivate old listing</span></div>
@@ -192,10 +207,10 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
           <div><Label>Notes (optional)</Label><Textarea rows={2} className="mt-1" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Condition, language, additional notes…" /></div>
           <Button type="button" variant="ghost" size="sm" onClick={() => {setSelectedExisting(null);setBuy('');setSell('');setCustomBuy(false);setCustomSell(false);}}>Select a source artwork instead</Button>
         </section>}
-        {listings.isFetching && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Looking up printings…</p>}
-        {listings.isError && <p className="text-xs text-destructive">Source lookup unavailable: {apiError(listings.error).message}</p>}
-        {listings.data?.length === 0 && <p className="text-xs text-muted-foreground">No matching listings found. Try another source.</p>}
-        {!!listings.data?.length && <section className="space-y-2">
+        {!selectedExisting && listings.isFetching && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Looking up printings…</p>}
+        {!selectedExisting && listings.isError && <p className="text-xs text-destructive">Source lookup unavailable: {apiError(listings.error).message}</p>}
+        {!selectedExisting && listings.data?.length === 0 && <p className="text-xs text-muted-foreground">No matching listings found. Try another source.</p>}
+        {!selectedExisting && !!listings.data?.length && <section className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground">{listings.data.length} variants · select the exact artwork</div>
           <div className="grid max-h-[260px] grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain sm:grid-cols-5 sm:gap-2">
             {listings.data.map(item => <button type="button" key={item.listingKey} onClick={() => { setSelectedExisting(null); setKey(item.listingKey); setCustomBuy(false); setCustomSell(false); setAuthorized(false); }} className={`min-w-0 rounded-lg border p-1.5 text-left ${key === item.listingKey ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'bg-card hover:bg-muted'}`} aria-pressed={key === item.listingKey}>
@@ -204,8 +219,8 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
             </button>)}
           </div>
         </section>}
-        {preview.isFetching && <p className="flex items-center gap-2 text-xs"><Loader2 className="size-3 animate-spin" /> Preparing card information…</p>}
-        {preview.isError && <p className="text-xs text-destructive">Could not prepare selected card: {apiError(preview.error).message}</p>}
+        {!selectedExisting && preview.isFetching && <p className="flex items-center gap-2 text-xs"><Loader2 className="size-3 animate-spin" /> Preparing card information…</p>}
+        {!selectedExisting && preview.isError && <p className="text-xs text-destructive">Could not prepare selected card: {apiError(preview.error).message}</p>}
         {record && <section className="space-y-3 rounded-lg border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-sm font-semibold">{record.metadata.name}</span><span className="rounded bg-muted px-2 py-1 text-xs">{existing ? `Existing · ${existing.quantity} in stock` : 'New listing'}</span></div>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2"><div><Label>English card name</Label><Input className="mt-1" value={englishName} onChange={e=>setEnglishName(e.target.value)} placeholder="Confirm English name" /></div><div><Label>English character</Label><Input className="mt-1" value={englishCharacter} onChange={e=>setEnglishCharacter(e.target.value)} placeholder="Confirm English character" /></div></div>
