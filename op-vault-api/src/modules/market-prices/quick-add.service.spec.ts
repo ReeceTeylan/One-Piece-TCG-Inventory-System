@@ -98,3 +98,107 @@ describe('QuickAddService selected sold-out restock', () => {
     expect(tx.inventoryLog.create).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('QuickAddService optional market link for old sold-out cards', () => {
+  const id = 'old-raw-123';
+  const selectedKey = 'st21/27182';
+  const dto: any = {
+    existingCardId: id, cardNumber: 'ST21-017', source: 'YUYUTEI',
+    listingKey: `existing:${id}`, marketLinkKey: selectedKey,
+    quantity: 3, buyCost: 140, postedPrice: 400,
+  };
+  const make = (currentLink: string | null = null, claimedByOther = false) => {
+    const oldCard = {
+      id, name: 'Luffy', cardNumber: 'ST21-017',
+      marketListingKey: currentLink, quantity: 0,
+      buyCost: 160, postedPrice: 400, notes: '',
+    };
+    const tx: any = {
+      rawCard: {
+        findUnique: jest.fn().mockResolvedValue(oldCard),
+        findMany: jest.fn().mockResolvedValue(claimedByOther ? [{ id: 'other-card' }] : []),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...oldCard, quantity: 3, marketListingKey: selectedKey }),
+      },
+      cardImage: { findFirst: jest.fn().mockResolvedValue({ id: 'existing-photo' }) },
+      restockLog: { create: jest.fn() },
+      inventoryLog: { create: jest.fn() },
+      priceHistory: { create: jest.fn() },
+      quickAddReceipt: { findUnique: jest.fn().mockResolvedValue(null), create: jest.fn() },
+    };
+    const prisma: any = {
+      $transaction: jest.fn((fn: any) => fn(tx)),
+    };
+    const market: any = {
+      listingsFor: jest.fn().mockResolvedValue([{
+        source: 'YUYUTEI', cardNumber: 'ST21-017', listingKey: selectedKey,
+      }]),
+    };
+    const svc = new QuickAddService(prisma, {} as any, market);
+    return { tx, prisma, market, svc };
+  };
+
+  it('attaches the exact chosen Yuyu-tei listing atomically while preserving the old image', async () => {
+    const { tx, svc, market } = make();
+    const result = await svc.add(dto, 'owner');
+    expect(result.action).toBe('reactivated');
+    expect(result.hasImage).toBe(true);
+    expect(market.listingsFor).toHaveBeenCalledWith('ST21-017', 'YUYUTEI');
+    expect(tx.rawCard.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id, quantity: 0, marketListingKey: null },
+      data: expect.objectContaining({ quantity: 3, marketListingKey: selectedKey }),
+    }));
+    expect(tx.rawCard.updateMany.mock.calls[0][0].data.images).toBeUndefined();
+    expect(tx.inventoryLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a previous none sentinel as unlinked', async () => {
+    const { tx, svc } = make('none');
+    await svc.add(dto, 'owner');
+    expect(tx.rawCard.updateMany.mock.calls[0][0].data.marketListingKey).toBe(selectedKey);
+  });
+
+  it('rejects an exact-number marketplace link already assigned to another card', async () => {
+    const { tx, svc } = make(null, true);
+    await expect(svc.add(dto, 'owner')).rejects.toThrow('already linked to another card');
+    expect(tx.rawCard.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects trying to replace a link on an already linked old record', async () => {
+    const { tx, svc } = make('duplicate-link-must-stay');
+    await expect(svc.add(dto, 'owner')).rejects.toThrow('already has a marketplace link');
+    expect(tx.rawCard.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a source or card mismatch without incrementing stock', async () => {
+    const { tx, prisma, svc, market } = make();
+    market.listingsFor.mockResolvedValue([{ source: 'CARDRUSH', cardNumber: 'ST21-017', listingKey: selectedKey }]);
+    await expect(svc.add(dto, 'owner')).rejects.toThrow('does not match this card number and source');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(tx.rawCard.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('still restocks without creating a source link when none is chosen', async () => {
+    const { tx, svc, market } = make();
+    await svc.add({ ...dto, marketLinkKey: undefined }, 'owner');
+    expect(market.listingsFor).not.toHaveBeenCalled();
+    expect(tx.rawCard.updateMany.mock.calls[0][0].data.marketListingKey).toBeUndefined();
+  });
+
+  it('returns the original receipt on retry instead of relinking or restocking again', async () => {
+    const { svc, prisma, market } = make();
+    const receiptId = 'b8c3a9cc-35b5-45e3-a10b-f67a06a09f8e';
+    prisma.quickAddReceipt = {
+      findUnique: jest.fn().mockResolvedValue({
+        userId: 'owner', listingKey: `existing:${id}`, cardId: id, action: 'reactivated',
+      }),
+    };
+    prisma.rawCard = { findUnique: jest.fn().mockResolvedValue({ id, quantity: 3 }) };
+    prisma.cardImage = { findFirst: jest.fn().mockResolvedValue({ id: 'existing-photo' }) };
+    const result = await svc.add({ ...dto, requestId: receiptId }, 'owner');
+    expect(result.action).toBe('reactivated');
+    expect(market.listingsFor).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
