@@ -93,6 +93,16 @@ export const marketPricesService = {
   // Sync refreshes prices of linked cards; Link new stock finds listings for never-linked cards.
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
   linkNew: () => api.post('/market-prices/link-new').then(unwrap<MarketSync>),
+  quickPreview: (params: { cardNumber: string; source: MarketSource; listingKey: string; notes?: string }) =>
+    api.get('/market-prices/quick-add/preview', { params }).then(unwrap<{
+      cardNumber: string; listing: MarketCandidate; metadata: { name: string; character: string; setName: string; rarity: string; color: string | null };
+      buyCost: number; postedPrice: number | null; purchaseRate: number; rate: number | null;
+      existing: { id: string; name: string; quantity: number; postedPrice: number; buyCost: number; hasImage: boolean } | null;
+    }>),
+  quickAdd: (dto: { cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes?: string; buyCost?: number; postedPrice?: number }) =>
+    api.post('/market-prices/quick-add', dto).then(unwrap<{
+      action: 'created' | 'restocked' | 'reactivated'; card: RawCard; hasImage: boolean;
+    }>),
   importArtwork: (dto: { itemId: string; listingKey: string; source: MarketSource; authorized: boolean }) =>
     api.post('/images/import-market-artwork', dto).then(unwrap<CardImage>),
   compareArtwork: (file: File, cardNumber: string, source: MarketSource) => {
