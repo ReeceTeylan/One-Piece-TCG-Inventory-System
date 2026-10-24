@@ -14,6 +14,7 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
   const [open, setOpen] = useState(false);
   const [shop, setShop] = useState<MarketSource>('YUYUTEI');
   const [checking, setChecking] = useState(false);
+  const [refreshIndex, setRefreshIndex] = useState(0);
   const [scores, setScores] = useState<Record<string, number | null>>({});
   const english = /\b(?:english|eng)\b/i.test(notes);
   const source = english ? 'TCGPLAYER' : shop;
@@ -21,7 +22,7 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
   const valid = /^[A-Z0-9]+-\d{2,3}$/.test(num);
   useEffect(() => { onSelect(null, null); setScores({}); }, [num, rarity, source]);
   const candidates = useQuery({
-    queryKey: ['artwork-review', num, source],
+    queryKey: ['artwork-review', num, source, refreshIndex],
     queryFn: () => marketPricesService.listings(num, source),
     enabled: open && valid, retry: false, staleTime: 5 * 60_000,
   });
@@ -49,10 +50,11 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
           {checking ? <Loader2 className="size-4 animate-spin" /> : <Images className="size-4" />} Compare photo
         </Button>
       </div>
+      {valid && <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => { setRefreshIndex(v => v + 1); setScores({}); }} disabled={candidates.isFetching}>Retry artwork lookup</Button>}
       {!valid && <p className="text-xs text-muted-foreground">Enter a complete card number first (e.g. OP01-120).</p>}
       {candidates.isFetching && <p className="text-xs text-muted-foreground">Looking up artwork…</p>}
       {candidates.isError && <p className="text-xs text-destructive">Reference artwork is unavailable. Please verify the card manually.</p>}
-      {candidates.data?.length === 0 && <p className="text-xs text-muted-foreground">No source listings found.</p>}
+      {candidates.data?.length === 0 && <p className="text-xs text-muted-foreground">No listings returned for this card number. The catalog may be missing this printing; try another source or Retry.</p>}
       <div className="grid max-h-64 grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-3">
         {candidates.data?.map(item => <div key={item.listingKey} className={`min-w-0 rounded-md border p-2 ${selected === item.listingKey ? 'border-primary ring-1 ring-primary' : ''}`}>
           <div className="flex h-28 items-center justify-center overflow-hidden rounded bg-muted/30">
