@@ -28,7 +28,22 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
   type Queued = { cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
-  const [queue, setQueue] = useState<Queued[]>([]);
+  // A draft is local to this browser, never submitted until Process All.
+  const [queue, setQueue] = useState<Queued[]>(() => {
+    try {
+      const parsed: unknown = JSON.parse(localStorage.getItem('opv:quick-add:draft:v2') || '[]');
+      return Array.isArray(parsed) ? parsed.filter((x): x is Queued =>
+        x && typeof x.listingKey === 'string' && typeof x.cardNumber === 'string' &&
+        typeof x.source === 'string' && ['YUYUTEI','CARDRUSH','TCGPLAYER'].includes(x.source) &&
+        Number.isInteger(x.quantity) && x.quantity > 0 &&
+        Number.isFinite(x.buyCost) && Number.isFinite(x.postedPrice)
+      ).slice(0,40) : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('opv:quick-add:draft:v2', JSON.stringify(queue)); }
+    catch { /* Private browsing may block storage; Quick Add still works. */ }
+  }, [queue]);
   const [englishName, setEnglishName] = useState('');
   const [englishCharacter, setEnglishCharacter] = useState('');
   const [results, setResults] = useState<{listingKey:string; status:string; reason?:string}[]>([]);
@@ -56,7 +71,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     if (!customSell) setSell(preview.data.postedPrice === null ? '' : String(preview.data.postedPrice));
   }, [preview.data, customBuy, customSell]);
   useEffect(() => {
-    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setQueue([]); setResults([]); }
+    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setResults([]); }
   }, [open]);
 
   const record = preview.data;
@@ -113,7 +128,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3 sm:p-5">
         {results.some(x => x.status === 'failed') && <div className="space-y-1 rounded-lg border border-destructive/30 p-3 text-xs"><strong>Some listings failed; they remain queued</strong>{results.filter(x=>x.status==='failed').map(x=><p key={x.listingKey}>{x.listingKey}: {x.reason}</p>)}</div>}
         {queue.length > 0 && <section className="rounded-lg border p-3 space-y-2"><div className="flex justify-between"><b className="text-sm">Queued listings</b><span className="text-xs text-muted-foreground">{queue.length} items · {queue.reduce((n,x)=>n+x.quantity,0)} cards</span></div>
-          <div className="max-h-36 space-y-1 overflow-y-auto">{queue.map(x=><div key={x.listingKey} className="flex min-w-0 items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs"><span className="min-w-0 flex-1 truncate">{x.englishName} · {x.cardNumber} · ×{x.quantity}</span><span className="text-muted-foreground">{peso(x.postedPrice)}</span><button type="button" onClick={()=>setQueue(q=>q.filter(c=>c.listingKey!==x.listingKey))} aria-label="Remove from queue"><Trash2 className="size-4"/></button></div>)}</div></section>}
+          <p className="text-[11px] text-muted-foreground">Draft saved on this browser. If a submission times out, check inventory before retrying to avoid adding stock twice.</p><div className="max-h-36 space-y-1 overflow-y-auto">{queue.map(x=><div key={x.listingKey} className="flex min-w-0 items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-xs"><span className="min-w-0 flex-1 truncate">{x.englishName} · {x.cardNumber} · ×{x.quantity}</span><span className="text-muted-foreground">{peso(x.postedPrice)}</span><button type="button" onClick={()=>setQueue(q=>q.filter(c=>c.listingKey!==x.listingKey))} aria-label="Remove from queue"><Trash2 className="size-4"/></button></div>)}</div></section>}
         {done && <div className="rounded-lg border border-success/30 p-3 text-sm text-success"><CheckCircle2 className="mr-2 inline size-4" />{done}. Ready for the next card.</div>}
         <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
           <div><Label>Card number</Label><div className="relative mt-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={number} onChange={e => setNumber(e.target.value.toUpperCase())} placeholder="OP01-120" className="pl-9" /></div></div>
