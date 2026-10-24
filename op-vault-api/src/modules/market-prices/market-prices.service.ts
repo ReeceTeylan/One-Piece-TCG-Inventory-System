@@ -785,13 +785,16 @@ export class MarketPricesService {
   }
 
   /** Runs a live fetch at most once per cooldown per key; concurrent callers share it. */
-  private async liveLookup(key: string, run: () => Promise<void>) {
+  private async liveLookup(key: string, run: () => Promise<void>, strict = false) {
     const last = this.liveTried.get(key);
     if (last && Date.now() - last < LIVE_COOLDOWN_MS) return;
     let p = this.liveInFlight.get(key);
     if (!p) {
       p = run()
-        .catch((e) => this.logger.warn(`Live price lookup ${key} failed: ${e?.message ?? e}`))
+        .catch((e) => {
+          this.logger.warn(`Live price lookup ${key} failed: ${e?.message ?? e}`);
+          if (strict) throw e;
+        })
         .finally(() => {
           this.liveInFlight.delete(key);
           if (this.liveTried.size > 1000) this.liveTried.clear();
@@ -998,8 +1001,11 @@ export class MarketPricesService {
     if (source === 'TCGPLAYER') {
       // Previously only stocked cards appeared: new numbers had no cached rows.
       let rows = await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: num }, orderBy: [{ priceUsd: 'asc' }] });
-      if (!isFresh(rows)) {
-        await this.liveLookup(`art-t:${num}`, () => this.liveTcgplayer(num));
+      if (!isFresh(rows) || rows.every(r => !r.imageUrl)) {
+        try { await this.liveLookup(`art-t:${num}`, () => this.liveTcgplayer(num), true); }
+        catch (e: any) {
+          if (!rows.length) throw new BadRequestException(`TCGplayer catalogue lookup failed: ${e?.message ?? 'try again'}`);
+        }
         rows = await this.prisma.tcgplayerPrice.findMany({ where: { cardNumber: num }, orderBy: [{ priceUsd: 'asc' }] });
       }
       return rows.map((t) => ({
@@ -1020,12 +1026,17 @@ export class MarketPricesService {
     let rows = await this.prisma.marketPrice.findMany({
       where, orderBy: [{ rarity: 'asc' }, { priceJpy: 'asc' }],
     });
-    if (!isFresh(rows)) {
-      await this.liveLookup(`art-y:${num}`, async () => {
-        const found = parseYuyuteiSearch(await this.withRetry(() => fetchYuyuteiSearch(num)))
-          .filter(l => l.cardNumber === num);
-        if (found.length) await this.saveListings(num, found);
-      });
+    if (!isFresh(rows) || rows.every(r => !r.imageUrl)) {
+      try {
+        await this.liveLookup(`art-y:${num}`, async () => {
+          // Identical search/parser/persistence path used by the working price suggestion.
+          const found = parseYuyuteiSearch(await this.withRetry(() => fetchYuyuteiSearch(num)))
+            .filter(l => l.cardNumber === num);
+          if (found.length) await this.saveListings(num, found);
+        }, true);
+      } catch (e: any) {
+        if (!rows.length) throw new BadRequestException(`Yuyu-tei catalogue lookup failed: ${e?.message ?? 'try again'}`);
+      }
       rows = await this.prisma.marketPrice.findMany({
         where, orderBy: [{ rarity: 'asc' }, { priceJpy: 'asc' }],
       });
