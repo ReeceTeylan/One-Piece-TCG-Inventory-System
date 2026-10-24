@@ -27,7 +27,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [authorized, setAuthorized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  type Queued = { existingCardId?: string; requestId: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
+  type Queued = { existingCardId?: string; marketLinkKey?: string; requestId: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
   const [queue, setQueue] = useState<Queued[]>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem('opv:quick-add:draft:v2') || '[]');
@@ -43,6 +43,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     character: string | null; color: string | null; imageUrl: string | null;
     quantity: number; buyCost: number; postedPrice: number; marketListingKey: string | null;
   } | null>(null);
+  const [selectedMarketKey, setSelectedMarketKey] = useState('');
   const [englishName, setEnglishName] = useState('');
   const [englishCharacter, setEnglishCharacter] = useState('');
   const [results, setResults] = useState<{listingKey:string; status:string; reason?:string}[]>([]);
@@ -64,9 +65,10 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const preview = useQuery({
     queryKey: ['quick-add-preview', debounced, source, key, notes],
     queryFn: () => marketPricesService.quickPreview({ cardNumber: debounced, source, listingKey: key, notes }),
-    enabled: open && valid && !!key, staleTime: 0, retry: false,
+    enabled: open && valid && !!key && !selectedExisting, staleTime: 0, retry: false,
   });
-  useEffect(() => { setKey(''); setSelectedExisting(null); setDone(null); }, [debounced, source]);
+  useEffect(() => { setKey(''); setSelectedMarketKey(''); setDone(null); }, [debounced, source]);
+  useEffect(() => { setSelectedExisting(null); }, [debounced]);
   useEffect(() => {
     if (!preview.data || selectedExisting) return;
     setEnglishName(preview.data.metadata.name || '');
@@ -81,6 +83,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setResults([]); }
   }, [open]);
 
+  const selectedLink = listings.data?.find(item => item.listingKey === selectedMarketKey);
   const record = selectedExisting ? undefined : preview.data;
   const existing = record?.existing;
   const canSave = !!(record || selectedExisting) && Number.isInteger(Number(qty)) && Number(qty) > 0 &&
@@ -91,7 +94,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const action = selectedExisting ? 'Reactivate listing' : existing ? existing.quantity > 0 ? 'Add stock' : 'Reactivate listing' : 'Create listing';
 
   function chooseExisting(item: NonNullable<typeof selectedExisting>) {
-    setKey('');
+    setKey(''); setSelectedMarketKey('');
     setSelectedExisting(item);
     setEnglishName(item.name);
     setEnglishCharacter(item.character || item.name);
@@ -103,8 +106,14 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
 
   function enqueue() {
     if (!canSave) return;
+    if (selectedExisting && queue.some(x => x.listingKey === `existing:${selectedExisting.id}` &&
+      x.marketLinkKey !== (selectedMarketKey || undefined))) {
+      toast.error('This old card is already queued with a different marketplace link. Remove that queued entry first.');
+      return;
+    }
     const item: Queued = selectedExisting ? {
       requestId: crypto.randomUUID(), existingCardId: selectedExisting.id,
+      marketLinkKey: selectedMarketKey || undefined,
       cardNumber: selectedExisting.cardNumber.trim().toUpperCase(),
       source, listingKey: `existing:${selectedExisting.id}`,
       quantity: Number(qty), notes, buyCost: Number(buy), postedPrice: Number(sell),
@@ -122,7 +131,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
       return old ? items.map(x => x.listingKey === item.listingKey ? { ...x, quantity: x.quantity + item.quantity, notes: [x.notes, item.notes].filter(Boolean).join(' · ') } : x) : [...items, item];
     });
     setKey(''); setNumber(''); setQty('1'); setNotes(''); setBuy(''); setSell('');
-    setCustomBuy(false); setCustomSell(false); setAuthorized(false); setSelectedExisting(null);
+    setCustomBuy(false); setCustomSell(false); setAuthorized(false); setSelectedExisting(null); setSelectedMarketKey('');
     toast.success('Added to queue. No stock changed yet.');
   }
 
@@ -167,7 +176,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-sm font-semibold">Reuse an existing sold-out listing {soldOut.data?.length ? `(${soldOut.data.length})` : ''}</p>
-              <p className="text-[11px] text-muted-foreground">Checks your own inventory first. Selecting an existing card keeps its saved photo and original marketplace link.</p>
+              <p className="text-[11px] text-muted-foreground">Checks your inventory first. Your saved photo stays; you can optionally link an unlinked card to a marketplace printing.</p>
             </div>
             <Button size="sm" variant="outline" type="button" className="shrink-0"
               onClick={() => { void soldOut.refetch(); }} disabled={soldOut.isFetching}>
@@ -198,14 +207,43 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
         </section>}
         {selectedExisting && <section className="space-y-3 rounded-lg border border-primary/30 p-3">
           <div className="flex items-center justify-between gap-2"><b className="min-w-0 truncate text-sm">{selectedExisting.name}</b><span className="shrink-0 rounded bg-primary/10 px-2 py-1 text-xs">Reactivate old listing</span></div>
-          <p className="text-xs text-muted-foreground">Your original image, card details, and marketplace link will be kept. You can edit prices and quantity for this new batch.</p>
+          <p className="text-xs text-muted-foreground">Your original image and card details stay unchanged. Add quantity, edit prices, and optionally choose a marketplace reference for a card that has no link.</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div><Label>Quantity to add</Label><Input className="mt-1" type="number" min="1" step="1" value={qty} onChange={e => setQty(e.target.value)} /></div>
             <div><Label>Buying cost (₱)</Label><Input className="mt-1" type="number" min="0" step=".01" value={buy} onChange={e => {setBuy(e.target.value);setCustomBuy(true);}} /></div>
             <div><Label>Selling price (₱)</Label><Input className="mt-1" type="number" min="0" step="1" value={sell} onChange={e => {setSell(e.target.value);setCustomSell(true);}} /></div>
           </div>
+          {(!selectedExisting.marketListingKey || selectedExisting.marketListingKey === 'none') ? <div className="space-y-2 border-t pt-3" aria-label="Optional marketplace link for existing card">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <Label>Link a marketplace listing (optional)</Label>
+                <p className="text-[11px] text-muted-foreground">Choose Yuyu-tei, Cardrush or TCGplayer using the catalog dropdown above. Select the same exact printing as your saved photo. Linking never replaces your image.</p>
+              </div>
+              {!!selectedMarketKey && <Button type="button" size="sm" variant="outline" onClick={() => setSelectedMarketKey('')}>Keep unlinked</Button>}
+            </div>
+            {listings.isFetching && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Loading {source} printings…</p>}
+            {listings.isError && <p className="text-xs text-destructive">Market catalog unavailable: {apiError(listings.error).message}. You can still restock without a link.</p>}
+            {listings.isSuccess && !listings.data?.length && <p className="text-xs text-muted-foreground">No marketplace candidates found for this card number on {source}. You can try another source or continue without linking.</p>}
+            {!!listings.data?.length && <div className="grid max-h-[220px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-4">
+              {listings.data.map(item => <button type="button" key={item.listingKey}
+                aria-pressed={selectedMarketKey === item.listingKey}
+                onClick={() => setSelectedMarketKey(item.listingKey)}
+                className={`min-w-0 rounded-lg border p-2 text-left ${selectedMarketKey === item.listingKey ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'bg-card hover:bg-muted'}`}>
+                <div className="flex h-24 items-center justify-center overflow-hidden rounded bg-muted/40">
+                  {item.imageUrl ? <img src={item.imageUrl} alt={item.name} referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-contain" /> : <span className="text-xs text-muted-foreground">No source image</span>}
+                </div>
+                <p className="mt-1 line-clamp-2 text-xs font-medium" title={item.name}>{item.name}</p>
+                <p className="truncate text-[10px] text-muted-foreground">{item.rarity ?? '—'} · {item.price} {item.currency}</p>
+              </button>)}
+            </div>}
+            {selectedLink && <div className="flex flex-wrap items-center gap-2 text-xs text-success">
+              <CheckCircle2 className="size-4" />
+              <span>Attach this {source} listing when stock is added.</span>
+              <a href={selectedLink.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">Verify reference <ExternalLink className="size-3" /></a>
+            </div>}
+          </div> : <p className="text-xs text-muted-foreground">This card already has a marketplace link. Restocking keeps that link unchanged; edit existing links from Market Prices.</p>}
           <div><Label>Notes (optional)</Label><Textarea rows={2} className="mt-1" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Condition, language, additional notes…" /></div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => {setSelectedExisting(null);setBuy('');setSell('');setCustomBuy(false);setCustomSell(false);}}>Select a source artwork instead</Button>
+          <Button type="button" variant="ghost" size="sm" onClick={() => {setSelectedExisting(null);setSelectedMarketKey('');setBuy('');setSell('');setCustomBuy(false);setCustomSell(false);}}>Create a new listing instead</Button>
         </section>}
         {!selectedExisting && listings.isFetching && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Looking up printings…</p>}
         {!selectedExisting && listings.isError && <p className="text-xs text-destructive">Source lookup unavailable: {apiError(listings.error).message}</p>}

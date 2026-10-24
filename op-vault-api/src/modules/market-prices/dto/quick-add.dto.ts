@@ -3,6 +3,8 @@ import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Min, M
 
 export class QuickAddDto {
   @IsOptional() @IsString() @MaxLength(100) existingCardId?: string;
+  /** Optional exact marketplace candidate to attach when reactivating an unlinked old card. */
+  @IsOptional() @IsString() @MaxLength(150) marketLinkKey?: string;
   @IsOptional() @IsUUID('4') requestId?: string;
   @IsString() @Matches(/^[A-Za-z0-9]+-\d{2,3}$/) cardNumber: string;
   @IsIn(['YUYUTEI', 'CARDRUSH', 'TCGPLAYER']) source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER';

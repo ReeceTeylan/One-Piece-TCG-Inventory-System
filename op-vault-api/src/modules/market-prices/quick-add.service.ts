@@ -80,7 +80,7 @@ export class QuickAddService {
     }));
   }
 
-  /** Explicitly selected existing record: restock by ID and keep existing artwork/link untouched. */
+  /** Restock by ID, preserving artwork; optionally attach a verified marketplace listing to an unlinked card. */
   private async restockSelected(dto: QueuedQuickAddItemDto, userId: string) {
     const id = dto.existingCardId!;
     if (dto.listingKey !== `existing:${id}`)
@@ -104,6 +104,16 @@ export class QuickAddService {
     };
     const previous = await replay();
     if (previous) return previous;
+    // Only a user-selected candidate from this source and exact card number may be linked.
+    // Never trust a supplied marketplace key by itself or replace existing photos.
+    if (dto.marketLinkKey) {
+      const num = dto.cardNumber.trim().toUpperCase();
+      const candidates = await this.market.listingsFor(num, dto.source);
+      if (!candidates.some(c => c.listingKey === dto.marketLinkKey &&
+        c.source === dto.source && c.cardNumber.trim().toUpperCase() === num)) {
+        throw new BadRequestException('Selected marketplace listing does not match this card number and source.');
+      }
+    }
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -121,6 +131,19 @@ export class QuickAddService {
           if (!existing) throw new NotFoundException('Existing card was removed');
           if (existing.cardNumber.trim().toUpperCase() !== dto.cardNumber.trim().toUpperCase())
             throw new ConflictException('Card number changed. Choose the correct existing listing again.');
+          const currentLink = existing.marketListingKey;
+          const unlinked = !currentLink || currentLink === 'none';
+          if (dto.marketLinkKey && !unlinked && currentLink !== dto.marketLinkKey)
+            throw new ConflictException('This card already has a marketplace link. Manage that link separately to avoid replacing it.');
+          const attachLink = !!dto.marketLinkKey && unlinked;
+          if (attachLink) {
+            const linkedElsewhere = await tx.rawCard.findMany({
+              where: { marketListingKey: dto.marketLinkKey },
+              select: { id: true }, take: 2,
+            });
+            if (linkedElsewhere.some(c => c.id !== id))
+              throw new ConflictException('This marketplace listing is already linked to another card. Choose a different printing.');
+          }
           const nextQty = existing.quantity + dto.quantity;
           const avg = buyCost > 0
             ? (existing.quantity * Number(existing.buyCost) + dto.quantity * buyCost) / nextQty
@@ -133,9 +156,11 @@ export class QuickAddService {
             ? [existing.notes, notes].filter(Boolean).join(' · ')
             : existing.notes;
           const changed = await tx.rawCard.updateMany({
-            where: { id, quantity: existing.quantity },
+            where: { id, quantity: existing.quantity,
+              ...(dto.marketLinkKey ? { marketListingKey: currentLink } : {}) },
             data: {
               quantity: nextQty, status: nextQty <= 3 ? 'LOW' : 'AVAILABLE',
+              ...(attachLink ? { marketListingKey: dto.marketLinkKey } : {}),
               buyCost: new Prisma.Decimal(avg.toFixed(2)),
               ...(changedPrice ? { postedPrice: new Prisma.Decimal(postedPrice!) } : {}),
               ...(nextNotes !== existing.notes ? { notes: nextNotes } : {}),
@@ -197,6 +222,7 @@ export class QuickAddService {
 
   async add(dto: QueuedQuickAddItemDto, userId: string) {
     if (dto.existingCardId) return this.restockSelected(dto, userId);
+    if (dto.marketLinkKey) throw new BadRequestException('Marketplace linking is only available when reusing an existing listing.');
     // Resolve a completed request before relying on a marketplace that may be temporarily down.
     if (dto.requestId) {
       const prior = await this.prisma.quickAddReceipt.findUnique({ where: { id: dto.requestId } });
