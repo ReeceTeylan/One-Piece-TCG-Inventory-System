@@ -329,7 +329,7 @@ function PriceRow({ row, canEdit, onChange, onMatch, matching }: {
             </div>
             <div className="truncate text-xs text-muted-foreground">{row.cardNumber} · {row.rarity} · qty {row.quantity}</div>
             <div className="mt-0.5 text-[11px] text-muted-foreground">Acquisition {peso(row.buyCost)} · Posted margin {expectedMargin ?? '—'}%</div>
-            {(stale || lossRisk) && <div className="text-[11px] font-semibold text-warning">{stale ? 'Stale quote · sync prices' : 'Below buying cost · review before matching'}</div>
+            {(stale || lossRisk) && <div className="text-[11px] font-semibold text-warning">{stale ? 'Stale quote · sync prices' : 'Below buying cost · review before matching'}</div>}}}
             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {l ? (
                 <>
