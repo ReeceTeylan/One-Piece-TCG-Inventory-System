@@ -143,9 +143,13 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{editing ? 'Edit raw card' : 'Add raw card'}</DialogTitle></DialogHeader>
-          <form onSubmit={handleSubmit(submit)} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <DialogContent className="flex h-[calc(100dvh-2rem)] max-h-[840px] w-[calc(100vw-2rem)] max-w-3xl flex-col overflow-hidden p-0 max-sm:top-1/2 max-sm:h-[calc(100dvh-1rem)] max-sm:max-h-none max-sm:w-[calc(100vw-1rem)] max-sm:-translate-y-1/2 max-sm:overflow-hidden max-sm:p-0">
+          <DialogHeader className="mb-0 shrink-0 border-b px-4 py-3 pr-12 sm:px-6 sm:py-4">
+            <DialogTitle>{editing ? 'Edit raw card' : 'Add raw card'}</DialogTitle>
+            <p className="text-xs text-muted-foreground">Check the card details, artwork and price before saving.</p>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(submit)} className="flex min-h-0 flex-1 flex-col">
+            <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-3 overflow-y-auto overscroll-contain px-4 py-3 sm:grid-cols-2 sm:gap-4 sm:px-6 sm:py-4">
             {field('Card name', 'name')}
             {field('Card number', 'cardNumber')}
             {field('Set', 'setName')}
@@ -175,7 +179,9 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
                 disabled={busy}
               />
             </div>
-            <DialogFooter className="sm:col-span-2">
+            </div>
+            <DialogFooter className="mt-0 shrink-0 items-center border-t bg-card px-4 py-3 max-sm:static max-sm:bottom-auto max-sm:py-3 sm:px-6">
+              <span className="mr-auto hidden text-xs text-muted-foreground sm:block">{verifiedListing && !editing ? '✓ Artwork reference selected' : 'Review details before saving'}</span>
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
               <Button type="submit" disabled={busy}>{busy ? (uploading ? 'Uploading…' : 'Saving…') : editing ? 'Save changes' : 'Add card'}</Button>
             </DialogFooter>
