@@ -1,8 +1,8 @@
 import sharp from 'sharp';
 
-/** Decorative thumbnail URLs remain source-linked. Do not copy or persist artwork. */
+/** Source artwork is shown for identification; persistence requires separate user authorization. */
 const ORIGINS = {
-  YUYUTEI: 'https://yuyu-tei.jp',
+  YUYUTEI: 'https://card.yuyu-tei.jp',
   CARDRUSH: 'https://www.cardrush-op.jp',
   TCGPLAYER: 'https://tcgplayer-cdn.tcgplayer.com',
 } as const;
@@ -12,8 +12,15 @@ export function imageUrlForSource(input: string | null | undefined, source: Artw
   if (!input) return null;
   try {
     const url = new URL(input, ORIGINS[source]);
-    return url.protocol === 'https:' ? url.href : null;
+    if (url.protocol === 'http:' && approvedImageHost(url, source)) url.protocol = 'https:';
+    return url.protocol === 'https:' && approvedImageHost(url, source) ? url.href : null;
   } catch { return null; }
+}
+
+export function yuyuteiImageFallback(listingKey: string): string | null {
+  // Verified Yuyu-tei catalog thumbnail convention. Never invent arbitrary hosts.
+  if (!/^[a-z0-9-]+\/\d+$/i.test(listingKey)) return null;
+  return `https://card.yuyu-tei.jp/opc/100_140/${listingKey.toLowerCase()}.jpg`;
 }
 
 function approvedImageHost(url: URL, source: ArtworkSource): boolean {

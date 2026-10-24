@@ -53,6 +53,15 @@ export class ImagesController {
     return this.service.upload(file, dto);
   }
 
+  @Post('import-market-artwork')
+  @Roles(Role.OWNER)
+  @ApiOperation({ summary: 'Import authorized source artwork for an already-created and verified raw card' })
+  importMarketArtwork(@Body() dto: {
+    itemId: string; listingKey: string; source: 'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER'; authorized: boolean;
+  }) {
+    return this.service.importMarketArtwork(dto);
+  }
+
   @Post('payment-qr/:method')
   @Roles(Role.OWNER)
   @ApiConsumes('multipart/form-data')

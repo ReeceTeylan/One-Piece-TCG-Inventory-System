@@ -93,6 +93,8 @@ export const marketPricesService = {
   // Sync refreshes prices of linked cards; Link new stock finds listings for never-linked cards.
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
   linkNew: () => api.post('/market-prices/link-new').then(unwrap<MarketSync>),
+  importArtwork: (dto: { itemId: string; listingKey: string; source: MarketSource; authorized: boolean }) =>
+    api.post('/images/import-market-artwork', dto).then(unwrap<CardImage>),
   compareArtwork: (file: File, cardNumber: string, source: MarketSource) => {
     const form = new FormData();
     form.append('file', file); form.append('cardNumber', cardNumber); form.append('source', source);
