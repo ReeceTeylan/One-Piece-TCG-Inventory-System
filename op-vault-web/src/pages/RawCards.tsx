@@ -13,6 +13,7 @@ import { Table, THead, TBody, TR, TH, TD } from '@/components/ui/table';
 import { CardThumb } from '@/components/common/CardImage';
 import { Pagination, PAGE_SIZES } from '@/components/common/Pagination';
 import { CardGrid } from '@/components/common/CardGrid';
+import type { GridDensity } from '@/components/common/CardGrid';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
@@ -62,6 +63,7 @@ export function RawCardsPage() {
   const [deleteCard, setDeleteCard] = useState<RawCard | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [density, setDensity] = useStickyState<GridDensity>('raw:gridDensity', 'standard', { allowed: ['compact','standard','comfortable'] });
   const [view, setView] = useState<'list' | 'grid'>(
     () => (localStorage.getItem('opv:rawcards:view') === 'grid' ? 'grid' : 'list'),
   );
@@ -205,7 +207,10 @@ export function RawCardsPage() {
           )}
         </div>
         </div>
-        <div className="ml-auto flex gap-0.5 rounded-md border bg-muted p-0.5">
+        {view === 'grid' && <Select value={density} onChange={(e) => setDensity(e.target.value as GridDensity)} className="ml-auto h-8 w-[112px] text-xs sm:hidden" aria-label="Card grid density">
+          <option value="compact">5 per row</option><option value="standard">4 per row</option><option value="comfortable">3 per row</option>
+        </Select>}
+        <div className={`${view === 'grid' ? '' : 'ml-auto'} flex gap-0.5 rounded-md border bg-muted p-0.5`}>
           {([['list', List], ['grid', LayoutGrid]] as const).map(([v, Icon]) => (
             <button key={v} onClick={() => { setView(v); localStorage.setItem('opv:rawcards:view', v); }}
               aria-label={`${v} view`} aria-pressed={view === v}
@@ -256,6 +261,7 @@ export function RawCardsPage() {
           <div className="flex min-h-0 flex-1 flex-col">
             {view === 'grid' ? (
               <CardGrid
+            density={density}
                 items={query.data.data.map((c) => ({
                   id: c.id,
                   imageUrl: c.images?.[0]?.url,
