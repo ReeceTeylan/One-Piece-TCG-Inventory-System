@@ -37,3 +37,15 @@ Dependabot prepares dependency update PRs weekly. CI must pass before merging; d
 - The English catalog import script is available, but the database is empty until a reviewed English JSON file is imported; it does not autonomously scrape official databases.
 - Uptime monitoring does not include an API endpoint until `OP_VAULT_API_HEALTH_URL` is configured.
 - Item-level Quick Add receipts prevent repeated submissions with the same requestId; older clients without an ID still use the legacy non-idempotent route.
+
+## Optional scheduled encrypted backups
+
+The GitHub Action `.github/workflows/op-vault-db-backup.yml` is configured for a daily UTC run, but is **not active** until all of the following repository secrets are set:
+
+- `OP_VAULT_BACKUP_DATABASE_URL`: direct PostgreSQL URL for a backup-only DB role
+- `OP_VAULT_BACKUP_S3_BUCKET`: bucket name for a private, restricted backup bucket
+- `OP_VAULT_BACKUP_PASSPHRASE`: independently stored strong encryption passphrase
+- `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`: least-privilege upload credentials
+
+Optional GitHub repository variables: `OP_VAULT_BACKUP_AWS_REGION` (for AWS S3), `OP_VAULT_BACKUP_S3_ENDPOINT` (for compatible storage).
+Ensure the GitHub runner has a compatible PostgreSQL client and AWS CLI version. Set a bucket retention policy and monitor workflow failures. Test one encrypted backup by downloading it securely, decrypting with the separately stored passphrase and restoring into a disposable staging database. Do not treat upload success as proof that a restore will work.
