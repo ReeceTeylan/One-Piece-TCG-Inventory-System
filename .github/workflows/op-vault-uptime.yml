@@ -17,8 +17,8 @@ jobs:
           API_HEALTH: ${{ vars.OP_VAULT_API_HEALTH_URL }}
         run: |
           if [ -z "$API_HEALTH" ]; then
-            echo "::warning::Set repository variable OP_VAULT_API_HEALTH_URL to https://your-backend.example.com/api/health/db for DB monitoring."
-            exit 0
+            API_HEALTH='https://one-piece-tcg-inventory-system.onrender.com/api/health/db'
+            echo "Checking OP Vault's verified Render API/database health endpoint."
           fi
           case "$API_HEALTH" in https://*) ;; *) echo "Health URL must use HTTPS"; exit 1 ;; esac
           curl --fail --silent --show-error --location --retry 2 --retry-delay 8 --connect-timeout 25 --max-time 95 "$API_HEALTH" --output /dev/null

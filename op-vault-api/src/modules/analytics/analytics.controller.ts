@@ -1,6 +1,8 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { Role } from '@prisma/client';
 import { TopQueryDto, TrendQueryDto } from './dto/analytics-query.dto';
 
 @ApiTags('analytics')
@@ -13,6 +15,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Dashboard summary: revenue/profit/orders by range + growth + inventory health' })
   dashboard() { return this.service.dashboard(); }
 
+  @Roles(Role.OWNER)
   @Get('trends')
   @ApiOperation({ summary: 'Time-bucketed revenue/profit/cardsSold series for line charts' })
   trends(@Query() query: TrendQueryDto) { return this.service.trends(query); }
@@ -21,6 +24,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Inventory value, average cost/price, margin, low/dead stock counts' })
   inventory() { return this.service.inventory(); }
 
+  @Roles(Role.OWNER)
   @Get('cards')
   @ApiOperation({ summary: 'Best sellers, most valuable, highest profit, top rarities, fastest/slowest, dead/low stock' })
   cards(@Query() query: TopQueryDto) { return this.service.cards(query); }
@@ -29,6 +33,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Slab analytics: totals, revenue, profit, average grade sold' })
   slabs() { return this.service.slabs(); }
 
+  @Roles(Role.OWNER)
   @Get('customers')
   @ApiOperation({ summary: 'Top customers by lifetime spend' })
   customers(@Query() query: TopQueryDto) { return this.service.customers(query); }
