@@ -516,3 +516,15 @@ model QuickAddReceipt {
   @@index([createdAt])
   @@map("quick_add_receipts")
 }
+
+model CardCatalogEntry {
+  cardNumber String @id
+  englishName String
+  category String?
+  colors String[] @default([])
+  rarity String?
+  setName String?
+  source String @default("manual-import")
+  updatedAt DateTime @updatedAt
+  @@map("card_catalog_entries")
+}

@@ -18,3 +18,14 @@ CREATE SEQUENCE IF NOT EXISTS op_vault_sale_reference_seq START WITH 1001;
 SELECT setval('op_vault_sale_reference_seq',
   GREATEST(1000, COALESCE((SELECT MAX(SUBSTRING("reference" FROM '^SALE-([0-9]+)$')::bigint) FROM "sales"), 1000)),
   true);
+
+CREATE TABLE IF NOT EXISTS "card_catalog_entries" (
+  "cardNumber" TEXT NOT NULL PRIMARY KEY,
+  "englishName" TEXT NOT NULL,
+  "category" TEXT,
+  "colors" TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  "rarity" TEXT,
+  "setName" TEXT,
+  "source" TEXT NOT NULL DEFAULT 'manual-import',
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

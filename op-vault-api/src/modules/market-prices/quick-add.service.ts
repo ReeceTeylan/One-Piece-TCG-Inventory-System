@@ -29,9 +29,14 @@ export class QuickAddService {
     if (source !== 'TCGPLAYER') {
       try { englishCatalog = await this.market.listingsFor(num, 'TCGPLAYER'); } catch { /* keep quick add available offline */ }
     }
-    const english = selectEnglishCharacter(listing, englishCatalog);
+    // Canonical, owner-imported English catalog beats incomplete marketplace titles.
+    // Never infer artwork/printing rarity from the base card catalog.
+    const official = await this.prisma.cardCatalogEntry.findUnique({ where: { cardNumber: num } });
+    const english = official?.englishName || selectEnglishCharacter(listing, englishCatalog);
     metadata.character = english ?? '';
     metadata.name = english ?? '';
+    if (official?.colors?.length) metadata.color = official.colors.join(' / ');
+    if (official?.setName && !metadata.setName) metadata.setName = official.setName;
     const prices = quickCardPrices(listing, await this.settings.getAll(), notes);
     const existing = await this.prisma.rawCard.findFirst({
       where: { marketListingKey: listingKey },

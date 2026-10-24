@@ -17,7 +17,8 @@
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "lint": "eslint \"src/**/*.ts\" --fix",
-    "prisma:push": "prisma db push"
+    "prisma:push": "prisma db push",
+    "catalog:import": "ts-node scripts/import-english-catalog.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
