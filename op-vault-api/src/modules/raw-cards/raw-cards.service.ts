@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, StockStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -30,6 +30,14 @@ export class RawCardsService {
         cardId: existing.id,
         currentQuantity: existing.quantity,
       });
+    }
+    // Do not persist a mismatched listing if the card number was edited after selection.
+    if (dto.marketListingKey) {
+      const where = { listingKey: dto.marketListingKey, cardNumber: dto.cardNumber.trim().toUpperCase() };
+      const found = dto.marketListingKey.startsWith('tcgp:')
+        ? await this.prisma.tcgplayerPrice.findFirst({ where, select: { listingKey: true } })
+        : await this.prisma.marketPrice.findFirst({ where, select: { listingKey: true } });
+      if (!found) throw new BadRequestException('Selected artwork listing does not match this card number');
     }
     const card = await this.repo.create({
       ...dto,

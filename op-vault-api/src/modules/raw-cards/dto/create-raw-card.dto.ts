@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class CreateRawCardDto {
   @ApiProperty() @IsString() @IsNotEmpty() name: string;
@@ -13,4 +13,6 @@ export class CreateRawCardDto {
   @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) buyCost: number;
   @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) postedPrice: number;
   @ApiPropertyOptional() @IsString() @IsOptional() notes?: string;
+  @ApiPropertyOptional({ description: 'Specific market listing visually confirmed when creating a new card' })
+  @IsOptional() @IsString() @MaxLength(150) marketListingKey?: string;
 }
