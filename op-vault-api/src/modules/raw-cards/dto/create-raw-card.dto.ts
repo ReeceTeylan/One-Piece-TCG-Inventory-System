@@ -13,6 +13,8 @@ export class CreateRawCardDto {
   @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) buyCost: number;
   @ApiProperty() @Type(() => Number) @IsNumber() @Min(0) postedPrice: number;
   @ApiPropertyOptional() @IsString() @IsOptional() notes?: string;
+  @ApiPropertyOptional({ description: 'Optional unique artwork/printing reference for variants' })
+  @IsOptional() @IsString() @MaxLength(190) variantKey?: string;
   @ApiPropertyOptional({ description: 'Specific market listing visually confirmed when creating a new card' })
   @IsOptional() @IsString() @MaxLength(150) marketListingKey?: string;
 }
