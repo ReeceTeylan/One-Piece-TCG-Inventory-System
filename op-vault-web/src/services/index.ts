@@ -99,7 +99,7 @@ export const marketPricesService = {
       buyCost: number; postedPrice: number | null; purchaseRate: number; rate: number | null;
       existing: { id: string; name: string; quantity: number; postedPrice: number; buyCost: number; hasImage: boolean } | null;
     }>),
-  quickAddBatch: (dto: { items: { cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes?: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string }[] }) =>
+  quickAddBatch: (dto: { items: { requestId?: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes?: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string }[] }) =>
     api.post('/market-prices/quick-add/batch', dto).then(unwrap<{
       total: number; succeeded: number; results: { listingKey: string; status: string; cardId?: string; hasImage?: boolean; reason?: string }[];
     }>),

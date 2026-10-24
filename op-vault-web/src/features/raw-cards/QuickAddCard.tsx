@@ -27,8 +27,18 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [authorized, setAuthorized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  type Queued = { cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
-  const [queue, setQueue] = useState<Queued[]>([]);
+  type Queued = { requestId: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
+  const [queue, setQueue] = useState<Queued[]>(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem('opv:quick-add:draft:v1') || '[]');
+      return Array.isArray(raw) ? raw.filter(x => x && typeof x.requestId === 'string'
+        && typeof x.listingKey === 'string' && typeof x.cardNumber === 'string'
+        && Number.isInteger(x.quantity) && x.quantity > 0).slice(0, 40) as Queued[] : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('opv:quick-add:draft:v1', JSON.stringify(queue)); } catch { /* storage unavailable */ }
+  }, [queue]);
   const [englishName, setEnglishName] = useState('');
   const [englishCharacter, setEnglishCharacter] = useState('');
   const [results, setResults] = useState<{listingKey:string; status:string; reason?:string}[]>([]);
@@ -56,7 +66,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     if (!customSell) setSell(preview.data.postedPrice === null ? '' : String(preview.data.postedPrice));
   }, [preview.data, customBuy, customSell]);
   useEffect(() => {
-    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setQueue([]); setResults([]); }
+    if (!open) { setKey(''); setQty('1'); setNotes(''); setBuy(''); setSell(''); setCustomBuy(false); setCustomSell(false); setAuthorized(false); setDone(null); setResults([]); }
   }, [open]);
 
   const record = preview.data;
@@ -70,7 +80,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
 
   function enqueue() {
     if (!canSave || !record) return;
-    const item: Queued = { cardNumber: debounced, source, listingKey: key, quantity: Number(qty), notes,
+    const item: Queued = { requestId: crypto.randomUUID(), cardNumber: debounced, source, listingKey: key, quantity: Number(qty), notes,
       buyCost: Number(buy), postedPrice: Number(sell),
       englishName: englishName.trim(), englishCharacter: englishCharacter.trim(),
       imageRequested: authorized, imageUrl: record.listing.imageUrl ?? null };

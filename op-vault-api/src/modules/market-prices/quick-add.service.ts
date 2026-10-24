@@ -1,9 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { RawCardsService } from '../raw-cards/raw-cards.service';
 import { SettingsService } from '../settings/settings.service';
 import { MarketPricesService } from './market-prices.service';
-import { QuickAddDto } from './dto/quick-add.dto';
+import { Prisma } from '@prisma/client';
 import { QuickSource, quickCardMetadata, quickCardPrices } from './quick-add.helpers';
 import { selectEnglishCharacter, isEnglishCharacter } from './quick-add.english';
 import { QuickAddBatchDto, QueuedQuickAddItemDto } from './dto/quick-add-batch.dto';
@@ -12,7 +11,6 @@ import { QuickAddBatchDto, QueuedQuickAddItemDto } from './dto/quick-add-batch.d
 export class QuickAddService {
   constructor(
     private prisma: PrismaService,
-    private rawCards: RawCardsService,
     private settings: SettingsService,
     private market: MarketPricesService,
   ) {}
@@ -91,52 +89,123 @@ export class QuickAddService {
     if (!Number.isFinite(buyCost) || !Number.isFinite(postedPrice) || buyCost < 0 || postedPrice < 0)
       throw new BadRequestException('Buying cost and selling price must be valid nonnegative numbers');
 
-    const exact = await this.prisma.rawCard.findFirst({ where: { marketListingKey: dto.listingKey } });
-    if (exact) {
-      if (exact.cardNumber.trim().toUpperCase() !== resolved.cardNumber)
-        throw new ConflictException('This marketplace listing is linked to a different card');
-      // An active listing keeps its posted price; a sold-out one takes the new rate and metadata.
-      if (exact.quantity === 0) {
-        await this.rawCards.update(exact.id, {
-          name: resolved.metadata.name, character: resolved.metadata.character,
-          setName: resolved.metadata.setName, rarity: resolved.metadata.rarity,
-          postedPrice,
-          ...(resolved.metadata.color ? { color: resolved.metadata.color } : {}),
-          notes: notes || exact.notes || undefined,
-        });
-      } else if (notes) {
-        // Preserve old notes including damage/English marker when adding stock.
-        const prev = (exact.notes ?? '').trim();
-        if (!prev.includes(notes))
-          await this.rawCards.update(exact.id, { notes: [prev, notes].filter(Boolean).join(' · ') });
-      } else if (dto.source === 'TCGPLAYER' && !/\b(?:english|eng)\b/i.test(exact.notes ?? '')) {
-        await this.rawCards.update(exact.id, { notes: [exact.notes, 'English'].filter(Boolean).join(' · ') });
-      }
-      const card = await this.rawCards.addQuantity(exact.id, dto.quantity, buyCost, userId);
-      const hasImage = !!(await this.prisma.cardImage.findFirst({ where: { rawCardId: exact.id }, select: { id: true } }));
-      return { action: exact.quantity === 0 ? 'reactivated' : 'restocked', card, hasImage };
+    // One atomic stock mutation + idempotency receipt per queued item.
+    // An HTTP retry can safely return the original result without adding stock twice.
+    const receiptResult = async (id: string) => {
+      const receipt = await this.prisma.quickAddReceipt.findUnique({ where: { id } });
+      if (!receipt) return null;
+      if (receipt.userId !== userId || receipt.listingKey !== dto.listingKey)
+        throw new ConflictException('Request ID has already been used for another listing');
+      const card = await this.prisma.rawCard.findUnique({ where: { id: receipt.cardId } });
+      if (!card) throw new ConflictException('Previously added card was removed. Review inventory before retrying.');
+      const hasImage = !!(await this.prisma.cardImage.findFirst({ where: { rawCardId: card.id }, select: { id: true } }));
+      return { action: receipt.action, card, hasImage };
+    };
+
+    const requestId = dto.requestId;
+    if (requestId) {
+      const prior = await receiptResult(requestId);
+      if (prior) return prior;
     }
-    // The legacy composite identity cannot safely distinguish alternate artworks.
-    // Never restock another variant simply because its number, set and rarity match.
-    const conflict = await this.prisma.rawCard.findFirst({
-      where: { cardNumber: resolved.cardNumber, setName: resolved.metadata.setName, rarity: resolved.metadata.rarity },
-      select: { id: true, name: true, marketListingKey: true },
-    });
-    if (conflict) throw new ConflictException({
-      code: 'CARD_VARIANT_CONFLICT', cardId: conflict.id,
-      message: 'A different artwork shares this card number, set and rarity. Open the existing card and review it before adding stock.',
-    });
-    const card = await this.rawCards.create({
-      cardNumber: resolved.cardNumber,
-      name: resolved.metadata.name,
-      setName: resolved.metadata.setName,
-      character: resolved.metadata.character,
-      ...(resolved.metadata.color ? { color: resolved.metadata.color } : {}),
-      rarity: resolved.metadata.rarity,
-      quantity: dto.quantity, buyCost, postedPrice,
-      notes: notes || undefined,
-      marketListingKey: dto.listingKey,
-    }, userId);
-    return { action: 'created', card, hasImage: false };
+    const variantKey = `source:${dto.listingKey}`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await this.prisma.$transaction(async tx => {
+          if (requestId) {
+            const prior = await tx.quickAddReceipt.findUnique({ where: { id: requestId } });
+            if (prior) {
+              if (prior.userId !== userId || prior.listingKey !== dto.listingKey)
+                throw new ConflictException('Request ID collision');
+              const card = await tx.rawCard.findUniqueOrThrow({ where: { id: prior.cardId } });
+              const image = await tx.cardImage.findFirst({ where: { rawCardId: card.id }, select: { id: true } });
+              return { action: prior.action, card, hasImage: !!image };
+            }
+          }
+          const exact = await tx.rawCard.findFirst({ where: { marketListingKey: dto.listingKey } });
+          let card;
+          let action: string;
+          let hasImage = false;
+          if (exact) {
+            if (exact.cardNumber.trim().toUpperCase() !== resolved.cardNumber)
+              throw new ConflictException('Marketplace listing already points to a different card number');
+            const nextQty = exact.quantity + dto.quantity;
+            const nextCost = buyCost > 0
+              ? (exact.quantity * Number(exact.buyCost) + dto.quantity * buyCost) / nextQty
+              : Number(exact.buyCost);
+            const newNotes = notes && !(exact.notes ?? '').includes(notes)
+              ? [exact.notes, notes].filter(Boolean).join(' · ')
+              : exact.notes;
+            const reactivated = exact.quantity === 0;
+            const changed = await tx.rawCard.updateMany({
+              where: { id: exact.id, quantity: exact.quantity },
+              data: {
+                quantity: nextQty, status: nextQty <= 3 ? 'LOW' : 'AVAILABLE',
+                buyCost: new Prisma.Decimal(nextCost.toFixed(2)),
+                ...(newNotes !== exact.notes ? { notes: newNotes } : {}),
+                ...(reactivated ? {
+                  postedPrice: new Prisma.Decimal(postedPrice),
+                  name: resolved.metadata.name, character: resolved.metadata.character,
+                  setName: resolved.metadata.setName, rarity: resolved.metadata.rarity,
+                  ...(resolved.metadata.color ? { color: resolved.metadata.color } : {}),
+                } : {}),
+              },
+            });
+            if (changed.count !== 1) throw new ConflictException('Stock changed while saving. Retry this item.');
+            if (reactivated && Number(exact.postedPrice) !== postedPrice) {
+              await tx.priceHistory.create({
+                data: { itemType: 'RAW', itemId: exact.id, field: 'postedPrice',
+                  oldValue: exact.postedPrice, newValue: new Prisma.Decimal(postedPrice) },
+              });
+            }
+            await tx.restockLog.create({ data: { rawCardId: exact.id, quantityAdded: dto.quantity, buyCost, userId } });
+            await tx.inventoryLog.create({
+              data: { itemType: 'RAW', rawCardId: exact.id, action: 'RESTOCK',
+                quantityDelta: dto.quantity, quantityAfter: nextQty, userId },
+            });
+            card = await tx.rawCard.findUniqueOrThrow({ where: { id: exact.id } });
+            hasImage = !!(await tx.cardImage.findFirst({ where: { rawCardId: exact.id }, select: { id: true } }));
+            action = reactivated ? 'reactivated' : 'restocked';
+          } else {
+            const conflict = await tx.rawCard.findFirst({
+              where: { cardNumber: resolved.cardNumber, setName: resolved.metadata.setName,
+                rarity: resolved.metadata.rarity, variantKey },
+            });
+            if (conflict)
+              throw new ConflictException('This printing already exists with another marketplace match. Review the existing record.');
+            card = await tx.rawCard.create({
+              data: {
+                cardNumber: resolved.cardNumber, name: resolved.metadata.name,
+                setName: resolved.metadata.setName, character: resolved.metadata.character,
+                color: resolved.metadata.color,
+                rarity: resolved.metadata.rarity, quantity: dto.quantity,
+                buyCost: new Prisma.Decimal(buyCost),
+                postedPrice: new Prisma.Decimal(postedPrice),
+                notes: notes || null, marketListingKey: dto.listingKey, variantKey,
+                status: dto.quantity <= 3 ? 'LOW' : 'AVAILABLE',
+              },
+            });
+            await tx.inventoryLog.create({
+              data: { itemType: 'RAW', rawCardId: card.id, action: 'CREATE',
+                quantityDelta: card.quantity, quantityAfter: card.quantity, userId },
+            });
+            action = 'created';
+          }
+          if (requestId) {
+            await tx.quickAddReceipt.create({
+              data: { id: requestId, listingKey: dto.listingKey, userId, cardId: card.id, action },
+            });
+          }
+          return { action, card, hasImage };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 25000 });
+      } catch (error: any) {
+        if (requestId && ['P2002','P2034'].includes(error?.code)) {
+          const prior = await receiptResult(requestId);
+          if (prior) return prior;
+        }
+        if (error?.code === 'P2034' && attempt < 2) continue;
+        throw error;
+      }
+    }
+    throw new ConflictException('Inventory changed while saving. Retry the batch.');
   }
 }
