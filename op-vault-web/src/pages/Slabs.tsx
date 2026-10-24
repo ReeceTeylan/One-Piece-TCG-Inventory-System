@@ -51,7 +51,7 @@ export function SlabsPage() {
   const debounced = useDebounce(search);
   const [sortBy, sortOrder] = sort.split(':');
 
-  const { data, isLoading, isError } = useSlabs({
+  const { data, isLoading, isError, refetch } = useSlabs({
     page, limit, search: debounced || undefined, status: status || undefined,
     grade: grade || undefined, kind: kind || undefined,
     // The status dropdown is the only filter — opt out of the backend's
@@ -214,7 +214,7 @@ export function SlabsPage() {
       )}
 
       <Card className="flex min-h-0 flex-1 flex-col">
-        {isLoading ? <TableSkeleton /> : isError ? <ErrorState /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : view === 'grid' ? (
+        {isLoading ? <TableSkeleton /> : isError ? <ErrorState onRetry={() => { void refetch(); }} /> : !data?.data.length ? <EmptyState message="No slabs match your filters." /> : view === 'grid' ? (
           <CardGrid
             density={density}
             items={data.data.map((s) => ({

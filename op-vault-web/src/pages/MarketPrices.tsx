@@ -233,7 +233,7 @@ export function MarketPricesPage() {
 
       <Card className={cn('flex min-h-0 flex-1 flex-col transition-opacity', query.isPlaceholderData && 'opacity-60')}>
         {query.isLoading ? <TableSkeleton />
-        : query.isError ? <ErrorState />
+        : query.isError ? <ErrorState onRetry={() => { void query.refetch(); }} />
         : !query.data?.data.length
           ? (view === 'changes' && !underpricedOnly && !search && !language && !condition
               ? <div className="flex flex-col items-center">
