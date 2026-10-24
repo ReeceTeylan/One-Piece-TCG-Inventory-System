@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ImageUploader } from '@/components/common/ImageUploader';
+import { ArtworkReview } from './ArtworkReview';
 import { useRawCardMutations, RARITIES, COLORS } from './use-raw-cards';
 import { useImageUpload } from '@/features/images/use-image-upload';
 import { apiError } from '@/lib/api';
@@ -41,6 +42,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
   const [dup, setDup] = useState<{ cardId: string; currentQuantity: number; quantity: number } | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [verifiedListing, setVerifiedListing] = useState<string | null>(null);
   const [removeExisting, setRemoveExisting] = useState(false);
   const existingImage = editing?.images?.[0] ?? null;
 
@@ -59,7 +61,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
     } else {
       reset({ rarity: 'SR', color: 'Red', quantity: 1, name: '', cardNumber: '', setName: '', buyCost: 0, postedPrice: 0 });
     }
-    setFile(null); setRemoveExisting(false);
+    setFile(null); setRemoveExisting(false); setVerifiedListing(null);
   }, [editing, open, reset]);
 
   // Suggested posted price from the market (Yuyu-tei, or TCGplayer when notes say ENG).
@@ -99,7 +101,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
         finishClose();
         return;
       }
-      const card = await create.mutateAsync(data);
+      const card = await create.mutateAsync({ ...data, ...(verifiedListing ? { marketListingKey: verifiedListing } : {}) });
       if (file) {
         try { await upload(file, 'RAW', card.id); }
         catch { toast.error('Card saved, but image upload failed. You can re-upload from Edit.'); }
@@ -147,6 +149,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
             {field('Posted price (₱)', 'postedPrice', 'number')}
             <PriceHint className="sm:col-span-2" loading={suggestion.isFetching && !suggestion.data} s={suggestion.data}
               current={posted} onUse={(v) => setValue('postedPrice', v, { shouldDirty: true })} />
+            {!editing && <ArtworkReview cardNumber={watch('cardNumber') ?? ''} notes={watch('notes') ?? ''} rarity={watch('rarity') ?? ''} photo={file} selected={verifiedListing} onSelect={setVerifiedListing} />}
             {field('Quantity', 'quantity', 'number')}
             <div className="sm:col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
             <div className="sm:col-span-2">

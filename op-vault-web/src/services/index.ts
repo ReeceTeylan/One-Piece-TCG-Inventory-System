@@ -45,7 +45,7 @@ export interface MarketListing {
 }
 export interface MarketCandidate {
   source: MarketSource; listingKey: string; cardNumber: string; name: string; rarity: string | null;
-  setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string;
+  setLabel: string; price: number; currency: 'JPY' | 'USD'; inStock: boolean | null; stockCount: number | null; url: string; imageUrl?: string | null;
 }
 export interface MarketSync {
   running: boolean; trigger: 'nightly' | 'manual' | 'link' | null; phase: 'yuyutei' | 'cardrush' | 'tcgplayer' | null;
@@ -93,6 +93,14 @@ export const marketPricesService = {
   // Sync refreshes prices of linked cards; Link new stock finds listings for never-linked cards.
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
   linkNew: () => api.post('/market-prices/link-new').then(unwrap<MarketSync>),
+  compareArtwork: (file: File, cardNumber: string, source: MarketSource) => {
+    const form = new FormData();
+    form.append('file', file); form.append('cardNumber', cardNumber); form.append('source', source);
+    return api.post('/market-prices/artwork/compare', form).then((r) => unwrap<{
+      checked: number; results: { listingKey: string; similarity: number | null }[];
+      warning: string;
+    }>(r));
+  },
   listings: (cardNumber: string, source: MarketSource) =>
     api.get(`/market-prices/listings/${encodeURIComponent(cardNumber)}`, { params: { source } }).then(unwrap<MarketCandidate[]>),
   // listingKey: a listing, 'none' = no market price, null = find one automatically now.
