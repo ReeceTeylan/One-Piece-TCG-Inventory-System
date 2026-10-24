@@ -16,6 +16,7 @@ import { CardGrid } from '@/components/common/CardGrid';
 import { TableSkeleton, ErrorState, EmptyState } from '@/components/common/DataState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RawCardForm } from '@/features/raw-cards/RawCardForm';
+import { QuickAddCard } from '@/features/raw-cards/QuickAddCard';
 import { ImportCsvDialog } from '@/features/raw-cards/ImportCsvDialog';
 import { RestockDialog } from '@/features/raw-cards/RestockDialog';
 import { useRawCards, useRawCardMutations, RARITIES } from '@/features/raw-cards/use-raw-cards';
@@ -54,6 +55,7 @@ export function RawCardsPage() {
   });
   const [pageInputVal, setPageInputVal] = useState('');
   const [showAdd, setShowAdd] = useState(false);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [editCard, setEditCard] = useState<RawCard | null>(null);
   const [restockCard, setRestockCard] = useState<RawCard | null>(null);
@@ -170,7 +172,8 @@ export function RawCardsPage() {
         actions={
           <div className="flex items-center gap-2 max-sm:gap-1.5">
             <Button variant="outline" size="sm" className="max-sm:h-8 max-sm:px-2" aria-label="Import CSV" onClick={() => setShowImport(true)}><Upload className="size-4" /> <span className="hidden sm:inline">Import CSV</span></Button>
-            <Button size="sm" className="max-sm:h-8 max-sm:px-2.5" onClick={() => setShowAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Add raw card</span><span className="sm:hidden">Add</span></Button>
+            <Button size="sm" className="max-sm:h-8 max-sm:px-2" onClick={() => setShowQuickAdd(true)}><Plus className="size-4" /> <span className="hidden sm:inline">Quick Add</span><span className="sm:hidden">Add</span></Button>
+            <Button variant="outline" size="sm" className="max-sm:h-8 max-sm:px-2" onClick={() => setShowAdd(true)}><span className="hidden sm:inline">Manual Add</span><span className="sm:hidden">Manual</span></Button>
           </div>
         } />
 
@@ -378,6 +381,7 @@ export function RawCardsPage() {
         )}
       </Card>
 
+      <QuickAddCard open={showQuickAdd} onOpenChange={setShowQuickAdd} />
       <RawCardForm open={showAdd} onOpenChange={setShowAdd} />
       <ImportCsvDialog open={showImport} onOpenChange={setShowImport} />
       <RawCardForm open={!!editCard} onOpenChange={(o) => !o && setEditCard(null)} editing={editCard} />
