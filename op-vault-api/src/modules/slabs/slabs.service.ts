@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, StockStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { paginate } from '../../common/dto/pagination.dto';
@@ -103,43 +103,24 @@ export class SlabsService {
   }
 
   async addQuantity(id: string, quantity: number, buyCost: number, userId: string) {
-    const slab = await this.findOne(id);
-    if (slab.kind !== 'SEALED') {
-      throw new ConflictException({
-        code: 'SLAB_NOT_STACKABLE',
-        message: 'Graded slabs are unique items — quantity applies to sealed products only.',
+    if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isFinite(buyCost) || buyCost < 0)
+      throw new BadRequestException('Quantity must be positive and buying cost nonnegative');
+    return this.prisma.$transaction(async tx => {
+      const slab = await tx.slabCard.findUnique({ where: { id } });
+      if (!slab) throw new NotFoundException('Item not found');
+      if (slab.kind !== 'SEALED') throw new BadRequestException('Only sealed products can be restocked');
+      const newQty = slab.quantity + quantity;
+      const average = buyCost > 0
+        ? (slab.quantity * Number(slab.buyCost) + quantity * buyCost) / newQty
+        : Number(slab.buyCost);
+      const updated = await tx.slabCard.updateMany({
+        where: { id, quantity: slab.quantity },
+        data: { quantity: newQty, status: this.computeStatus(newQty), buyCost: new Prisma.Decimal(average.toFixed(2)) },
       });
-    }
-
-    const newQty = slab.quantity + quantity;
-
-    // Weighted-average cost, same rule as raw cards: a 0 cost means
-    // "just add stock" and leaves the existing cost untouched.
-    let newBuyCost = Number(slab.buyCost);
-    if (buyCost > 0) {
-      const oldQty = slab.quantity;
-      const oldCost = Number(slab.buyCost);
-      const totalQty = oldQty + quantity;
-      newBuyCost = totalQty > 0 ? (oldQty * oldCost + quantity * buyCost) / totalQty : buyCost;
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      const s = await tx.slabCard.update({
-        where: { id },
-        data: {
-          quantity: newQty,
-          status: this.computeStatus(newQty),
-          buyCost: new Prisma.Decimal(newBuyCost.toFixed(2)),
-        },
-      });
+      if (updated.count !== 1) throw new ConflictException('Stock changed while restocking. Refresh and retry.');
       await tx.restockLog.create({ data: { slabId: id, quantityAdded: quantity, buyCost, userId } });
-      await tx.inventoryLog.create({
-        data: {
-          itemType: 'SLAB', slabId: id, action: 'RESTOCK',
-          quantityDelta: quantity, quantityAfter: newQty, userId,
-        },
-      });
-      return s;
+      await tx.inventoryLog.create({ data: { itemType: 'SLAB', slabId: id, action: 'RESTOCK', quantityDelta: quantity, quantityAfter: newQty, userId } });
+      return tx.slabCard.findUniqueOrThrow({ where: { id } });
     });
   }
 
