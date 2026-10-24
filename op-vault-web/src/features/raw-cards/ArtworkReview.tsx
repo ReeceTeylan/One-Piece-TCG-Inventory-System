@@ -9,7 +9,7 @@ import { apiError } from '@/lib/api';
 
 export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSelect }: {
   cardNumber: string; notes: string; rarity: string; photo: File | null;
-  selected: string | null; onSelect: (key: string | null) => void;
+  selected: string | null; onSelect: (key: string | null, source: MarketSource | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [shop, setShop] = useState<MarketSource>('YUYUTEI');
@@ -19,7 +19,7 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
   const source = english ? 'TCGPLAYER' : shop;
   const num = cardNumber.trim().toUpperCase();
   const valid = /^[A-Z0-9]+-\d{2,3}$/.test(num);
-  useEffect(() => { onSelect(null); setScores({}); }, [num, rarity, source]);
+  useEffect(() => { onSelect(null, null); setScores({}); }, [num, rarity, source]);
   const candidates = useQuery({
     queryKey: ['artwork-review', num, source],
     queryFn: () => marketPricesService.listings(num, source),
@@ -62,7 +62,7 @@ export function ArtworkReview({ cardNumber, notes, rarity, photo, selected, onSe
           <p className="truncate text-[11px] text-muted-foreground">{item.rarity ?? '—'} · {item.price} {item.currency}</p>
           {scores[item.listingKey] !== undefined && <p className="text-[11px] text-warning">Image similarity: {scores[item.listingKey] === null ? 'Unavailable' : `${scores[item.listingKey]}% (estimate)`}</p>}
           <div className="mt-1 flex items-center justify-between gap-1">
-            <Button type="button" size="sm" className="h-7 text-xs" variant={selected === item.listingKey ? 'default' : 'outline'} onClick={() => onSelect(selected === item.listingKey ? null : item.listingKey)}>
+            <Button type="button" size="sm" className="h-7 text-xs" variant={selected === item.listingKey ? 'default' : 'outline'} onClick={() => onSelect(selected === item.listingKey ? null : item.listingKey, selected === item.listingKey ? null : source)}>
               {selected === item.listingKey ? <><Check className="size-3" /> Chosen</> : 'Choose'}
             </Button>
             <a href={item.url} target="_blank" rel="noreferrer" aria-label="Open shop listing" className="p-1 text-muted-foreground"><ExternalLink className="size-4" /></a>

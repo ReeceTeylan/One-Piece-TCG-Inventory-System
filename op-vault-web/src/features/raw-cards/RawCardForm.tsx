@@ -43,6 +43,9 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
 
   const [file, setFile] = useState<File | null>(null);
   const [verifiedListing, setVerifiedListing] = useState<string | null>(null);
+  const [verifiedSource, setVerifiedSource] = useState<'YUYUTEI' | 'CARDRUSH' | 'TCGPLAYER' | null>(null);
+  const [useSourceImage, setUseSourceImage] = useState(false);
+  const [authorizedArtwork, setAuthorizedArtwork] = useState(false);
   const [removeExisting, setRemoveExisting] = useState(false);
   const existingImage = editing?.images?.[0] ?? null;
 
@@ -61,7 +64,7 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
     } else {
       reset({ rarity: 'SR', color: 'Red', quantity: 1, name: '', cardNumber: '', setName: '', buyCost: 0, postedPrice: 0 });
     }
-    setFile(null); setRemoveExisting(false); setVerifiedListing(null);
+    setFile(null); setRemoveExisting(false); setVerifiedListing(null); setVerifiedSource(null); setUseSourceImage(false); setAuthorizedArtwork(false);
   }, [editing, open, reset]);
 
   // Suggested posted price from the market (Yuyu-tei, or TCGplayer when notes say ENG).
@@ -101,8 +104,12 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
         finishClose();
         return;
       }
+      if (useSourceImage && (!verifiedListing || !verifiedSource || !authorizedArtwork)) { toast.error('Select artwork and confirm your reuse permission'); return; }
       const card = await create.mutateAsync({ ...data, ...(verifiedListing ? { marketListingKey: verifiedListing } : {}) });
-      if (file) {
+      if (useSourceImage && verifiedListing && verifiedSource) {
+        try { await marketPricesService.importArtwork({ itemId: card.id, listingKey: verifiedListing, source: verifiedSource, authorized: true }); }
+        catch { toast.error('Card saved, but source image could not be imported. Upload your own photo from Edit.'); }
+      } else if (file) {
         try { await upload(file, 'RAW', card.id); }
         catch { toast.error('Card saved, but image upload failed. You can re-upload from Edit.'); }
       }
@@ -149,7 +156,11 @@ export function RawCardForm({ open, onOpenChange, editing }: { open: boolean; on
             {field('Posted price (₱)', 'postedPrice', 'number')}
             <PriceHint className="sm:col-span-2" loading={suggestion.isFetching && !suggestion.data} s={suggestion.data}
               current={posted} onUse={(v) => setValue('postedPrice', v, { shouldDirty: true })} />
-            {!editing && <ArtworkReview cardNumber={watch('cardNumber') ?? ''} notes={watch('notes') ?? ''} rarity={watch('rarity') ?? ''} photo={file} selected={verifiedListing} onSelect={setVerifiedListing} />}
+            {!editing && <ArtworkReview cardNumber={watch('cardNumber') ?? ''} notes={watch('notes') ?? ''} rarity={watch('rarity') ?? ''} photo={file} selected={verifiedListing} onSelect={(key, source) => { setVerifiedListing(key); setVerifiedSource(source); setUseSourceImage(false); setAuthorizedArtwork(false); }} />}
+            {!editing && verifiedListing && verifiedSource && <div className="sm:col-span-2 space-y-2 rounded-md border p-3">
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={useSourceImage} onChange={e => setUseSourceImage(e.target.checked)} /> Use selected source image instead of uploading mine</label>
+              {useSourceImage && <label className="flex items-start gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={authorizedArtwork} onChange={e => setAuthorizedArtwork(e.target.checked)} /> I confirm I have permission to reproduce this marketplace image on my store. If the source denies access, I will upload my own photo.</label>}
+            </div>}
             {field('Quantity', 'quantity', 'number')}
             <div className="sm:col-span-2"><Label>Notes</Label><Textarea {...register('notes')} className="mt-1" /></div>
             <div className="sm:col-span-2">
