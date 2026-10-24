@@ -27,7 +27,7 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   const [authorized, setAuthorized] = useState(false);
   const [saving, setSaving] = useState(false);
   const [done, setDone] = useState<string | null>(null);
-  type Queued = { requestId: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
+  type Queued = { existingCardId?: string; requestId: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string; imageRequested: boolean; imageUrl: string | null; };
   const [queue, setQueue] = useState<Queued[]>(() => {
     try {
       const raw = JSON.parse(localStorage.getItem('opv:quick-add:draft:v2') || '[]');
@@ -38,6 +38,11 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
   useEffect(() => {
     try { localStorage.setItem('opv:quick-add:draft:v2', JSON.stringify(queue)); } catch { /* storage unavailable */ }
   }, [queue]);
+  const [selectedExisting, setSelectedExisting] = useState<{
+    id: string; cardNumber: string; name: string; setName: string; rarity: string;
+    character: string | null; color: string | null; imageUrl: string | null;
+    quantity: number; buyCost: number; postedPrice: number; marketListingKey: string | null;
+  } | null>(null);
   const [englishName, setEnglishName] = useState('');
   const [englishCharacter, setEnglishCharacter] = useState('');
   const [results, setResults] = useState<{listingKey:string; status:string; reason?:string}[]>([]);
@@ -48,12 +53,19 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
     queryFn: () => marketPricesService.listings(debounced, source),
     enabled: open && valid, staleTime: 60_000, retry: false,
   });
+  const soldOut = useQuery({
+    queryKey: ['quick-add-sold-out', debounced],
+    queryFn: () => marketPricesService.soldOut(debounced),
+    enabled: open && valid,
+    staleTime: 10_000,
+    retry: false,
+  });
   const preview = useQuery({
     queryKey: ['quick-add-preview', debounced, source, key, notes],
     queryFn: () => marketPricesService.quickPreview({ cardNumber: debounced, source, listingKey: key, notes }),
     enabled: open && valid && !!key, staleTime: 0, retry: false,
   });
-  useEffect(() => { setKey(''); setDone(null); }, [debounced, source]);
+  useEffect(() => { setKey(''); setSelectedExisting(null); setDone(null); }, [debounced, source]);
   useEffect(() => {
     if (!preview.data) return;
     setEnglishName(preview.data.metadata.name || '');
@@ -70,25 +82,46 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
 
   const record = preview.data;
   const existing = record?.existing;
-  const canSave = !!record && Number.isInteger(Number(qty)) && Number(qty) > 0 &&
+  const canSave = !!(record || selectedExisting) && Number.isInteger(Number(qty)) && Number(qty) > 0 &&
     buy.trim() !== '' && sell.trim() !== '' && Number.isFinite(Number(buy)) &&
     Number.isFinite(Number(sell)) && Number(buy) >= 0 && Number(sell) >= 0 &&
-    englishName.trim().length > 1 && englishCharacter.trim().length > 1 &&
-    !/[\u3040-\u30ff\u3400-\u9fff]/u.test(englishName + englishCharacter) && !saving;
+    (selectedExisting !== null || (englishName.trim().length > 1 && englishCharacter.trim().length > 1 &&
+    !/[\u3040-\u30ff\u3400-\u9fff]/u.test(englishName + englishCharacter))) && !saving;
   const action = existing ? existing.quantity > 0 ? 'Add stock' : 'Reactivate listing' : 'Create listing';
 
+  function chooseExisting(item: NonNullable<typeof selectedExisting>) {
+    setKey('');
+    setSelectedExisting(item);
+    setEnglishName(item.name);
+    setEnglishCharacter(item.character || item.name);
+    setBuy(item.buyCost.toFixed(2));
+    setSell(String(item.postedPrice));
+    setCustomBuy(true); setCustomSell(true);
+    setAuthorized(false);
+  }
+
   function enqueue() {
-    if (!canSave || !record) return;
-    const item: Queued = { requestId: crypto.randomUUID(), cardNumber: debounced, source, listingKey: key, quantity: Number(qty), notes,
-      buyCost: Number(buy), postedPrice: Number(sell),
+    if (!canSave) return;
+    const item: Queued = selectedExisting ? {
+      requestId: crypto.randomUUID(), existingCardId: selectedExisting.id,
+      cardNumber: selectedExisting.cardNumber.trim().toUpperCase(),
+      source, listingKey: `existing:${selectedExisting.id}`,
+      quantity: Number(qty), notes, buyCost: Number(buy), postedPrice: Number(sell),
+      englishName: selectedExisting.name,
+      englishCharacter: selectedExisting.character || selectedExisting.name,
+      imageRequested: false, imageUrl: selectedExisting.imageUrl,
+    } : {
+      requestId: crypto.randomUUID(), cardNumber: debounced, source, listingKey: key,
+      quantity: Number(qty), notes, buyCost: Number(buy), postedPrice: Number(sell),
       englishName: englishName.trim(), englishCharacter: englishCharacter.trim(),
-      imageRequested: authorized, imageUrl: record.listing.imageUrl ?? null };
+      imageRequested: authorized, imageUrl: record!.listing.imageUrl ?? null,
+    };
     setQueue(items => {
       const old = items.find(x => x.listingKey === item.listingKey);
       return old ? items.map(x => x.listingKey === item.listingKey ? { ...x, quantity: x.quantity + item.quantity, notes: [x.notes, item.notes].filter(Boolean).join(' · ') } : x) : [...items, item];
     });
     setKey(''); setNumber(''); setQty('1'); setNotes(''); setBuy(''); setSell('');
-    setCustomBuy(false); setCustomSell(false); setAuthorized(false);
+    setCustomBuy(false); setCustomSell(false); setAuthorized(false); setSelectedExisting(null);
     toast.success('Added to queue. No stock changed yet.');
   }
 
@@ -128,14 +161,44 @@ export function QuickAddCard({ open, onOpenChange }: { open: boolean; onOpenChan
           <div><Label>Card number</Label><div className="relative mt-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" /><Input autoFocus value={number} onChange={e => setNumber(e.target.value.toUpperCase())} placeholder="OP01-120" className="pl-9" /></div></div>
           <div><Label>Price / card catalog</Label><Select value={source} className="mt-1 w-full" onChange={e => setSource(e.target.value as MarketSource)}><option value="YUYUTEI">Yuyu-tei</option><option value="CARDRUSH">Cardrush</option><option value="TCGPLAYER">TCGplayer</option></Select></div>
         </div>
-        {!valid && <p className="text-xs text-muted-foreground">Enter a full card number to load variants.</p>}
+        {!valid && <p className="text-xs text-muted-foreground">Enter a full card number to load variants and find sold-out inventory.</p>}
+        {soldOut.isLoading && valid && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Checking your sold-out listings…</p>}
+        {soldOut.isError && <p className="text-xs text-destructive">Couldn't check existing stock: {apiError(soldOut.error).message}</p>}
+        {!!soldOut.data?.length && <section className="space-y-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+          <div className="text-sm font-semibold">Already in your inventory · sold out ({soldOut.data.length})</div>
+          <p className="text-[11px] text-muted-foreground">Select the exact existing artwork to reactivate its listing and keep its current uploaded image. Marketplace links remain unchanged.</p>
+          <div className="grid max-h-[220px] grid-cols-2 gap-2 overflow-y-auto sm:grid-cols-4">
+            {soldOut.data.map(item => <button type="button" key={item.id}
+              onClick={() => chooseExisting(item)}
+              aria-pressed={selectedExisting?.id === item.id}
+              className={`min-w-0 rounded-lg border p-2 text-left ${selectedExisting?.id === item.id ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'bg-card hover:bg-muted'}`}>
+              <div className="flex h-24 items-center justify-center overflow-hidden rounded bg-muted/40">
+                {item.imageUrl ? <img src={item.imageUrl} alt={item.name} loading="lazy" className="h-full w-full object-contain" /> : <span className="text-xs text-muted-foreground">No saved image</span>}
+              </div>
+              <p className="mt-1 line-clamp-2 text-xs font-medium" title={item.name}>{item.name}</p>
+              <p className="truncate text-[10px] text-muted-foreground">{item.setName} · {item.rarity}</p>
+              <p className="text-[10px] text-primary">{item.imageUrl ? 'Saved photo retained' : 'Reuse listing without photo'}</p>
+            </button>)}
+          </div>
+        </section>}
+        {selectedExisting && <section className="space-y-3 rounded-lg border border-primary/30 p-3">
+          <div className="flex items-center justify-between gap-2"><b className="min-w-0 truncate text-sm">{selectedExisting.name}</b><span className="shrink-0 rounded bg-primary/10 px-2 py-1 text-xs">Reactivate old listing</span></div>
+          <p className="text-xs text-muted-foreground">Your original image, card details, and marketplace link will be kept. You can edit prices and quantity for this new batch.</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div><Label>Quantity to add</Label><Input className="mt-1" type="number" min="1" step="1" value={qty} onChange={e => setQty(e.target.value)} /></div>
+            <div><Label>Buying cost (₱)</Label><Input className="mt-1" type="number" min="0" step=".01" value={buy} onChange={e => {setBuy(e.target.value);setCustomBuy(true);}} /></div>
+            <div><Label>Selling price (₱)</Label><Input className="mt-1" type="number" min="0" step="1" value={sell} onChange={e => {setSell(e.target.value);setCustomSell(true);}} /></div>
+          </div>
+          <div><Label>Notes (optional)</Label><Textarea rows={2} className="mt-1" value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Condition, language, additional notes…" /></div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => {setSelectedExisting(null);setBuy('');setSell('');setCustomBuy(false);setCustomSell(false);}}>Select a source artwork instead</Button>
+        </section>}
         {listings.isFetching && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Looking up printings…</p>}
         {listings.isError && <p className="text-xs text-destructive">Source lookup unavailable: {apiError(listings.error).message}</p>}
         {listings.data?.length === 0 && <p className="text-xs text-muted-foreground">No matching listings found. Try another source.</p>}
         {!!listings.data?.length && <section className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground">{listings.data.length} variants · select the exact artwork</div>
           <div className="grid max-h-[260px] grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain sm:grid-cols-5 sm:gap-2">
-            {listings.data.map(item => <button type="button" key={item.listingKey} onClick={() => { setKey(item.listingKey); setCustomBuy(false); setCustomSell(false); setAuthorized(false); }} className={`min-w-0 rounded-lg border p-1.5 text-left ${key === item.listingKey ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'bg-card hover:bg-muted'}`} aria-pressed={key === item.listingKey}>
+            {listings.data.map(item => <button type="button" key={item.listingKey} onClick={() => { setSelectedExisting(null); setKey(item.listingKey); setCustomBuy(false); setCustomSell(false); setAuthorized(false); }} className={`min-w-0 rounded-lg border p-1.5 text-left ${key === item.listingKey ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'bg-card hover:bg-muted'}`} aria-pressed={key === item.listingKey}>
               <div className="flex h-24 items-center justify-center overflow-hidden rounded bg-muted/40 sm:h-32">{item.imageUrl ? <img src={item.imageUrl} alt={item.name} referrerPolicy="no-referrer" loading="lazy" className="h-full w-full object-contain" /> : <span className="text-center text-[10px]">No image</span>}</div>
               <p className="mt-1 truncate text-[11px] font-semibold" title={item.name}>{item.name}</p><p className="truncate text-[10px] text-muted-foreground">{item.rarity ?? '—'} · {item.price} {item.currency}</p>
             </button>)}

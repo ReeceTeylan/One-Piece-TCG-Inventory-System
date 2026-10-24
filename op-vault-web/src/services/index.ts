@@ -93,13 +93,20 @@ export const marketPricesService = {
   // Sync refreshes prices of linked cards; Link new stock finds listings for never-linked cards.
   sync: () => api.post('/market-prices/sync').then(unwrap<MarketSync>),
   linkNew: () => api.post('/market-prices/link-new').then(unwrap<MarketSync>),
+  soldOut: (cardNumber: string) =>
+    api.get('/market-prices/quick-add/sold-out', { params: { cardNumber } }).then(unwrap<{
+      id: string; cardNumber: string; name: string; setName: string; rarity: string;
+      character: string | null; color: string | null; imageUrl: string | null;
+      marketListingKey: string | null; quantity: number;
+      buyCost: number; postedPrice: number;
+    }[]>),
   quickPreview: (params: { cardNumber: string; source: MarketSource; listingKey: string; notes?: string }) =>
     api.get('/market-prices/quick-add/preview', { params }).then(unwrap<{
       cardNumber: string; listing: MarketCandidate; metadata: { name: string; character: string; setName: string; rarity: string; color: string | null };
       buyCost: number; postedPrice: number | null; purchaseRate: number; rate: number | null;
       existing: { id: string; name: string; quantity: number; postedPrice: number; buyCost: number; hasImage: boolean } | null;
     }>),
-  quickAddBatch: (dto: { items: { requestId?: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes?: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string }[] }) =>
+  quickAddBatch: (dto: { items: { existingCardId?: string; requestId?: string; cardNumber: string; source: MarketSource; listingKey: string; quantity: number; notes?: string; buyCost: number; postedPrice: number; englishName: string; englishCharacter: string }[] }) =>
     api.post('/market-prices/quick-add/batch', dto).then(unwrap<{
       total: number; succeeded: number; results: { listingKey: string; status: string; cardId?: string; hasImage?: boolean; reason?: string }[];
     }>),
