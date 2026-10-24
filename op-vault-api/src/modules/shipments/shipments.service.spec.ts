@@ -33,7 +33,7 @@ describe('ShipmentsService', () => {
 
   it('rejects an invalid status transition', async () => {
     prisma.shipment.findUnique.mockResolvedValue({ id: 'sh1', status: 'TO_PACK', sale: { customer: {} } });
-    await expect(service.update('sh1', { status: 'DELIVERED' } as any, 'u1')).rejects.toThrow(BadRequestException);
+    await expect(service.update('sh1', { status: 'SHIPPED' } as any, 'u1')).rejects.toThrow(BadRequestException);
   });
 
   it('allows a valid transition and writes a timeline event', async () => {

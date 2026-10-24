@@ -26,9 +26,9 @@ export class NotificationsController {
 
   @Patch(':id/read')
   @ApiOperation({ summary: 'Mark one notification as read' })
-  read(@Param('id') id: string) { return this.service.markRead(id); }
+  read(@Param('id') id: string, @CurrentUser('id') userId: string) { return this.service.markRead(id, userId); }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Dismiss (delete) a notification' })
-  dismiss(@Param('id') id: string) { return this.service.dismiss(id); }
+  dismiss(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('role') role: string) { return this.service.dismiss(id, userId, role); }
 }

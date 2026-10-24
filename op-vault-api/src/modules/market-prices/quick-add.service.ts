@@ -70,6 +70,18 @@ export class QuickAddService {
   }
 
   async add(dto: QueuedQuickAddItemDto, userId: string) {
+    // Resolve a completed request before relying on a marketplace that may be temporarily down.
+    if (dto.requestId) {
+      const prior = await this.prisma.quickAddReceipt.findUnique({ where: { id: dto.requestId } });
+      if (prior) {
+        if (prior.listingKey !== dto.listingKey || prior.userId !== userId)
+          throw new ConflictException('Request ID already belongs to another listing');
+        const card = await this.prisma.rawCard.findUnique({ where: { id: prior.cardId } });
+        if (!card) throw new ConflictException('Original card was removed. Please review inventory.');
+        const image = await this.prisma.cardImage.findFirst({ where: { rawCardId: card.id }, select: { id: true } });
+        return { action: prior.action, card, hasImage: !!image };
+      }
+    }
     const notesInput = (dto.notes ?? '').trim();
     const notes = dto.source === 'TCGPLAYER' && !/\b(?:english|eng)\b/i.test(notesInput)
       ? [notesInput, 'English'].filter(Boolean).join(' · ') : notesInput;
